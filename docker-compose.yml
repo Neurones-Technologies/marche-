@@ -1,0 +1,13 @@
+services:
+  marcheplus:
+    build: .
+    ports: ["3000:3000"]
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?définir JWT_SECRET (ex. openssl rand -hex 32)}
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
+      SHOW_DEMO_ACCOUNTS: ${SHOW_DEMO_ACCOUNTS:-0}
+      SEED_DEMO: ${SEED_DEMO:-1}
+    volumes: ["marcheplus-data:/data"]
+    restart: unless-stopped
+volumes:
+  marcheplus-data:
