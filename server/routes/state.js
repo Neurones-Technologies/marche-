@@ -112,14 +112,16 @@ r.post('/offers', needPerm('portail.use'), (req, res) => {
   if (errs.length) return res.status(422).json({ error: errs.join(' ') });
 
   const docDefs = kvGet('docDefs').value;
-  const docs = {};
-  docDefs.forEach((x) => { docs[x.id] = !!(d.docs && d.docs[x.id]); });
-  // pièces non exigées pour ce profil : considérées fournies (même règle que requiredDocs côté interface)
+  const pending = db.prepare('SELECT * FROM files WHERE owner=? AND offer_id IS NULL').all(req.user.id);
+  const byDoc = new Map(pending.map((f) => [f.doc_id, f]));
   const isLocal = d.iso === 'CI', isUemoa = org.uemoa.includes(d.iso);
+  const docs = {}, missing = [];
   docDefs.forEach((x) => {
     const need = x.scope === 'tous' ? true : x.scope === 'local' ? isLocal : !isUemoa;
-    if (!need) docs[x.id] = true;
+    docs[x.id] = need ? byDoc.has(x.id) : true; // pièce non exigée pour ce profil : considérée fournie
+    if (need && !byDoc.has(x.id)) missing.push(x.label);
   });
+  if (missing.length) return res.status(422).json({ error: 'Pièces manquantes : ' + missing.join(' ; ') + '.' });
   const sep = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   const id = 'sub' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const offer = {
@@ -137,7 +139,9 @@ r.post('/offers', needPerm('portail.use'), (req, res) => {
   };
   let receipt;
   db.transaction(() => {
+    offer.pieces = pending.filter((f) => docs[f.doc_id] === true).map((f) => ({ id: f.id, doc: f.doc_id, name: f.name, size: f.size, sha256: f.sha256 }));
     offerInsert(offer, true);
+    db.prepare('UPDATE files SET offer_id=? WHERE owner=? AND offer_id IS NULL').run(id, req.user.id);
     const q = kvGet('quality').value; q[id] = { metho: offer.aiMetho, refs: offer.aiRefs }; kvSet('quality', q, req.user.id);
     const n = db.prepare('SELECT COUNT(*) c FROM receipts').get().c + 1;
     receipt = { num: 'DEP-' + String(n).padStart(4, '0'), name, pays: offer.pays, t: frDate(), montant: sep(montant) + ' ' + d.devise, lots: lots.length };

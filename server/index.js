@@ -20,14 +20,16 @@ app.use(helmet({
     },
   },
 }));
-app.use(express.json({ limit: '1mb' }));
+app.use((req, res, next) => (req.path.startsWith('/api/files') ? next() : express.json({ limit: '1mb' })(req, res, next)));
 
 // Les requêtes d'écriture doivent être du JSON (protection CSRF complémentaire au cookie SameSite=Strict)
 app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/files')) return next();
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !req.is('application/json')) return res.status(415).json({ error: 'JSON requis.' });
   next();
 });
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/files', require('./routes/files'));
 app.use('/api', require('./routes/state'));
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Route inconnue.' }));

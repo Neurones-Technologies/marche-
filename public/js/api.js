@@ -15,7 +15,18 @@
       });
     });
   }
-  window.MP = { api: api };
+  function upload(url, file) {
+    return fetch(url, { method: 'POST', credentials: 'same-origin', body: file,
+      headers: { 'Content-Type': 'application/octet-stream', 'x-filename': encodeURIComponent(file.name) } })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (r.status === 401) showLogin('Session expirée, reconnectez-vous.');
+          if (!r.ok) { var e = new Error(j.error || ('Erreur ' + r.status)); e.status = r.status; throw e; }
+          return j;
+        });
+      });
+  }
+  window.MP = { api: api, upload: upload };
 
   function showLogin(msg) {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }

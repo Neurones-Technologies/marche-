@@ -65,9 +65,21 @@ En production : `SEED_DEMO=0` (pas de comptes de démo), `ALLOW_RESET=0`, HTTPS 
 
 > GitHub Pages ne convient plus : le projet nécessite le serveur Node.
 
+## Pièces jointes
+
+Le soumissionnaire téléverse chaque pièce exigée dans le portail (PDF, PNG, JPG, DOCX, XLSX, 10 Mo max par défaut,
+`MAX_FILE_MB`). Le format est vérifié sur le contenu du fichier, une empreinte SHA-256 est enregistrée, et le dépôt de
+l'offre est refusé si une pièce exigée manque. Les acheteurs téléchargent les pièces depuis « Réception des offres »
+(chaque consultation est consignée à l'audit). Les fichiers sont dans `data/files` (ou `FILES_DIR`) : à sauvegarder
+avec la base.
+
+## Écrans d'administration
+
+- **Comptes utilisateurs** : création, rôle, activation/désactivation, réinitialisation du mot de passe.
+- **Piste d'audit** : bouton de vérification d'intégrité de la chaîne de hachage.
+
 ## Limites connues
 
-- Les pièces jointes ne sont pas stockées : « Joindre la pièce » reste déclaratif, comme dans le prototype.
 - L'extraction IA des offres (scores, champs à confiance faible) reste celle des données de démonstration.
 - Les courriels sont simulés (journalisés, non envoyés).
-- Pas d'écran d'administration des comptes (création / désactivation par API uniquement).
+- Le classement, la conformité automatique et les anomalies sont encore calculés dans le navigateur.

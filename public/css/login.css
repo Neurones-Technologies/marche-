@@ -17,3 +17,7 @@
 .dlg form{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:8px}
 .dlg input{min-height:42px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font:inherit}
 .dlg .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.tbl{border-collapse:collapse}
+.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 10px}
+.tbl td{padding:9px 10px;border-top:1px solid var(--line-2);font-size:13px;vertical-align:middle}
+.tbl select{min-height:36px}

@@ -6,7 +6,7 @@ const { slug } = require('../db');
 const cfg = require('../config');
 
 const r = express.Router();
-const limiter = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Trop de tentatives. Réessayez dans une minute.' } });
+const limiter = rateLimit({ windowMs: 60_000, limit: Number(process.env.LOGIN_RATE_LIMIT) || 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Trop de tentatives. Réessayez dans une minute.' } });
 
 const pub = (u) => ({ id: u.id, nom: u.nom, email: u.email, role: u.role, roleLab: u.roleLab });
 
@@ -67,10 +67,17 @@ r.post('/users', requireAuth, needPerm('roles.edit'), (req, res) => {
 });
 
 r.patch('/users/:id', requireAuth, needPerm('roles.edit'), (req, res) => {
-  const { active, password } = req.body || {};
+  const { active, password, role } = req.body || {};
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!u) return res.status(404).json({ error: 'Utilisateur introuvable.' });
   if (u.id === req.user.id && active === false) return res.status(422).json({ error: 'Vous ne pouvez pas désactiver votre propre compte.' });
+  if (role !== undefined) {
+    const roles = require('../db').kvGet('roles').value;
+    if (!roles[role]) return res.status(422).json({ error: 'Rôle inconnu.' });
+    if (u.id === req.user.id && role !== u.role) return res.status(422).json({ error: 'Vous ne pouvez pas modifier votre propre rôle.' });
+    db.prepare('UPDATE users SET role=? WHERE id=?').run(role, u.id);
+    auditAppend(req.user.id, whoLabel(req.user), `Rôle modifié — ${u.nom} : ${u.role} → ${role}`);
+  }
   if (typeof active === 'boolean') db.prepare('UPDATE users SET active=? WHERE id=?').run(active ? 1 : 0, u.id);
   if (password) {
     if (String(password).length < 10) return res.status(422).json({ error: '10 caractères minimum.' });

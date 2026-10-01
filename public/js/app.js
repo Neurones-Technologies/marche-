@@ -943,6 +943,7 @@ var VIEWS=[
   {id:'pv',        label:'Procès-verbal',            grp:'Décision', perm:'pv.read'},
   {id:'audit',     label:"Piste d'audit",            grp:'Décision', perm:'audit.read'},
   {id:'roles',     label:'Rôles et habilitations',   grp:'Administration', perm:'roles.edit'},
+  {id:'comptes',   label:'Comptes utilisateurs',     grp:'Administration', perm:'roles.edit'},
   {id:'params',    label:'Paramètres',               grp:'Administration', perm:'params.edit'},
   {id:'regles',    label:'Règles de notification',   grp:'Administration', perm:'notif.manage'}
 ];
@@ -1389,6 +1390,14 @@ function vReception(m){
     if(o.devise!=='XOF') add(rg,'span','chip c-violet', sep(o.montant)+' '+o.devise+' → '+xof(montantXOF(o)));
     var seuilC=Number(state.seuils.confianceMin);
     add(rg,'span','chip '+(avg>=seuilC?'c-green':'c-amber'),'Confiance '+avg+' % (seuil '+seuilC+' %)');
+    if(o.pieces && o.pieces.length){
+      var pc=add(row,'div'); pc.style.cssText='margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center';
+      add(pc,'span','muted','Pièces déposées :');
+      o.pieces.forEach(function(f){
+        var a=add(pc,'a','pill',f.name+' · '+taille(f.size)); a.href='/api/files/'+f.id; a.setAttribute('download',f.name); a.title='SHA-256 '+f.sha256;
+        a.setAttribute('aria-label','Télécharger '+f.name);
+      });
+    }
     var bar=add(row,'div','bar'); bar.style.marginTop='10px';
     var sp=add(bar,'span'); sp.style.width=avg+'%'; if(avg<seuilC) sp.style.background='var(--amber-line)';
   });
@@ -1825,6 +1834,16 @@ function vAudit(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,"Piste d'audit");
   add(l,'p','lede',"Journal horodaté de toutes les actions de la procédure. C'est cette trace qui permet de démontrer, en cas de recours devant l'organe de régulation, que chaque score retenu a été validé ou corrigé par une personne identifiée.");
+  var vb=add(m,'div'); vb.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px';
+  var vbtn=add(vb,'button','btn btn-ghost btn-sm',"Vérifier l'intégrité du journal");
+  var vres=add(vb,'span','chip c-grey','Non vérifié'); vres.setAttribute('role','status');
+  vbtn.addEventListener('click',function(){
+    vbtn.disabled=true;
+    MP.api('GET','/api/audit/verify').then(function(r){
+      vres.className='chip '+(r.ok?'c-green':'c-red');
+      vres.textContent=r.ok ? 'Intact — '+r.entries+' entrée(s) chaînée(s), empreinte '+r.head.slice(0,12)+'…' : 'ALTÉRÉ à l’entrée n° '+r.brokenAt;
+    }).catch(function(e){ vres.className='chip c-red'; vres.textContent=e.message; }).then(function(){ vbtn.disabled=false; });
+  });
   var card=add(m,'div','card');
   add(card,'div','panel-head','Journal — '+state.audit.length+' entrée(s)');
   var b=add(card,'div','pad');
@@ -1837,8 +1856,19 @@ function vAudit(m){
   });
 }
 
+var PIECES_OK=false;
+function taille(n){ return n>=1048576 ? (n/1048576).toFixed(1).replace('.',',')+' Mo' : Math.max(1,Math.round(n/1024))+' Ko'; }
 function vPortail(m){
   var c=state.cdc, d=state.draft;
+  if(!d.files) d.files={};
+  if(!PIECES_OK){
+    PIECES_OK=true;
+    MP.api('GET','/api/files/mine').then(function(list){
+      d.files={}; Object.keys(d.docs).forEach(function(k){ d.docs[k]=false; });
+      list.forEach(function(f){ d.files[f.doc]=f; d.docs[f.doc]=true; });
+      if(state.view==='portail') render();
+    }).catch(function(){});
+  }
   var PAYS=[['CI','Côte d\u2019Ivoire'],['BF','Burkina Faso'],['SN','Sénégal'],['ML','Mali'],['BJ','Bénin'],
     ['TG','Togo'],['NE','Niger'],['GW','Guinée-Bissau'],['GH','Ghana'],['NG','Nigeria'],['GN','Guinée'],
     ['MA','Maroc'],['TN','Tunisie'],['FR','France'],['DE','Allemagne'],['CN','Chine'],['IN','Inde'],
@@ -1930,16 +1960,35 @@ function vPortail(m){
     return !uem;
   });
   req.forEach(function(doc){
-    var on=!!d.docs[doc.id];
+    var meta=(d.files||{})[doc.id], on=!!meta;
     var row=add(b3,'div','docline');
     var lf=add(row,'div');
     add(lf,'div',null,doc.label).style.fontWeight='600';
-    add(lf,'div','muted', doc.id==='caution' ? 'Montant : '+c.caution+' % du montant de l\u2019offre' :
-      (doc.id==='contreGarantie' ? 'Émise ou contre-garantie par un établissement agréé dans l\u2019UEMOA' :
+    add(lf,'div','muted', doc.id==='caution' ? 'Montant : '+c.caution+' % du montant de l’offre' :
+      (doc.id==='contreGarantie' ? 'Émise ou contre-garantie par un établissement agréé dans l’UEMOA' :
       (doc.id==='traduction' ? 'Traduction française certifiée conforme' : 'Pièce exigée au règlement de consultation')));
-    var btn=add(row,'button','pill'+(on?' on':''), on?'Pièce jointe ✓':'Joindre la pièce');
-    btn.setAttribute('aria-pressed', on?'true':'false'); fk(btn,'doc-'+doc.id);
-    btn.addEventListener('click',function(){ d.docs[doc.id]=!on; save(); render(); });
+    if(on) add(lf,'div','muted','Fichier : '+meta.name+' ('+taille(meta.size)+') · empreinte '+meta.sha256.slice(0,12)+'…').title=meta.sha256;
+    var act=add(row,'div'); act.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    var inp=el('input'); inp.type='file'; inp.accept='.pdf,.png,.jpg,.jpeg,.docx,.xlsx'; inp.hidden=true; inp.setAttribute('aria-label','Choisir le fichier : '+doc.label);
+    act.appendChild(inp);
+    var btn=add(act,'button','pill'+(on?' on':''), on?'Remplacer le fichier':'Joindre la pièce'); fk(btn,'doc-'+doc.id);
+    btn.addEventListener('click',function(){ inp.click(); });
+    inp.addEventListener('change',function(){
+      var f=inp.files&&inp.files[0]; if(!f) return;
+      if(f.size>10*1024*1024){ toast('Fichier trop volumineux (10 Mo maximum).'); return; }
+      btn.disabled=true; btn.textContent='Envoi…';
+      MP.upload('/api/files?doc='+encodeURIComponent(doc.id), f).then(function(m){
+        d.files=d.files||{}; d.files[doc.id]=m; d.docs[doc.id]=true; toast('Pièce jointe enregistrée.'); save(); render();
+      }).catch(function(e){ toast(e.message||'Envoi impossible.'); render(); });
+    });
+    if(on){
+      var rm=add(act,'button','btn btn-ghost btn-sm','Retirer');
+      rm.setAttribute('aria-label','Retirer le fichier : '+doc.label);
+      rm.addEventListener('click',function(){
+        MP.api('DELETE','/api/files/'+meta.id).then(function(){ delete d.files[doc.id]; d.docs[doc.id]=false; save(); render(); })
+          .catch(function(e){ toast(e.message||'Suppression impossible.'); });
+      });
+    }
   });
   var non = DOCS().filter(function(x){ return req.indexOf(x)<0; });
   if(non.length){
@@ -2002,7 +2051,7 @@ function vPortail(m){
         (offer.devise!=='XOF' ? " soit "+xof(montantXOF(offer)) : "")+". Lots : "+d.lots.length+".");
       state.audit.unshift({t:receipt.t, who:me().nom, a:'Dépôt enregistré — '+offer.name+' ('+offer.pays+') — accusé '+receipt.num});
       toast('Offre déposée — accusé '+receipt.num);
-      state.draft={ name:'', iso:d.iso, devise:d.devise, montant:'', delai:'', garantie:'', refsCount:'', lots:[], docs:{} };
+      state.draft={ name:'', iso:d.iso, devise:d.devise, montant:'', delai:'', garantie:'', refsCount:'', lots:[], docs:{}, files:{} };
       save(); render();
     }).catch(function(err){ sub.disabled=false; toast(err.message||'Dépôt impossible.'); });
   });
@@ -2085,6 +2134,77 @@ function vNotifs(m){
 }
 
 /* ============ Rôles et habilitations ============ */
+function vComptes(m){
+  if(!can('roles.edit')) return denyBox(m,'roles.edit');
+  var h=add(m,'div','head'); var l=add(h,'div');
+  add(l,'h1',null,'Comptes utilisateurs');
+  add(l,'p','lede',"Création, rôle, activation et réinitialisation de mot de passe. Toute action est consignée dans la piste d'audit. Un compte désactivé perd son accès immédiatement.");
+
+  var card=add(m,'div','card');
+  add(card,'div','panel-head','Comptes');
+  var body=add(card,'div','pad'); add(body,'p','muted','Chargement…');
+  var me0=state.me;
+  function msg(t){ toast(t); }
+  function charger(){
+    MP.api('GET','/api/auth/users').then(function(list){
+      body.textContent='';
+      var tbl=add(body,'table','tbl'); tbl.style.width='100%';
+      var thr=add(add(tbl,'thead'),'tr');
+      ['Nom','Courriel','Rôle','Statut','Dernière connexion','Actions'].forEach(function(t){ add(thr,'th',null,t).style.textAlign='left'; });
+      var tb=add(tbl,'tbody');
+      list.forEach(function(u){
+        var tr=add(tb,'tr'); tr.style.opacity=u.active?'1':'.55';
+        add(tr,'td',null,u.nom).style.fontWeight='600';
+        add(tr,'td',null,u.email);
+        var tdr=add(tr,'td'); var sel=add(tdr,'select'); sel.setAttribute('aria-label','Rôle de '+u.nom);
+        Object.keys(state.roles).forEach(function(r){ var o=add(sel,'option',null,state.roles[r].lab); o.value=r; if(r===u.role) o.selected=true; });
+        sel.disabled = u.id===me0;
+        sel.addEventListener('change',function(){
+          MP.api('PATCH','/api/auth/users/'+u.id,{role:sel.value}).then(function(){ msg('Rôle modifié — '+u.nom); return MP.api('GET','/api/state'); })
+            .then(function(p){ var us=p.state.users; state.users=us; synced.users=JSON.stringify(us); charger(); })
+            .catch(function(e){ msg(e.message); charger(); });
+        });
+        var st=add(add(tr,'td'),'span','chip '+(u.active?'c-green':'c-grey'),u.active?'Actif':'Désactivé');
+        add(tr,'td','muted',u.last_login?u.last_login.replace('T',' ')+' UTC':'Jamais');
+        var ta=add(tr,'td'); ta.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+        var tg=add(ta,'button','btn btn-ghost btn-sm',u.active?'Désactiver':'Réactiver'); tg.disabled=u.id===me0;
+        tg.addEventListener('click',function(){
+          ask(u.active?u.nom+" perdra immédiatement l'accès à la plateforme.":u.nom+' retrouvera son accès.', function(){
+            MP.api('PATCH','/api/auth/users/'+u.id,{active:!u.active}).then(function(){ msg(u.active?'Compte désactivé.':'Compte réactivé.'); charger(); }).catch(function(e){ msg(e.message); });
+          }, u.active?'Désactiver ce compte ?':'Réactiver ce compte ?', u.active?'Désactiver':'Réactiver');
+        });
+        var rp=add(ta,'button','btn btn-ghost btn-sm','Réinitialiser le mot de passe'); rp.setAttribute('aria-label','Réinitialiser le mot de passe de '+u.nom);
+        rp.addEventListener('click',function(){
+          var pw=window.prompt('Nouveau mot de passe provisoire pour '+u.nom+' (10 caractères minimum) :');
+          if(!pw) return;
+          MP.api('PATCH','/api/auth/users/'+u.id,{password:pw}).then(function(){ msg('Mot de passe réinitialisé — à transmettre à '+u.nom+' par un canal sûr.'); }).catch(function(e){ msg(e.message); });
+        });
+      });
+      labelize(tbl);
+    }).catch(function(e){ body.textContent=''; add(body,'p','muted',e.message); });
+  }
+  charger();
+
+  var k2=add(m,'div','card'); k2.style.marginTop='18px';
+  add(k2,'div','panel-head','Créer un compte');
+  var f=add(add(k2,'div','pad'),'div','frm');
+  function champ(lab,type,ph){ var w=add(f,'div'); var id='c'+Math.random().toString(36).slice(2,8); add(w,'label',null,lab).setAttribute('for',id); var i=add(w,'input'); i.id=id; i.type=type; if(ph) i.placeholder=ph; return i; }
+  var nom=champ('Nom','text','Ex. K. Yao'), mail=champ('Courriel','email','prenom.nom'+(state.mailSuffix||'@exemple.ci')), pw=champ('Mot de passe initial','password','10 caractères minimum');
+  var rw=add(f,'div'); add(rw,'label',null,'Rôle').setAttribute('for','nc-role'); var rs=add(rw,'select'); rs.id='nc-role';
+  Object.keys(state.roles).forEach(function(r){ var o=add(rs,'option',null,state.roles[r].lab); o.value=r; });
+  if(state.roles.audit) rs.value='audit'; /* moindre privilège par défaut */
+  var ft=add(k2,'div','panel-foot');
+  add(ft,'span','muted','Le titulaire doit changer ce mot de passe à sa première connexion (bouton « Mot de passe » en haut de l\u2019écran).');
+  var go=add(ft,'button','btn btn-primary','Créer le compte');
+  go.addEventListener('click',function(){
+    go.disabled=true;
+    MP.api('POST','/api/auth/users',{nom:nom.value.trim(), email:mail.value.trim(), role:rs.value, password:pw.value}).then(function(u){
+      msg('Compte créé — '+u.nom); nom.value=''; mail.value=''; pw.value='';
+      return MP.api('GET','/api/state').then(function(p){ state.users=p.state.users; synced.users=JSON.stringify(p.state.users); });
+    }).then(charger).catch(function(e){ msg(e.message); }).then(function(){ go.disabled=false; });
+  });
+}
+
 function vRoles(m){
   if(!can('roles.edit')) return denyBox(m,'roles.edit');
   var h=add(m,'div','head'); var l=add(h,'div');
@@ -2656,7 +2776,7 @@ function coiBanner(m){
   return true;
 }
 
-var ROUTER={dashboard:vDashboard, notifs:vNotifs, roles:vRoles, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
+var ROUTER={dashboard:vDashboard, notifs:vNotifs, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit};
 
 function render(){
@@ -2701,7 +2821,7 @@ resetBtn.addEventListener('click',function(){
   }, 'Réinitialiser la démonstration ?', 'Tout effacer');
 });
 window.MarchePlus = {
-  start:function(p){ state=null; synced={}; applyServer(p,false); resetBtn.style.display = can('params.edit')||can('roles.edit') ? '' : 'none'; render(); },
+  start:function(p){ PIECES_OK=false; state=null; synced={}; applyServer(p,false); resetBtn.style.display = can('params.edit')||can('roles.edit') ? '' : 'none'; render(); },
   poll:poll,
   stop:function(){ if(flushTimer) clearTimeout(flushTimer); state=null; synced={}; dirty=false; }
 };

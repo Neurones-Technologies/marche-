@@ -1,5 +1,6 @@
 process.env.DB_FILE = ':memory:';
 process.env.NODE_ENV = 'test';
+process.env.LOGIN_RATE_LIMIT = '1000';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const app = require('../index');
@@ -13,6 +14,11 @@ async function call(method, url, body, cookie) {
   const res = await fetch(base + url, { method, headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) }, body: body ? JSON.stringify(body) : undefined });
   return { status: res.status, json: await res.json().catch(() => ({})), cookie: (res.headers.get('set-cookie') || '').split(';')[0] };
 }
+async function upload(doc, name, buf, cookie) {
+  const res = await fetch(base + '/api/files?doc=' + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: buf });
+  return { status: res.status, json: await res.json().catch(() => ({})) };
+}
+const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');
 async function login(email) { const r = await call('POST', '/api/auth/login', { email, password: PW }); assert.equal(r.status, 200); return r.cookie; }
 
 test('connexion refusée avec un mauvais mot de passe', async () => {
@@ -38,12 +44,29 @@ test('publication du CDC puis dépôt d’offre avec accusé et audit', async ()
   const soum = await login('contact.sotrap@bal.ci');
   const bad = await call('POST', '/api/offers', { name: 'X', iso: 'CI', devise: 'XOF', montant: -5, lots: ['l1'] }, soum);
   assert.equal(bad.status, 422);
-  const ok = await call('POST', '/api/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', montant: 91000000, delai: 90, garantie: 24, refsCount: 4, lots: ['l1', 'l2'], docs: {} }, soum);
+  const noFiles = await call('POST', '/api/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', montant: 91000000, delai: 90, garantie: 24, refsCount: 4, lots: ['l1', 'l2'] }, soum);
+  assert.equal(noFiles.status, 422);
+  assert.match(noFiles.json.error, /Pièces manquantes/);
+  assert.equal((await upload('registre', 'virus.exe', Buffer.from('MZ....'), soum)).status, 415);
+  assert.equal((await upload('registre', 'faux.pdf', Buffer.from('pas un pdf'), soum)).status, 415);
+  const evalCookie = await login('f.assamoi@bal.ci');
+  assert.equal((await upload('registre', 'a.pdf', PDF, evalCookie)).status, 403);
+  for (const d of ['registre', 'fiscal', 'cnps', 'caution']) assert.equal((await upload(d, d + '.pdf', PDF, soum)).status, 201);
+  const ok = await call('POST', '/api/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', montant: 91000000, delai: 90, garantie: 24, refsCount: 4, lots: ['l1', 'l2'] }, soum);
   assert.equal(ok.status, 201);
   assert.match(ok.json.receipt.num, /^DEP-\d{4}$/);
   const after = (await call('GET', '/api/state', null, achats)).json.state;
   assert.ok(after.offers.some((o) => o.name === 'SOTRAP SARL'));
   assert.ok(after.audit.some((e) => e.a.includes('Dépôt enregistré')));
+  const piece = after.offers.find((o) => o.name === 'SOTRAP SARL').pieces[0];
+  const dl = await fetch(base + '/api/files/' + piece.id, { headers: { cookie: achats } });
+  assert.equal(dl.status, 200);
+  assert.equal(dl.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(dl.headers.get('content-disposition'), /attachment/);
+  const dl2 = await fetch(base + '/api/files/' + piece.id, { headers: { cookie: soum } });
+  assert.equal(dl2.status, 200); // le déposant retrouve ses propres pièces
+  const other = await login('s.bamba@bal.ci');
+  assert.equal((await fetch(base + '/api/files/' + piece.id, { headers: { cookie: other } })).status, 200); // lecteur des offres
 });
 
 test('notation : déclaration de conflit d’intérêts obligatoire, une seule fois par personne', async () => {
@@ -102,4 +125,18 @@ test('un administrateur ne peut pas se retirer la gestion des rôles', async () 
 test('requêtes d’écriture non JSON refusées', async () => {
   const res = await fetch(base + '/api/audit', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'a=1' });
   assert.equal(res.status, 415);
+});
+
+test('gestion des comptes : création, changement de rôle, désactivation', async () => {
+  const admin = await login('administrateur@bal.ci');
+  const made = await call('POST', '/api/auth/users', { nom: 'K. Nouveau', email: 'k.nouveau@bal.ci', role: 'audit', password: 'Initial2026ok' }, admin);
+  assert.equal(made.status, 201);
+  assert.equal((await call('POST', '/api/auth/users', { nom: 'K. Nouveau', email: 'k.nouveau@bal.ci', role: 'audit', password: 'Initial2026ok' }, admin)).status, 409);
+  const l = await call('POST', '/api/auth/login', { email: 'k.nouveau@bal.ci', password: 'Initial2026ok' });
+  assert.equal(l.status, 200);
+  assert.equal((await call('PATCH', '/api/auth/users/' + made.json.id, { role: 'evaltech' }, admin)).status, 200);
+  assert.equal((await call('PATCH', '/api/auth/users/' + made.json.id, { active: false }, admin)).status, 200);
+  assert.equal((await call('GET', '/api/state', null, l.cookie)).status, 401); // session coupée aussitôt
+  const buyer = await login('y.koffi@bal.ci');
+  assert.equal((await call('POST', '/api/auth/users', { nom: 'X', role: 'audit', password: 'Initial2026ok' }, buyer)).status, 403);
 });
