@@ -1,0 +1,197 @@
+/* Marché+ — Écran Cahier des charges.
+   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
+"use strict";
+
+function vCDC(m){
+  var c=state.cdc;
+  var h=add(m,'div','head'); var l=add(h,'div');
+  add(l,'h1',null,'Cahier des charges');
+  add(l,'p','lede',"Construction du dossier d'appel d'offres : objet, allotissement, spécifications, pièces exigées selon l'origine du soumissionnaire, régime fiscal et douanier, préférence communautaire. Ces paramètres alimentent ensuite tout le reste de la procédure.");
+  var pb=add(h,'button','btn '+(c.cdcPublie?'btn-ghost':'btn-primary'), c.cdcPublie?'Cahier des charges publié ✓':'Publier le cahier des charges');
+  pb.disabled=c.cdcPublie; guard('cdc.publish',pb);
+  pb.addEventListener('click',function(){
+    ask('Le dossier devient opposable aux candidats et le portail de dépôt s\u2019ouvre.', function(){
+      c.cdcPublie=true; logit('Cahier des charges publié — ouverture aux soumissions');
+      notify('cdc.publie', 'Cahier des charges publié',
+        "Le dossier d'appel d'offres "+REF()+" est publié. Objet : "+c.objet+". Date limite de dépôt : "+c.ouverture+" à 10 h 00.");
+      save(); render();
+    }, 'Publier le cahier des charges ?', 'Publier');
+  });
+
+  /* Identification */
+  var k1=add(m,'div','card'); add(k1,'div','panel-head','1 · Identification de la procédure');
+  var f1=add(add(k1,'div','pad'),'div','frm');
+  function txt(parent,lab,val,cb,type){
+    var w=add(parent,'div'); var id='f'+Math.random().toString(36).slice(2,8);
+    var lb=add(w,'label',null,lab); lb.setAttribute('for',id);
+    var i=add(w,type==='textarea'?'textarea':'input'); i.id=id;
+    if(type==='number'){ i.type='number'; } else if(type!=='textarea'){ i.type='text'; }
+    if(type==='textarea'){ i.rows=2; }
+    i.value=val; fk(i,'cdc-'+lab.slice(0,16));
+    i.addEventListener('change',function(){ cb(i.value); save(); render(); });
+    return i;
+  }
+  txt(f1,"Référence de la procédure",c.ref,function(v){ c.ref=String(v).trim(); logit('Référence de la procédure : '+c.ref); });
+  txt(f1,"Objet du marché",c.objet,function(v){ c.objet=v; logit('Objet du marché modifié'); },'textarea').style.gridColumn='1/-1';
+  txt(f1,"Autorité contractante",c.autorite,function(v){ c.autorite=v; });
+  txt(f1,"Type de procédure",c.procedure,function(v){ c.procedure=v; });
+  (function(){
+    var w=add(f1,'div'); add(w,'label',null,'Profil réglementaire').setAttribute('for','cdc-profil');
+    var s=add(w,'select'); s.id='cdc-profil'; fk(s,'cdc-profil');
+    Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(s,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
+    s.value=R.profilId(RCTX());
+    s.disabled=!!c.cdcPublie;
+    s.addEventListener('change',function(){ c.profil=s.value; logit('Profil réglementaire de la procédure : '+MPProfils.profil(s.value).lab); save(); render(); });
+    if(c.cdcPublie) add(w,'div','muted','Figé à la publication du dossier.');
+  })();
+  txt(f1,"Langue de soumission",c.langue,function(v){ c.langue=v; });
+  txt(f1,"Devise de soumission",c.deviseSoumission,function(v){ c.deviseSoumission=v; });
+  txt(f1,"Date d'ouverture des plis",c.ouverture,function(v){ c.ouverture=v; });
+
+  /* Allotissement */
+  var k2=add(m,'div','card'); k2.style.marginTop='18px';
+  add(k2,'div','panel-head','2 · Allotissement');
+  var b2=add(k2,'div','pad');
+  c.lots.forEach(function(lot,i){
+    var row=add(b2,'div','lot');
+    var n=add(row,'input'); n.type='text'; n.value=lot.nom; n.style.flex='2 1 260px';
+    n.setAttribute('aria-label','Intitulé du lot');
+    n.addEventListener('change',function(){ lot.nom=n.value; save(); });
+    var mt=add(row,'input'); mt.type='text'; mt.value=lot.montant; mt.style.flex='1 1 150px';
+    mt.setAttribute('aria-label','Montant estimatif du lot');
+    mt.addEventListener('change',function(){ lot.montant=mt.value; save(); });
+    var d=add(row,'button','icon-btn','×'); d.setAttribute('aria-label','Supprimer le lot');
+    d.addEventListener('click',function(){
+      ask('Le lot « '+lot.nom+' » sera retiré du cahier des charges et du dossier généré.', function(){
+        c.lots.splice(i,1); logit('Lot supprimé du cahier des charges'); save(); render();
+      }, 'Supprimer ce lot ?', 'Supprimer');
+    });
+  });
+  var f2=add(k2,'div','panel-foot');
+  add(f2,'span','muted','Un marché alloti permet aux PME locales de soumissionner sur un lot sans porter l\u2019ensemble du marché.');
+  add(f2,'button','btn btn-ghost btn-sm','+ Ajouter un lot').addEventListener('click',function(){
+    c.lots.push({id:'l'+Date.now(), nom:'Nouveau lot', montant:'— XOF'});
+    logit('Lot ajouté au cahier des charges'); save(); render();
+  });
+
+  /* Spécifications */
+  var k3=add(m,'div','card'); k3.style.marginTop='18px';
+  add(k3,'div','panel-head','3 · Spécifications techniques');
+  var b3=add(k3,'div','pad');
+  c.specs.forEach(function(s,i){
+    var row=add(b3,'div','lot');
+    var t=add(row,'input'); t.type='text'; t.value=s; t.style.flex='1 1 320px';
+    t.setAttribute('aria-label','Spécification technique');
+    t.addEventListener('change',function(){ c.specs[i]=t.value; save(); });
+    var d=add(row,'button','icon-btn','×'); d.setAttribute('aria-label','Supprimer la spécification');
+    d.addEventListener('click',function(){
+      ask('Cette exigence disparaîtra du CCTP et ne sera plus opposable aux soumissionnaires.', function(){
+        c.specs.splice(i,1); logit('Spécification technique supprimée'); save(); render();
+      }, 'Supprimer cette spécification ?', 'Supprimer');
+    });
+  });
+  var f3=add(k3,'div','panel-foot');
+  add(f3,'span','muted','Rédigez des spécifications fonctionnelles neutres : citer une marque restreint la concurrence et fragilise la procédure.');
+  add(f3,'button','btn btn-ghost btn-sm','+ Ajouter une spécification').addEventListener('click',function(){
+    c.specs.push('Nouvelle spécification'); save(); render();
+  });
+
+  /* Conditions */
+  var k4=add(m,'div','card'); k4.style.marginTop='18px';
+  add(k4,'div','panel-head','4 · Conditions administratives et financières');
+  var f4=add(add(k4,'div','pad'),'div','frm');
+  txt(f4,"Caution de soumission (% du montant)",c.caution,function(v){ c.caution=Number(v)||0; logit('Taux de caution porté à '+v+' %'); },'number');
+  txt(f4,"Garantie minimale exigée (mois)",c.garantieMin,function(v){ c.garantieMin=Number(v)||0; logit('Garantie minimale portée à '+v+' mois'); },'number');
+  txt(f4,"Délai d'exécution maximal (jours)",c.delaiMax,function(v){ c.delaiMax=Number(v)||0; logit('Délai maximal porté à '+v+' jours'); },'number');
+  txt(f4,"Pénalité de retard (‰ par jour)",c.penalite,function(v){ c.penalite=Number(v)||0; },'number');
+  txt(f4,"Avance de démarrage (%)",c.avance,function(v){ c.avance=Number(v)||0; },'number');
+
+  /* Fiscal */
+  var k5=add(m,'div','card'); k5.style.marginTop='18px';
+  add(k5,'div','panel-head','5 · Régime fiscal et douanier');
+  var f5=add(add(k5,'div','pad'),'div','frm');
+  txt(f5,"TVA applicable (%)",c.tva,function(v){ c.tva=Number(v)||0; },'number');
+  txt(f5,"Retenue à la source — non-résidents (%)",c.retenueNonResident,function(v){ c.retenueNonResident=Number(v)||0; },'number');
+  txt(f5,"Droits et taxes à l'importation à la charge de",c.douaneACharge,function(v){ c.douaneACharge=v; });
+  var w5=add(add(k5,'div','pad'),'div','warn'); w5.style.marginTop='0';
+  add(w5,'strong',null,'Pourquoi ce bloc compte pour les offres étrangères. ');
+  w5.appendChild(document.createTextNode("Une offre hors zone peut paraître moins-disante et se révéler plus chère une fois la retenue à la source et les droits d'entrée intégrés. Le cahier des charges doit dire explicitement qui les supporte, sinon la comparaison entre offres locales et étrangères n'a pas de base commune."));
+
+  /* Préférence */
+  var k6=add(m,'div','card'); k6.style.marginTop='18px';
+  add(k6,'div','panel-head','6 · Préférence communautaire UEMOA');
+  var b6=add(k6,'div','pad');
+  var row6=add(b6,'div'); row6.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap';
+  var K=CADRE();
+  var pill=add(row6,'button','pill'+(c.prefActive?' on':''), c.prefActive?'Marge de préférence activée':'Marge de préférence désactivée');
+  pill.disabled=!K.preferenceAutorisee && !c.prefActive;
+  pill.addEventListener('click',function(){
+    c.prefActive=!c.prefActive;
+    logit('Marge de préférence communautaire '+(c.prefActive?'activée':'désactivée'));
+    save(); render();
+  });
+  var wr=add(row6,'div');
+  var lb=add(wr,'label',null,'Taux (%)'); lb.setAttribute('for','preftaux');
+  lb.style.cssText='font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;display:block';
+  var pi=add(wr,'input'); pi.id='preftaux'; pi.type='number'; pi.min='0'; pi.max=String(K.preferenceTauxMax); pi.value=c.prefTaux; pi.style.width='110px';
+  pi.disabled=!c.prefActive;
+  pi.addEventListener('change',function(){
+    c.prefTaux=Math.max(0,Math.min(K.preferenceTauxMax,Number(pi.value)||0));
+    logit('Taux de préférence communautaire porté à '+c.prefTaux+' %'); save(); render();
+  });
+  if(state.depClosed){
+    pill.disabled=true; pi.disabled=true;
+    add(b6,'p','muted',"Dépouillement clôturé : la marge est figée, elle conditionne le classement.").style.marginTop='12px';
+  }
+  add(b6,'p','muted', K.preferenceAutorisee
+    ? 'Profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » : taux de '+K.preferenceTauxMax+' % au plus.'
+    : 'Le profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » n’autorise pas de marge de préférence.').style.marginTop='12px';
+  add(b6,'p','muted',"Mécanisme : les offres de soumissionnaires établis hors de l'espace communautaire sont majorées du taux retenu pour les seuls besoins de la comparaison. Le prix contractuel du titulaire reste son prix d'offre.").style.marginTop='12px';
+
+  /* Pièces */
+  var k7=add(m,'div','card'); k7.style.marginTop='18px';
+  add(k7,'div','panel-head','7 · Pièces exigées du dossier de candidature');
+  var b7=add(k7,'div','pad');
+  DOCS().forEach(function(d){
+    var row=add(b7,'div','docline');
+    var lf=add(row,'div');
+    add(lf,'div',null,d.label).style.fontWeight='600';
+    add(lf,'div','muted', d.scope==='tous'?'Exigée de tous les soumissionnaires'
+      : (d.scope==='local'?'Exigée des soumissionnaires établis en Côte d\u2019Ivoire'
+      : 'Exigée des soumissionnaires établis hors zone UEMOA'));
+    add(row,'span','chip '+(d.scope==='tous'?'c-grey':(d.scope==='local'?'c-teal':'c-violet')),
+      d.scope==='tous'?'Tous':(d.scope==='local'?'Local':'Étranger'));
+  });
+  add(add(k7,'div','panel-foot'),'span','muted',"Le dossier d'un soumissionnaire étranger n'est pas « allégé » : il est différent. Exiger une attestation CNPS d'une entreprise allemande n'a pas de sens ; exiger une contre-garantie bancaire locale et une traduction certifiée en a un.");
+
+  /* Aperçu DAO */
+  var k8=add(m,'div','card'); k8.style.marginTop='18px';
+  var ph8=add(k8,'div','panel-head'); add(ph8,'span',null,'8 · Génération du dossier d\u2019appel d\u2019offres');
+  var gob=add(ph8,'button','btn btn-primary btn-sm','Générer le dossier complet →');
+  gob.addEventListener('click',function(){ logit('Dossier d\u2019appel d\u2019offres généré'); go('dao'); });
+  var prb=add(ph8,'button','btn btn-ghost btn-sm','Imprimer l\u2019extrait');
+  prb.addEventListener('click',function(){ imprimer(); });
+  var b8=add(k8,'div','pad'); var pv=add(b8,'div','pv');
+  add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — '+REF()).style.cssText='font-weight:700;font-size:15px;color:var(--ink)';
+  add(pv,'p',null, c.autorite+' — '+c.procedure+' — langue : '+c.langue+' — ouverture des plis : '+c.ouverture);
+  add(pv,'h4',null,'Objet'); add(pv,'p',null,c.objet);
+  add(pv,'h4',null,'Allotissement');
+  var u1=add(pv,'ul'); c.lots.forEach(function(x){ add(u1,'li',null, x.nom+' — estimation : '+x.montant); });
+  add(pv,'h4',null,'Spécifications techniques');
+  var u2=add(pv,'ul'); c.specs.forEach(function(x){ add(u2,'li',null,x); });
+  add(pv,'h4',null,'Conditions');
+  add(pv,'p',null,'Caution de soumission : '+c.caution+' % du montant de l\u2019offre · Garantie minimale : '+c.garantieMin+' mois · Délai maximal : '+c.delaiMax+' jours · Pénalité de retard : '+c.penalite+' ‰ par jour · Avance de démarrage : '+c.avance+' %.');
+  add(pv,'h4',null,'Régime fiscal et douanier');
+  add(pv,'p',null,'TVA : '+c.tva+' % · Retenue à la source applicable aux non-résidents : '+c.retenueNonResident+' % · Droits et taxes à l\u2019importation à la charge de : '+c.douaneACharge+'.');
+  add(pv,'h4',null,'Préférence communautaire');
+  add(pv,'p',null, c.prefActive ? 'Une marge de préférence de '+c.prefTaux+' % est appliquée aux fins de comparaison en faveur des soumissionnaires établis dans l\u2019espace UEMOA.' : 'Aucune marge de préférence communautaire n\u2019est appliquée.');
+  add(pv,'h4',null,'Critères d\u2019évaluation');
+  add(pv,'p',null, state.criteria.map(function(x){ return x.label+' ('+x.weight+' %)'; }).join(' · '));
+  add(pv,'h4',null,'Pièces exigées');
+  var u3=add(pv,'ul');
+  DOCS().forEach(function(d){ add(u3,'li',null, d.label+' — '+(d.scope==='tous'?'tous soumissionnaires':(d.scope==='local'?'soumissionnaires locaux':'soumissionnaires hors UEMOA'))); });
+
+  var n=add(m,'div','note');
+  add(n,'strong',null,'Ce module produit un projet, pas un acte juridique. ');
+  n.appendChild(document.createTextNode("Le dossier généré doit être relu par le juriste de l'autorité contractante et mis en conformité avec le code des marchés publics applicable et, le cas échéant, les procédures du bailleur de fonds, qui priment sur tout gabarit logiciel."));
+}

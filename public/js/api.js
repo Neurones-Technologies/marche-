@@ -1,4 +1,4 @@
-/* Client API + écran de connexion. app.js (chargé ensuite) expose window.MarchePlus. */
+/* Client API + écran de connexion. Les scripts de js/app/ (chargés ensuite) exposent window.MarchePlus. */
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };

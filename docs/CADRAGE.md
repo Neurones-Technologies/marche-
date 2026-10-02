@@ -267,7 +267,22 @@ obligatoire et les délais minimaux de remise des offres.
   Un parcours dans Chrome (confirmations, note, justification, approbation par les boutons) a révélé et fait corriger
   une approbation envoyée sans corps JSON, refusée par la protection CSRF.
 
-Reste pour l'étape 2 : le **découpage d'`app.js`**. Restes du prototype
+### Étape 2, troisième incrément : découpage de l'interface, réalisé le 02/10/2026
+
+- L'ancien `public/js/app.js` (3 225 lignes) est découpé en 23 fichiers sous `public/js/app/` : `noyau.js`,
+  `composants.js`, un fichier par écran dans `ecrans/`, et `demarrage.js` chargé en dernier. Le code est
+  inchangé : un contrôle a vérifié que les 3 053 lignes non vides se retrouvent toutes, une fois chacune.
+- **Scripts classiques plutôt que modules ES** : les fonctions de premier niveau restent communes à tous les
+  fichiers, comme dans l'ancienne fermeture unique. Passer en modules aurait demandé d'expliciter des centaines de
+  dépendances croisées ; cela peut se faire plus tard, fichier par fichier. Aucun nom de premier niveau ne masque une
+  propriété de `window` (vérifié dans Chrome). Convention et procédure d'ajout d'un écran :
+  [public/js/app/LISEZMOI.md](../public/js/app/LISEZMOI.md).
+- Vérification : les 21 écrans du menu s'affichent sans erreur en administrateur, les 4 du soumissionnaire aussi,
+  et les parcours dans le navigateur (profils, procédures, écritures ciblées) passent.
+
+**L'étape 2 (socle) est terminée.** Prochaine étape : le moteur de circuits paramétrables (étape 3).
+
+Restes du prototype
 repérés en chemin, non traités : le calendrier du tableau de bord (dates écrites en dur) et le texte « Prototype de
 démonstration » de son introduction ; le jeu de démonstration AO-2026-014 est créé même quand `SEED_DEMO=0`.
 

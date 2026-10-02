@@ -1,0 +1,189 @@
+/* Marché+ — Écran Paramètres (dont le cadre réglementaire).
+   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
+"use strict";
+
+/* ============ Paramètres ============ */
+function vParams(m){
+  if(!can('params.edit')) return denyBox(m,'params.edit');
+  var o=state.org, sx=state.seuils;
+  var h=add(m,'div','head'); var l=add(h,'div');
+  add(l,'h1',null,'Paramètres');
+  add(l,'p','lede',"Tout ce qui varie d'une organisation à l'autre se règle ici : identité, devises, seuils de détection, pièces exigibles et circuit d'approbation. Aucune de ces valeurs n'est codée en dur dans les écrans.");
+
+  function champ(parent,lab,val,cb,type,opts){
+    var w=add(parent,'div'); var id='s'+Math.random().toString(36).slice(2,8);
+    add(w,'label',null,lab).setAttribute('for',id);
+    var i=add(w, type==='select'?'select':'input'); i.id=id; fk(i,'par-'+lab.slice(0,16));
+    if(type==='select'){ (opts||[]).forEach(function(x){ var op=add(i,'option',null,x[1]); op.value=x[0]; }); i.value=val; }
+    else { i.type=(type==='number'?'number':(type==='color'?'color':'text')); i.value=val; }
+    i.addEventListener('change',function(){ cb(i.value); save(); render(); });
+    return i;
+  }
+
+  var k1=add(m,'div','card'); add(k1,'div','panel-head','1 · Organisation');
+  var f1=add(add(k1,'div','pad'),'div','frm');
+  champ(f1,'Raison sociale',o.nom,function(v){ o.nom=v; state.cdc.autorite=v; logit('Raison sociale modifiée'); });
+  champ(f1,'Pays',o.pays,function(v){ o.pays=v; });
+  champ(f1,'Ville',o.ville,function(v){ o.ville=v; });
+  champ(f1,'Initiales (badge)',o.initiales,function(v){ o.initiales=v.slice(0,3).toUpperCase(); });
+  champ(f1,'Devise pivot',o.devisePivot,function(v){ o.devisePivot=v.toUpperCase(); },'select',[['XOF','Franc CFA (XOF)'],['XAF','Franc CFA CEMAC (XAF)'],['GHS','Cedi (GHS)'],['NGN','Naira (NGN)']]);
+  champ(f1,"Couleur d'accent",o.accent,function(v){ o.accent=v; logit('Couleur d\u2019accent modifiée'); },'color');
+
+  var k2=add(m,'div','card'); k2.style.marginTop='18px';
+  var ph2=add(k2,'div','panel-head'); add(ph2,'span',null,'2 · Taux de conversion');
+  add(ph2,'span','chip c-grey','Arrêtés à la date d\u2019ouverture des plis');
+  var f2=add(add(k2,'div','pad'),'div','frm');
+  Object.keys(o.rates).forEach(function(d){
+    if(d===o.devisePivot) return;
+    champ(f2,'1 '+d+' = ? '+o.devisePivot, o.rates[d], function(v){
+      o.rates[d]=Number(v)||o.rates[d]; logit('Taux '+d+' porté à '+o.rates[d]);
+    },'number');
+  });
+  add(add(k2,'div','panel-foot'),'span','muted','La parité EUR/XOF est fixe ; les autres taux sont à relever auprès de la banque centrale à la date d\u2019ouverture et à figer pour toute la procédure.');
+  if(state.fxFrozen){
+    var fz=add(add(k2,'div','pad'),'div','note'); fz.style.marginTop='0';
+    add(fz,'strong',null,'Taux de la procédure figés le '+state.fxFrozen.at+'. ');
+    fz.appendChild(document.createTextNode("Une modification ci-dessus ne change plus le classement en cours, calculé avec les taux figés : "+
+      Object.keys(state.fxFrozen.rates).filter(function(k){ return k!==o.devisePivot; }).map(function(k){ return k+' '+state.fxFrozen.rates[k]; }).join(', ')+'.'));
+  }
+
+  var k3=add(m,'div','card'); k3.style.marginTop='18px';
+  add(k3,'div','panel-head','3 · Seuils de détection et de contrôle');
+  var f3=add(add(k3,'div','pad'),'div','frm');
+  champ(f3,'Confiance minimale d\u2019extraction (%)',sx.confianceMin,function(v){ sx.confianceMin=Number(v)||0; logit('Seuil de confiance porté à '+sx.confianceMin+' %'); },'number');
+  champ(f3,'Écart déclenchant « prix bas » (%)',sx.prixBas,function(v){ sx.prixBas=Number(v)||0; logit('Seuil de prix anormalement bas porté à '+sx.prixBas+' %'); },'number');
+  champ(f3,'Écart max. structures de prix (points)',sx.structureEcart,function(v){ sx.structureEcart=Number(v)||0; },'number');
+  champ(f3,'Références minimales exigées',sx.refsMin,function(v){ sx.refsMin=Number(v)||0; },'number');
+  champ(f3,'Validité minimale des offres (jours)',sx.validiteMin,function(v){ sx.validiteMin=Number(v)||0; },'number');
+  add(add(k3,'div','panel-foot'),'span','muted','Abaisser le seuil de confiance réduit le nombre de vérifications manuelles — et augmente le risque qu\u2019un montant mal extrait fausse le classement. Ce réglage engage l\u2019organisation.');
+
+  var k4=add(m,'div','card'); k4.style.marginTop='18px';
+  add(k4,'div','panel-head','4 · Pièces exigibles du dossier de candidature');
+  var b4=add(k4,'div','pad');
+  state.docDefs.forEach(function(d,i){
+    var row=add(b4,'div','docline');
+    var ti=add(row,'input'); ti.type='text'; ti.value=d.label; ti.style.flex='1 1 280px';
+    ti.setAttribute('aria-label','Libellé de la pièce'); fk(ti,'doc-lab-'+d.id);
+    ti.addEventListener('change',function(){ d.label=ti.value; save(); });
+    var se=add(row,'select'); se.setAttribute('aria-label','Profil concerné'); fk(se,'doc-scope-'+d.id);
+    [['tous','Tous les soumissionnaires'],['local','Soumissionnaires locaux'],['etranger','Soumissionnaires hors UEMOA']].forEach(function(x){
+      var op=add(se,'option',null,x[1]); op.value=x[0];
+    });
+    se.value=d.scope;
+    se.addEventListener('change',function(){ d.scope=se.value; logit('Pièce « '+d.label+' » : profil concerné modifié'); save(); render(); });
+    var del=add(row,'button','icon-btn','×'); del.setAttribute('aria-label','Supprimer la pièce '+d.label);
+    if(CADRE().piecesImposees.indexOf(d.id)>=0){ del.disabled=true; del.title='Pièce exigée par le profil réglementaire'; }
+    del.addEventListener('click',function(){
+      ask('Cette pièce ne sera plus exigée ni contrôlée sur aucune offre.', function(){
+        state.docDefs.splice(i,1); logit('Pièce retirée du référentiel : '+d.label); save(); render();
+      },'Retirer « '+d.label+' » ?','Retirer');
+    });
+  });
+  var f4b=add(k4,'div','panel-foot');
+  add(f4b,'span','muted','Le contrôle de conformité et le portail de dépôt se reconfigurent automatiquement sur ce référentiel.');
+  add(f4b,'button','btn btn-ghost btn-sm','+ Ajouter une pièce').addEventListener('click',function(){
+    state.docDefs.push({id:'d'+Date.now(), label:'Nouvelle pièce exigée', scope:'tous'});
+    SEED_OFFERS.forEach(function(oo){ oo.docs['d'+0]=true; });
+    logit('Pièce ajoutée au référentiel'); save(); render();
+  });
+
+  var k5=add(m,'div','card'); k5.style.marginTop='18px';
+  add(k5,'div','panel-head','5 · Circuit d\u2019approbation de la procédure '+REF());
+  var b5=add(k5,'div','pad');
+  var rk=Object.keys(state.roles);
+  state.approvals.forEach(function(a,i){
+    var row=add(b5,'div','docline');
+    var lf=add(row,'div'); lf.style.flex='1 1 240px';
+    var ti=add(lf,'input'); ti.type='text'; ti.value=a.role; ti.style.width='100%';
+    ti.setAttribute('aria-label','Intitulé du niveau'); fk(ti,'appr-lab-'+i);
+    ti.addEventListener('change',function(){ a.role=ti.value; save(); });
+    var wi=add(lf,'input'); wi.type='text'; wi.value=a.who; wi.style.cssText='width:100%;margin-top:6px';
+    wi.setAttribute('aria-label','Titulaire du niveau'); fk(wi,'appr-who-'+i);
+    wi.addEventListener('change',function(){ a.who=wi.value; save(); });
+    var up=add(row,'button','icon-btn','↑'); up.setAttribute('aria-label','Remonter ce niveau');
+    up.disabled = i===0;
+    up.addEventListener('click',function(){
+      var t=state.approvals[i-1]; state.approvals[i-1]=state.approvals[i]; state.approvals[i]=t;
+      logit('Ordre du circuit d\u2019approbation modifié'); save(); render();
+    });
+    var del=add(row,'button','icon-btn','×'); del.setAttribute('aria-label','Supprimer ce niveau');
+    del.addEventListener('click',function(){
+      var nmin=Math.max(1,CADRE().niveauxApprobationMin);
+      if(state.approvals.length<=nmin){ toast('Le profil réglementaire exige au moins '+nmin+' niveau(x) d’approbation.'); return; }
+      ask('Ce niveau de validation disparaîtra du circuit et du procès-verbal.', function(){
+        state.approvals.splice(i,1); logit('Niveau d\u2019approbation supprimé : '+a.role); save(); render();
+      },'Supprimer « '+a.role+' » ?','Supprimer');
+    });
+  });
+  var f5=add(k5,'div','panel-foot');
+  add(f5,'span','muted',state.approvals.length+' niveau(x) configuré(s). L\u2019ordre détermine la séquence d\u2019approbation. Une nouvelle procédure part du circuit par défaut.');
+  add(f5,'button','btn btn-ghost btn-sm','Enregistrer comme circuit par défaut').addEventListener('click',function(){
+    state.circuitModele=state.approvals.map(function(a){ return {role:a.role, who:a.who}; });
+    logit('Circuit d\u2019approbation par défaut : '+state.circuitModele.map(function(a){ return a.role; }).join(' → ')); save(); render();
+  });
+  add(f5,'button','btn btn-ghost btn-sm','+ Ajouter un niveau').addEventListener('click',function(){
+    state.approvals.push({role:'Nouveau niveau de validation', who:'À désigner', done:false});
+    logit('Niveau d\u2019approbation ajouté'); save(); render();
+  });
+
+  var k6=add(m,'div','card'); k6.style.marginTop='18px';
+  add(k6,'div','panel-head','6 · Messagerie');
+  var f6=add(add(k6,'div','pad'),'div','frm');
+  champ(f6,'Adresse expéditrice',state.mailFrom,function(v){ state.mailFrom=v; });
+  champ(f6,'Domaine des destinataires',state.mailSuffix,function(v){ state.mailSuffix=v; });
+  vParamsCadre(m,o);
+  add(add(k6,'div','panel-foot'),'span','muted','Aucun message n\u2019est réellement expédié dans cette maquette : la boîte d\u2019envoi restitue ce qui partirait.');
+}
+
+/* Cadre réglementaire : profil par défaut et réglages du client, dans les bornes du profil (profils.js). */
+function vParamsCadre(m,o){
+  var P=MPProfils, pid=R.profilId({ cdc:state.cdc, org:o }), prof=P.profil(pid);
+  var eff=P.effectif(pid,o.reglages);
+  var k7=add(m,'div','card'); k7.style.marginTop='18px';
+  var ph=add(k7,'div','panel-head'); add(ph,'span',null,'7 · Cadre réglementaire');
+  add(ph,'span','chip '+(prof.public?'c-violet':'c-teal'), prof.lab);
+  var b=add(k7,'div','pad');
+  var w=add(add(b,'div','frm'),'div');
+  add(w,'label',null,'Profil par défaut des nouvelles procédures').setAttribute('for','par-profil');
+  var s=add(w,'select'); s.id='par-profil'; fk(s,'par-profil');
+  Object.keys(P.PROFILS).forEach(function(id){ var op=add(s,'option',null,P.PROFILS[id].lab); op.value=id; });
+  s.value=o.profilDefaut||P.DEFAUT;
+  s.addEventListener('change',function(){ o.profilDefaut=s.value; logit('Profil réglementaire par défaut : '+P.profil(s.value).lab); save(); render(); });
+  add(b,'p','muted','Règles du profil « '+prof.lab+' », celui de la procédure en cours. '+prof.note).style.marginTop='12px';
+  if(state.cadre) add(b,'div','note','Le cadre de la procédure '+REF()+' a été figé à sa publication, le '+state.cadre.at+' : un réglage modifié ici ne s’appliquera qu’aux procédures publiées ensuite.');
+  var lab=function(id){ var d=DOCS().filter(function(x){ return x.id===id; })[0]; return d?d.label:id; };
+  P.REGLES.forEach(function(def){
+    var r=prof.regles[def.id], v=eff[def.id];
+    var row=add(b,'div','docline');
+    var lf=add(row,'div'); lf.style.flex='1 1 260px';
+    add(lf,'div',null,def.lab).style.fontWeight='600';
+    if(def.type==='pieces' && !v.length){ add(lf,'div','muted','Aucune : toutes les pièces du référentiel peuvent être retirées.'); return; }
+    if(r.impose){
+      add(lf,'div','muted', def.type==='bool' ? (v?'Oui':'Non') : def.type==='liste-pays' ? v.join(', ')
+        : def.type==='pieces' ? (v.length ? v.map(lab).join(' ; ') : 'Aucune') : String(v));
+      add(row,'span','chip c-grey','Imposé par le profil');
+      return;
+    }
+    var set=function(val,aff){ o.reglages=o.reglages||{}; o.reglages[def.id]=val; logit('Réglage « '+def.lab+' » : '+aff); save(); render(); };
+    if(def.type==='bool'){
+      var p=add(row,'button','pill'+(v?' on':''), v?'Oui':'Non'); fk(p,'rg-'+def.id);
+      p.setAttribute('aria-pressed',v?'true':'false'); p.setAttribute('aria-label',def.lab);
+      p.addEventListener('click',function(){ set(!v, v?'non':'oui'); });
+      return;
+    }
+    var i=add(row,'input'); i.setAttribute('aria-label',def.lab); fk(i,'rg-'+def.id);
+    if(def.type==='nombre'){
+      i.type='number'; i.min=r.min; i.max=r.max; i.value=v; i.style.width='110px';
+      add(lf,'div','muted','Entre '+r.min+' et '+r.max+'.');
+    } else {
+      i.type='text'; i.value = def.type==='liste-pays' ? v.join(', ') : v; i.style.flex='1 1 200px';
+      add(lf,'div','muted', def.type==='liste-pays' ? 'Codes pays à deux lettres, séparés par des virgules.' : 'Code pays à deux lettres.');
+    }
+    i.addEventListener('change',function(){
+      var val = def.type==='nombre' ? Number(i.value)
+        : def.type==='liste-pays' ? i.value.toUpperCase().split(/[\s,;]+/).filter(Boolean) : i.value.trim().toUpperCase();
+      set(val, Array.isArray(val) ? val.join(', ') : String(val));
+    });
+  });
+  add(add(k7,'div','panel-foot'),'span','muted','Les valeurs du profil public sont à faire valider par un juriste marchés publics avant tout usage réel.');
+}

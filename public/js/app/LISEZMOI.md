@@ -1,0 +1,30 @@
+# Interface de Marché+ : organisation des scripts
+
+L'interface est en JavaScript natif, sans framework ni étape de build. Elle est découpée en **scripts classiques**
+(pas des modules ES), chargés par `public/index.html` **dans cet ordre** :
+
+1. `noyau.js` : référentiels, état synchronisé avec l'API (envoi en bloc, écritures ciblées), aides DOM
+   (`add`, `el`…), habilitations (`can`), notifications, cycle de vie de la procédure, navigation (`go`, menu).
+2. `composants.js` : composants de présentation partagés (icônes, pastilles, bandeaux, frise des étapes) et
+   bandeau de déclaration de conflit d'intérêts.
+3. `ecrans/*.js` : un fichier par écran, chacun définissant sa fonction `vNomDeLEcran(m)`.
+4. `demarrage.js` : table des écrans (`ROUTER`), rendu, événements globaux et point d'entrée `window.MarchePlus`.
+   Il doit rester **le dernier**.
+
+Avant eux, `profils.js`, `regles.js` (partagés avec le serveur) et `api.js` (connexion, appels à l'API).
+
+## Règles
+
+- Les fonctions et variables de premier niveau sont **communes à tous les fichiers** (portée globale de la page),
+  comme elles l'étaient dans l'ancien `app.js` unique. Un fichier ne doit exécuter aucun code au chargement qui
+  dépende d'un fichier chargé après lui ; les écrans ne font que définir des fonctions.
+- Un nom de premier niveau ne doit pas masquer une propriété de `window` (`name`, `status`, `open`, `close`…).
+  Le découpage du 02/10/2026 a été vérifié sans collision.
+- Chaque fichier commence par `"use strict";`.
+
+## Ajouter un écran
+
+1. Créer `ecrans/mon-ecran.js` avec `function vMonEcran(m){ … }`.
+2. L'ajouter dans `index.html`, avant `demarrage.js`.
+3. Déclarer l'écran dans `VIEWS` (`noyau.js`), son icône dans `NAV_ICONS` (`composants.js`) et sa fonction dans
+   `ROUTER` (`demarrage.js`).

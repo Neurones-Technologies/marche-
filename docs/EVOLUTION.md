@@ -193,5 +193,6 @@ forme des tables.
 - **Les valeurs réglementaires** (taux de préférence, retenue à la source, délai de recours, pièces exigibles).
   Elles sont déjà paramétrables, mais les valeurs par défaut doivent être validées par un juriste
   marchés publics, par pays et par bailleur.
-- **Le découpage de `app.js`** en un fichier par écran (modules natifs `<script type="module">`, sans build) :
+- **Le découpage de `app.js`** : **réalisé le 02/10/2026**, en scripts classiques plutôt qu'en modules natifs
+  (voir CADRAGE.md, étape 2). Estimation d'origine, en un fichier par écran (modules natifs, sans build) :
   utile pendant le lot C, environ 2 à 3 jours.

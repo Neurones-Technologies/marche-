@@ -10,7 +10,8 @@ servie par un vrai backend avec comptes, droits et base de données.
 ## Architecture
 
 ```
-public/            front (HTML/CSS/JS sans build) : index.html, css/, js/api.js (connexion, API), js/app.js (vues),
+public/            front (HTML/CSS/JS sans build) : index.html, css/, js/api.js (connexion, API),
+                   js/app/ (noyau, composants, un fichier par écran, démarrage : voir js/app/LISEZMOI.md),
                    js/regles.js (calculs métier, partagés avec le serveur), js/profils.js (profils réglementaires)
 server/
   index.js         Express, helmet (CSP), service du front
