@@ -335,24 +335,44 @@ function defaultOrgKv() {
   };
 }
 
+/** Compte administrateur initial d'une instance sans démonstration : ADMIN_EMAIL, ADMIN_NOM, ADMIN_PASSWORD ;
+    sans ADMIN_PASSWORD, un mot de passe aléatoire est tiré et affiché une seule fois dans le journal du serveur. */
+function adminInitial() {
+  const email = String(process.env.ADMIN_EMAIL || 'administrateur@localhost').trim().toLowerCase();
+  let mdp = process.env.ADMIN_PASSWORD, tire = false;
+  if (!mdp) { mdp = crypto.randomBytes(12).toString('base64').replace(/[+/=]/g, '') + 'Aa1'; tire = true; }
+  db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)').run('u0', String(process.env.ADMIN_NOM || 'Administrateur').trim(), email, 'admin', bcrypt.hashSync(mdp, 10));
+  if (tire) console.log(`Compte administrateur initial : ${email} — mot de passe : ${mdp} (à changer dès la première connexion).`);
+}
+
 function seedAll(withUsers = true) {
   const tx = db.transaction(() => {
     db.exec('DELETE FROM kv; DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins; DELETE FROM commandes; DELETE FROM partenaires; DELETE FROM jetons; UPDATE users SET partenaire_id=NULL;');
-    for (const [k, v] of Object.entries(defaultOrgKv())) kvSet(k, v, 'seed');
-    // procédure de démonstration : AO-2026-014, publiée telle que dans le prototype, avec ses offres
-    const demo = procDefaults(clone(seed.CDC));
-    seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
-    procedureInsert('p1', demo, 'seed');
-    seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));
+    const org = defaultOrgKv();
+    if (!cfg.seedDemo) {
+      // instance réelle : l'organisation est nommée par l'environnement, sans aucune donnée fictive
+      const nom = String(process.env.ORG_NOM || 'Mon organisation').trim();
+      Object.assign(org.org, { nom, ville: String(process.env.ORG_VILLE || '').trim(), pays: String(process.env.ORG_PAYS || '').trim(),
+        initiales: nom.split(/\s+/).map((x) => x[0] || '').join('').slice(0, 3).toUpperCase() });
+      org.mailFrom = ''; org.mailSuffix = '';
+    }
+    for (const [k, v] of Object.entries(org)) kvSet(k, v, 'seed');
+    if (cfg.seedDemo) {
+      // procédure de démonstration : AO-2026-014, telle que dans le prototype, avec ses offres
+      const demo = procDefaults(clone(seed.CDC));
+      seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
+      procedureInsert('p1', demo, 'seed');
+      seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));
+    }
     if (withUsers) {
       db.exec('DELETE FROM users');
       if (cfg.seedDemo) {
         const h = bcrypt.hashSync(cfg.seedPassword, 10);
         const ins = db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)');
         for (const u of seed.USERS) ins.run(u.id, u.nom, slug(u.nom) + '@bal.ci', u.role, h);
-      }
+      } else adminInitial();
     }
-    partenaireDemo();
+    if (cfg.seedDemo) partenaireDemo();
     auditAppend(null, 'Système', 'Instance initialisée');
   });
   tx();

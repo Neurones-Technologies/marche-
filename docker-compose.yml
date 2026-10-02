@@ -11,6 +11,13 @@ services:
       SEED_PASSWORD: ${SEED_PASSWORD:-}
       SHOW_DEMO_ACCOUNTS: ${SHOW_DEMO_ACCOUNTS:-0}
       SEED_DEMO: ${SEED_DEMO:-1}
+      # Instance réelle (SEED_DEMO=0) : compte administrateur initial et nom de l'organisation
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_NOM: ${ADMIN_NOM:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ORG_NOM: ${ORG_NOM:-}
+      ORG_VILLE: ${ORG_VILLE:-}
+      ORG_PAYS: ${ORG_PAYS:-}
       ALLOW_RESET: ${ALLOW_RESET:-1}
       MAX_FILE_MB: ${MAX_FILE_MB:-10}
       # Courriels par Microsoft 365 (voir README, « Courriels ») ; sans MAIL_MODE=graph, ils restent simulés

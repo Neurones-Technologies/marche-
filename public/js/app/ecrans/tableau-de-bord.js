@@ -6,7 +6,7 @@
 function vDashboard(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Tableau de bord');
-  add(l,'p','lede',"Prototype de démonstration — données fictives. Procédure d'appel d'offres ouvert international : soumissionnaires de la zone UEMOA et hors zone, offres en plusieurs devises converties en francs CFA.");
+  add(l,'p','lede',[state.cdc.procedure, 'profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' »', state.cdc.objet].filter(Boolean).join(' — ')+'.');
   var b=add(h,'button','btn btn-primary', state.cdc.cdcPublie?'Reprendre le dépouillement':'Préparer le cahier des charges');
   b.addEventListener('click',function(){ go(state.cdc.cdcPublie?'depouille':'cdc'); });
   frise(m);
@@ -93,17 +93,23 @@ function vDashboard(m){
   var cal=add(g2,'div','card');
   add(cal,'div','panel-head','Calendrier de la procédure');
   var cb=add(cal,'div','pad');
-  [['Publication de l\u2019avis','28/09/2026',true],
-   ['Visite de site obligatoire','06/10/2026',true],
-   ['Date limite de questions des candidats','08/10/2026',true],
-   ['Date limite de dépôt des plis','15/10/2026 à 10h00',state.cdc.cdcPublie],
-   ['Séance d\u2019ouverture des plis','15/10/2026 à 11h00',state.depClosed],
-   ['Notification d\u2019attribution','à fixer',allApproved()]
+  // Dates réelles : posées par le serveur (cadre figé, taux figés, approbations, délai de recours) ou lues dans le
+  // journal d'audit ; date prévue d'ouverture des plis reprise du cahier des charges.
+  function dateAudit(debut){ var e=(state.audit||[]).filter(function(x){ return x.a.indexOf(debut)===0; })[0]; return e ? e.t : null; }
+  var appro=(state.approvals||[]).filter(function(a){ return a.done && a.at; }).map(function(a){ return a.at; });
+  var ss=state.standstill||{};
+  [['Publication du dossier', state.cadre ? state.cadre.at : null, !!state.cdc.cdcPublie],
+   ['Ouverture des plis (prévue)', state.cdc.ouverture || 'date à fixer au cahier des charges', !!state.depClosed],
+   ['Clôture du dépouillement', state.fxFrozen ? state.fxFrozen.at : null, !!state.depClosed],
+   ['Validation de l\u2019évaluation', dateAudit('Évaluation validée'), !!state.evalDone],
+   ['Attribution prononcée', appro.length ? appro[appro.length-1] : null, allApproved()],
+   ['Notification aux soumissionnaires', ss.startedAt ? new Date(ss.startedAt).toLocaleString('fr-FR') : null, !!ss.startedAt],
+   ['Signature du marché', dateAudit('Marché signé'), !!state.contractSigned]
   ].forEach(function(x){
     var r=add(cb,'div','docline');
     var lf=add(r,'div');
     add(lf,'div',null,x[0]).style.fontWeight='600';
-    add(lf,'div','muted',x[1]);
+    add(lf,'div','muted', x[1] || (x[2] ? 'date non disponible' : 'à venir'));
     add(r,'span','chip '+(x[2]?'c-green':'c-grey'), x[2]?'Fait':'À venir');
   });
 
