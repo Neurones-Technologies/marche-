@@ -20,7 +20,8 @@ server/
                    jeu de données initial, migrations, audit chaîné
   auth.js          JWT en cookie HttpOnly/SameSite=Strict, middleware d'habilitations
   rules.js         règles métier côté serveur : qui peut écrire quoi, et dans quel ordre
-  routes/          /api/auth/*, /api/inscription (publique), /api/partenaires (référencement),
+  routes/          /api/auth/*, /api/accueil (tâches et chiffres clés), /api/registre (appels d'offres),
+                   /api/inscription (publique), /api/partenaires (référencement),
                    /api/commandes (bons de commande, réceptions, export CSV),
                    /api/besoins (expression, validation, transformation en procédure),
                    /api/organisation/state (état sans procédure ouverte), /api/procedures (liste, création, archivage),
@@ -30,6 +31,16 @@ server/
   seed/seed.json   données de référence extraites du prototype
   test/            tests (node:test) : API, calculs partagés, parcours complet, profils, procédures, migration
 ```
+
+Organisation de l'interface (menu) :
+
+- **Accueil** : tableau de bord de l'organisation, avec « À faire pour moi » (les actions qui attendent
+  l'utilisateur, calculées par le serveur selon ses habilitations) et les chiffres clés de chaque registre.
+- **Registres** : besoins, appels d'offres (toutes les procédures, en cours et passées : phase, titulaire, montant
+  attribué, besoin d'origine, commandes ; filtres par phase, année et recherche), commandes et réceptions,
+  partenaires (ou « Mon référencement » pour un prestataire).
+- **Procédure** : les écrans de la procédure ouverte, de la vue d'ensemble au procès-verbal, avec son sélecteur.
+- **Administration** : comptes, rôles, paramètres, alertes.
 
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 
@@ -87,7 +98,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 87 tests (Node 22 requis pour better-sqlite3)
+npm test             # 90 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :

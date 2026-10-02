@@ -3,9 +3,10 @@
 "use strict";
 
 /* ============ Vues ============ */
+/* Vue d'ensemble de la procédure ouverte (l'accueil de l'organisation est l'écran « Tableau de bord »). */
 function vDashboard(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,'Tableau de bord');
+  add(l,'h1',null,'Vue d’ensemble — '+REF());
   add(l,'p','lede',[state.cdc.procedure, 'profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' »', state.cdc.objet].filter(Boolean).join(' — ')+'.');
   var b=add(h,'button','btn btn-primary', state.cdc.cdcPublie?'Reprendre le dépouillement':'Préparer le cahier des charges');
   b.addEventListener('click',function(){ go(state.cdc.cdcPublie?'depouille':'cdc'); });

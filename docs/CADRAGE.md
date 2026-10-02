@@ -391,6 +391,23 @@ seuil, jamais de suspension automatique ; note montrée aux évaluateurs, hors d
   il voit la sienne dans « Mon référencement ».
 - Tests : 80 au total ; parcours dans Chrome jusqu'à la réception définitive notée.
 
+### Réorganisation de la navigation, 02/10/2026
+
+Retour d'usage : le menu mélangeait écrans de l'organisation et écrans d'une seule procédure, et le « tableau de
+bord » était celui d'une procédure, sans vue d'ensemble ni historique. Réorganisation validée :
+
+- **Accueil** de l'organisation (`/api/accueil`) : « À faire pour moi », calculé par le serveur pour chaque utilisateur
+  (besoins à soumettre, valider ou transformer ; dossiers à publier, dépouiller, évaluer, approuver, notifier, signer ;
+  recours à instruire ; commandes à compléter, valider, émettre, réceptionner ; avenants ; dossiers de référencement,
+  pièces à vérifier ou expirées, partenaires sous le seuil ; pour un prestataire, son dossier et les appels d'offres
+  ouverts), et chiffres clés de chaque registre visible. C'est l'écran d'arrivée de tous les rôles.
+- **Registre des appels d'offres** (`/api/registre`) : toutes les procédures, en cours et passées, avec phase, date
+  de publication, offres reçues, titulaire et montant attribués, besoin d'origine et commandes émises ; filtres par
+  phase, année et recherche. Un prestataire n'y voit que les appels d'offres publiés, sans données internes.
+- **Menu en quatre groupes** : Accueil, Registres, Procédure (écrans de la procédure ouverte, sous son sélecteur ;
+  l'ancien tableau de bord devient sa « Vue d'ensemble »), Administration. La pastille de phase n'apparaît plus que
+  sur les écrans de la procédure.
+
 ## 8. Bilan au 02/10/2026
 
 Les cinq modules du cadrage existent, sur le socle (plusieurs procédures, écritures ciblées, interface découpée) et

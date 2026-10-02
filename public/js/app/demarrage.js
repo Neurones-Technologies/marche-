@@ -2,18 +2,18 @@
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
-var ROUTER={dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
+var ROUTER={accueil:vAccueil, dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
-function isAdminView(id){ return VIEWS.some(function(v){ return v.id===id && v.grp==='Administration'; }); }
+/* Écran de la procédure ouverte (groupe « Procédure » du menu) : la pastille de phase et le bandeau d'archivage s'y rapportent. */
+function vueDeProcedure(id){ return VIEWS.some(function(v){ return v.id===id && v.grp==='Procédure'; }); }
 /* Sélecteur de la procédure courante, en tête du menu. Les procédures archivées n'y figurent que si l'une est ouverte. */
 function renderProcSel(){
-  var box=document.getElementById('side-proc'); box.textContent='';
+  var box=document.getElementById('side-proc'); if(!box) return; box.textContent='';
   var list=MP.procs().filter(function(p){ return !p.archive || p.id===MP.pid(); });
-  if(!list.length){ add(box,'div','navgrp','Aucune procédure ouverte'); return; }
-  add(box,'label','navgrp','Procédure').setAttribute('for','proc-sel');
-  var s=add(box,'select'); s.id='proc-sel';
+  if(!list.length) return;
+  var s=add(box,'select'); s.id='proc-sel'; s.setAttribute('aria-label','Procédure ouverte');
   list.forEach(function(p){ var o=add(s,'option',null,p.ref+(p.archive?' (archivée)':'')+' — '+(p.objet||'')); o.value=p.id; });
   s.value=MP.pid();
   s.addEventListener('change',function(){ ouvrirProcedure(s.value); });
@@ -43,14 +43,14 @@ function render(){
   renderHeader();
   var chip=document.getElementById('phase-chip');
   if(avecProcedure()){ var ph=phase(); chip.textContent=ph.k; chip.className='chip '+ph.c; }
-  chip.style.display = !avecProcedure() || isAdminView(state.view) ? 'none' : '';
+  chip.style.display = !avecProcedure() || !vueDeProcedure(state.view) ? 'none' : '';
   if(!viewAllowed(state.view)) state.view=homeView();
   var lbl=null;
   for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===state.view) lbl=VIEWS[i].label;
   document.title = (lbl? lbl+' — ' : '')+'Marché+';
   var m=document.getElementById('main'); m.textContent='';
   var cur=MP.current();
-  if(cur && cur.archive && !isAdminView(state.view) && state.view!=='procedures'){
+  if(cur && cur.archive && vueDeProcedure(state.view)){
     var na=add(m,'div','note'); add(na,'strong',null,'Procédure archivée. ');
     na.appendChild(document.createTextNode('Elle se consulte mais ne se modifie plus.'));
   }
@@ -94,7 +94,7 @@ window.MarchePlus = {
   /* Aucune procédure visible (soumissionnaire sans appel d'offres publié) : rien à afficher qu'un message. */
   none:function(user){
     state=null; synced={};
-    document.getElementById('navs').textContent=''; document.getElementById('side-proc').textContent='';
+    document.getElementById('navs').textContent='';
     document.getElementById('phase-chip').style.display='none';
     resetBtn.style.display='none';
     var m=document.getElementById('main'); m.textContent='';

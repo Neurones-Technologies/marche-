@@ -494,28 +494,31 @@ function vide(parent, ic, titre, texte){
 }
 
 /* ============ Navigation ============ */
+/* Menu en quatre niveaux : l'accueil, les registres de l'organisation (avec leur historique), les écrans de la
+   procédure ouverte (groupe « Procédure », avec son sélecteur), puis l'administration. */
 var VIEWS=[
-  {id:'dashboard',  label:'Tableau de bord', grp:'Pilotage'},
-  {id:'notifs',     label:'Notifications', grp:'Pilotage'},
-  {id:'procedures', label:'Procédures', grp:'Pilotage'},
-  {id:'besoins',    label:'Besoins', grp:'Préparation', perms:['besoin.create','besoin.approve','besoin.manage']},
-  {id:'cdc',        label:'Cahier des charges', grp:'Préparation', perm:'cdc.edit'},
-  {id:'dao',        label:'DAO', grp:'Préparation', perm:'cdc.edit'},
-  {id:'criteres',   label:'Grille de critères', grp:'Préparation', perm:'criteres.edit'},
-  {id:'qa',         label:'Questions', grp:'Préparation', perm:'offres.read'},
-  {id:'referencement', label:'Mon référencement', grp:'Soumission', role:true, perm:'portail.use'},
-  {id:'portail',    label:'Portail de dépôt', grp:'Soumission', role:true, perm:'portail.use'},
-  {id:'reception',  label:'Réception', grp:'Offres', perm:'offres.read'},
-  {id:'depouille',  label:'Dépouillement', grp:'Offres', perm:'offres.read'},
-  {id:'conformite', label:'Conformité', grp:'Offres', perm:'offres.read'},
-  {id:'clarifs',    label:'Clarifications', grp:'Offres', perm:'offres.read'},
-  {id:'evaluation', label:'Évaluation', grp:'Décision', perm:'offres.read'},
-  {id:'decision',   label:'Décision', grp:'Décision', perm:'offres.read'},
-  {id:'recours',    label:'Recours', grp:'Décision', perm:'offres.read'},
-  {id:'pv',         label:'Procès-verbal', grp:'Décision', perm:'pv.read'},
-  {id:'audit',      label:"Journal d'audit", grp:'Décision', perm:'audit.read'},
-  {id:'partenaires', label:'Partenaires', grp:'Partenaires', perm:'partenaires.manage'},
-  {id:'commandes',  label:'Commandes et réceptions', grp:'Exécution'},
+  {id:'accueil',    label:'Tableau de bord', grp:'Accueil'},
+  {id:'notifs',     label:'Notifications', grp:'Accueil'},
+  {id:'besoins',    label:'Besoins', grp:'Registres', perms:['besoin.create','besoin.approve','besoin.manage']},
+  {id:'procedures', label:'Appels d’offres', grp:'Registres'},
+  {id:'commandes',  label:'Commandes et réceptions', grp:'Registres'},
+  {id:'partenaires', label:'Partenaires', grp:'Registres', perm:'partenaires.manage'},
+  {id:'referencement', label:'Mon référencement', grp:'Registres', role:true, perm:'portail.use'},
+  {id:'dashboard',  label:'Vue d’ensemble', grp:'Procédure'},
+  {id:'cdc',        label:'Cahier des charges', grp:'Procédure', perm:'cdc.edit'},
+  {id:'dao',        label:'DAO', grp:'Procédure', perm:'cdc.edit'},
+  {id:'criteres',   label:'Grille de critères', grp:'Procédure', perm:'criteres.edit'},
+  {id:'qa',         label:'Questions', grp:'Procédure', perm:'offres.read'},
+  {id:'portail',    label:'Déposer une offre', grp:'Procédure', role:true, perm:'portail.use'},
+  {id:'reception',  label:'Réception des offres', grp:'Procédure', perm:'offres.read'},
+  {id:'depouille',  label:'Dépouillement', grp:'Procédure', perm:'offres.read'},
+  {id:'conformite', label:'Conformité', grp:'Procédure', perm:'offres.read'},
+  {id:'clarifs',    label:'Clarifications', grp:'Procédure', perm:'offres.read'},
+  {id:'evaluation', label:'Évaluation', grp:'Procédure', perm:'offres.read'},
+  {id:'decision',   label:'Décision', grp:'Procédure', perm:'offres.read'},
+  {id:'recours',    label:'Recours et signature', grp:'Procédure', perm:'offres.read'},
+  {id:'pv',         label:'Procès-verbal', grp:'Procédure', perm:'pv.read'},
+  {id:'audit',      label:"Journal d'audit", grp:'Procédure', perm:'audit.read'},
   {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit'},
   {id:'comptes',    label:'Comptes', grp:'Administration', perm:'roles.edit'},
   {id:'params',     label:'Paramètres', grp:'Administration', perm:'params.edit'},
@@ -533,7 +536,7 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['notifs','procedures','besoins','referencement','partenaires','commandes','comptes','roles','regles'];
+var SANS_PROCEDURE = ['accueil','notifs','procedures','besoins','referencement','partenaires','commandes','comptes','roles','regles'];
 function avecProcedure(){ return !!(state && state.procedure); }
 /* Un écran est visible si l'une de ses habilitations est accordée (perm, ou perms pour plusieurs), et, sans
    procédure ouverte, s'il ne dépend pas d'une procédure. */
@@ -544,21 +547,19 @@ function vueVisible(v){
 }
 function viewAllowed(id){ return VIEWS.some(function(v){ return v.id===id && vueVisible(v); }); }
 /* Le soumissionnaire n'a rien à faire sur le tableau de bord acheteur : il arrive sur son portail. */
-function homeView(){
-  if(!avecProcedure()){
-    if(can('portail.use')) return 'referencement';
-    return can('besoin.create')||can('besoin.approve')||can('besoin.manage') ? 'besoins' : 'procedures';
-  }
-  if(!can('offres.read') && can('portail.use')) return 'portail';
-  if(!can('offres.read') && can('besoin.create')) return 'besoins';
-  return 'dashboard';
-}
+/* Tout le monde arrive sur l'accueil : chiffres clés et « À faire pour moi ». */
+function homeView(){ return 'accueil'; }
 function renderNav(){
   var box=document.getElementById('navs'); box.textContent='';
   var grp=null;
   var vis=VIEWS.filter(vueVisible);
   vis.forEach(function(v){
-    if(v.grp!==grp){ grp=v.grp; add(box,'div','navgrp',grp); }
+    if(v.grp!==grp){
+      grp=v.grp;
+      add(box,'div','navgrp',grp);
+      // le groupe de la procédure porte son sélecteur (rempli par renderProcSel)
+      if(grp==='Procédure'){ var sp=add(box,'div','side-proc'); sp.id='side-proc'; }
+    }
     var b=el('button','navb'+(v.role?' role':''));
     icon(b, NAV_ICONS[v.id]);
     b.appendChild(document.createTextNode(v.label));

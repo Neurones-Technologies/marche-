@@ -37,6 +37,7 @@ app.use('/api/procedures', require('./routes/procedures'));
 app.use('/api/besoins', require('./routes/besoins'));
 app.use('/api/partenaires', require('./routes/partenaires'));
 app.use('/api/commandes', require('./routes/commandes'));
+app.use('/api', require('./routes/accueil')); // /api/accueil, /api/registre
 app.use('/api/inscription', require('./routes/inscription')); // seule route publique (sans compte)
 // État de l'organisation seule, quand aucune procédure n'est ouverte (demandeur, instance encore vide) :
 // lecture de l'état et écriture des seules clés d'organisation, par les mêmes routes que pour une procédure.
