@@ -19,7 +19,9 @@ server/
   auth.js          JWT en cookie HttpOnly/SameSite=Strict, middleware d'habilitations
   rules.js         règles métier côté serveur : qui peut écrire quoi, et dans quel ordre
   routes/          /api/auth/*, /api/procedures (liste, création, archivage),
-                   /api/procedures/:id/{state,offers,audit,files}, /api/files/:id, /api/audit/verify, /api/admin/reset
+                   /api/procedures/:id/{state,offers,audit,files},
+                   écritures ciblées /api/procedures/:id/{scores,confirmations,conformite,approbations},
+                   /api/files/:id, /api/audit/verify, /api/admin/reset
   seed/seed.json   données de référence extraites du prototype
   test/            tests (node:test) : API, calculs partagés, parcours complet, profils, procédures, migration
 ```
@@ -47,14 +49,16 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 - **Piste d'audit chaînée par SHA-256** (identité et horodatage posés par le serveur) ; vérification : `GET /api/audit/verify`.
 - **Dépôt d'offre** validé et construit par le serveur, accusé de réception numéroté (`DEP-0001`…).
 - **Cloisonnement** : un soumissionnaire ne voit ni les autres offres, ni les notes, ni les décisions internes.
-- **Multi-utilisateurs** : détection de conflits de modification (409) et rafraîchissement automatique.
+- **Multi-utilisateurs** : notes, justifications, confirmations, décisions de conformité et approbations s'écrivent
+  une par une (deux évaluateurs peuvent noter en même temps) ; pour le reste, détection de conflits de modification
+  (409) ; rafraîchissement automatique.
 
 ## Démarrer
 
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 45 tests (Node 22 requis pour better-sqlite3)
+npm test             # 53 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :

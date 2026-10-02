@@ -33,23 +33,22 @@ r.get('/state', (req, res) => {
   res.json(buildState(req));
 });
 
-/** Modification d'une ou plusieurs clés ; tout ou rien. */
-r.patch('/state', (req, res) => {
-  const { changes, base } = req.body || {};
-  if (!changes || typeof changes !== 'object') return res.status(400).json({ error: 'Corps invalide.' });
+const MERGED = ['notifs', 'emails'];
+
+/**
+ * Écrit un lot de clés, tout ou rien : mêmes contrôles (habilitations, règles, effets serveur) quelle que soit la
+ * route d'origine. Retourne { status, body }. Les routes ciblées ci-dessous ne font que construire le lot.
+ */
+function ecrire(req, changes) {
   const keys = Object.keys(changes);
-  if (!keys.length) return res.json({ ok: true, rev: getRev(), revs: {} });
+  if (!keys.length) return { status: 200, body: { ok: true, rev: getRev(), revs: {} } };
   // procédure archivée : seules les clés de l'organisation (notifications lues, paramètres) restent modifiables
   if (req.archived && keys.some(isProcKey))
-    return res.status(409).json({ error: 'Procédure archivée : elle ne peut plus être modifiée.', code: 'PROCEDURE_ARCHIVED' });
-  // conflit de révision : quelqu'un d'autre a modifié la clé depuis le dernier chargement
-  const MERGED = ['notifs', 'emails'];
-  const conflicts = keys.filter((k) => { if (MERGED.includes(k)) return false; const cur = req.store.raw(k); return cur && base && base[k] != null && cur.rev !== base[k]; });
-  if (conflicts.length) return res.status(409).json({ error: 'Données modifiées entre-temps par un autre utilisateur.', conflicts });
+    return { status: 409, body: { error: 'Procédure archivée : elle ne peut plus être modifiée.', code: 'PROCEDURE_ARCHIVED' } };
   for (const k of keys) {
     const err = validateChange(k, changes[k], req, changes);
-    if (typeof err === 'string') return res.status(403).json({ error: err, key: k });
-    if (err) return res.status(err.status).json({ error: err.error, code: err.code, key: k });
+    if (typeof err === 'string') return { status: 403, body: { error: err, key: k } };
+    if (err) return { status: err.status, body: { error: err.error, code: err.code, key: k } };
   }
   const newRevs = {}, who = whoLabel(req.user), uid = req.user.id;
   // journal : une clé de procédure se rattache à la procédure, une clé d'organisation à l'organisation
@@ -90,8 +89,90 @@ r.patch('/state', (req, res) => {
       }
     }
   });
-  try { tx(); } catch (e) { return res.status(e.status || 500).json({ error: e.message }); }
-  res.json({ ok: true, rev: getRev(), revs: newRevs });
+  try { tx(); } catch (e) { return { status: e.status || 500, body: { error: e.message } }; }
+  return { status: 200, body: { ok: true, rev: getRev(), revs: newRevs } };
+}
+
+/** Modification d'une ou plusieurs clés entières, avec détection de conflit sur les révisions envoyées. */
+r.patch('/state', (req, res) => {
+  const { changes, base } = req.body || {};
+  if (!changes || typeof changes !== 'object') return res.status(400).json({ error: 'Corps invalide.' });
+  // conflit de révision : quelqu'un d'autre a modifié la clé depuis le dernier chargement
+  const conflicts = Object.keys(changes).filter((k) => { if (MERGED.includes(k)) return false; const cur = req.store.raw(k); return cur && base && base[k] != null && cur.rev !== base[k]; });
+  if (conflicts.length) return res.status(409).json({ error: 'Données modifiées entre-temps par un autre utilisateur.', conflicts });
+  const out = ecrire(req, changes);
+  res.status(out.status).json(out.body);
+});
+
+/* ---- Écritures ciblées (lot B) ----
+   Une action ne modifie qu'un élément : le serveur part de la valeur en base, y applique l'action et écrit la clé
+   par le même chemin que PATCH. Deux évaluateurs qui notent en même temps ne se gênent plus (pas de 409).
+   La réponse renvoie les valeurs écrites, telles que le serveur les a enregistrées (identité, date…). */
+const copie = (x) => JSON.parse(JSON.stringify(x == null ? {} : x));
+function cible(req, res, changes) {
+  if (changes.error) return res.status(changes.status || 422).json({ error: changes.error, code: changes.code });
+  const out = ecrire(req, changes);
+  if (out.status !== 200) return res.status(out.status).json(out.body);
+  const values = {};
+  for (const k of Object.keys(changes)) values[k] = req.store.get(k);
+  res.json({ ...out.body, values });
+}
+const offreDe = (req) => req.store.offers().find((o) => o.id === req.params.offre);
+const introuvable = (quoi) => ({ status: 404, error: quoi + ' introuvable dans cette procédure.' });
+
+/** Note d'un critère qualitatif et/ou justification de l'écart avec le score proposé par l'IA. */
+r.put('/scores/:offre/:critere', (req, res) => {
+  const { note, justification } = req.body || {};
+  const o = offreDe(req), c = (req.store.get('criteria') || []).find((x) => x.id === req.params.critere);
+  let changes = {};
+  if (!o) changes = introuvable('Offre');
+  else if (!c || c.kind !== 'qual') changes = introuvable('Critère qualitatif');
+  else if (note == null && justification == null) changes = { error: 'Note ou justification attendue.' };
+  else if (justification != null && (typeof justification !== 'string' || justification.length > 2000)) changes = { error: 'Justification invalide (2 000 caractères au plus).' };
+  else {
+    if (note != null) { const q = copie(req.store.get('quality')); q[o.id] = { ...(q[o.id] || {}), [c.id]: Number(note) }; changes.quality = q; }
+    if (justification != null) { const j = copie(req.store.get('justif')); j[o.id + '_' + c.id] = justification.trim(); changes.justif = j; }
+  }
+  cible(req, res, changes);
+});
+
+/** Confirmation (ou retrait de la confirmation) d'un champ extrait d'une offre. */
+r.put('/confirmations/:offre/:champ', (req, res) => {
+  const o = offreDe(req), i = Number(req.params.champ), { confirme } = req.body || {};
+  let changes;
+  if (!o) changes = introuvable('Offre');
+  else if (!Number.isInteger(i) || !(o.fields || [])[i]) changes = introuvable('Champ');
+  else if (typeof confirme !== 'boolean') changes = { error: 'Champ « confirme » (oui ou non) attendu.' };
+  else {
+    const c = copie(req.store.get('confirmed'));
+    if (confirme) c[o.id + '_' + i] = true; else delete c[o.id + '_' + i];
+    changes = { confirmed: c };
+  }
+  cible(req, res, changes);
+});
+
+/** Décision de conformité d'une offre : exclue, réintégrée, ou rendue au contrôle automatique des pièces (null). */
+r.put('/conformite/:offre', (req, res) => {
+  const o = offreDe(req), { exclue } = req.body || {};
+  let changes;
+  if (!o) changes = introuvable('Offre');
+  else if (exclue !== null && typeof exclue !== 'boolean') changes = { error: 'Champ « exclue » (oui, non ou null) attendu.' };
+  else {
+    const e = copie(req.store.get('excluded'));
+    if (exclue === null) delete e[o.id]; else e[o.id] = exclue;
+    changes = { excluded: e };
+  }
+  cible(req, res, changes);
+});
+
+/** Approbation d'un niveau du circuit. Identité et date sont posées par le serveur (règles d'approbation). */
+r.post('/approbations/:niveau', (req, res) => {
+  const ap = copie(req.store.get('approvals') || []), i = Number(req.params.niveau);
+  let changes;
+  if (!Array.isArray(ap) || !Number.isInteger(i) || !ap[i]) changes = introuvable('Niveau d’approbation');
+  else if (ap[i].done) changes = { status: 409, code: 'APPROVAL_ALREADY_GIVEN', error: 'Ce niveau est déjà approuvé.' };
+  else { ap[i].done = true; changes = { approvals: ap }; }
+  cible(req, res, changes);
 });
 
 /** Journal d'audit : l'horodatage et l'identité viennent du serveur, jamais du client. */

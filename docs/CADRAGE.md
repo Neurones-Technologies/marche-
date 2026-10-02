@@ -253,7 +253,21 @@ obligatoire et les délais minimaux de remise des offres.
 - Tests : 45 au total, dont 7 sur les procédures (cloisonnement, visibilité, dépôt, archivage) et 2 sur la migration
   d'une base à l'ancien schéma.
 
-Restent pour l'étape 2 : les **écritures ciblées** (lot B) et le **découpage d'`app.js`**. Restes du prototype
+### Étape 2, deuxième incrément : écritures ciblées, réalisé le 02/10/2026
+
+- Routes, sous `/api/procedures/:id/` : `PUT scores/:offre/:critere` (note et/ou justification),
+  `PUT confirmations/:offre/:champ`, `PUT conformite/:offre` (exclue, réintégrée, ou `null` pour revenir au contrôle
+  automatique des pièces), `POST approbations/:niveau`.
+- Le serveur part de la valeur en base, applique l'action, puis écrit par **le même chemin que l'écriture en bloc** :
+  les règles (déclaration de conflit d'intérêts, séquencement, séparation des fonctions, verrous) ne sont pas dupliquées.
+  La réponse renvoie les valeurs enregistrées (par exemple l'identité et la date d'une approbation).
+- Interface : ces quatre clés ne partent plus dans l'envoi en bloc ; chaque action appelle sa route. « Rétablir les
+  scores IA », opération globale, reste une écriture en bloc avec détection de conflit.
+- Tests : 53 au total, dont 8 sur les écritures ciblées (deux évaluateurs notant en même temps sans perte ni conflit).
+  Un parcours dans Chrome (confirmations, note, justification, approbation par les boutons) a révélé et fait corriger
+  une approbation envoyée sans corps JSON, refusée par la protection CSRF.
+
+Reste pour l'étape 2 : le **découpage d'`app.js`**. Restes du prototype
 repérés en chemin, non traités : le calendrier du tableau de bord (dates écrites en dur) et le texte « Prototype de
 démonstration » de son introduction ; le jeu de démonstration AO-2026-014 est créé même quand `SEED_DEMO=0`.
 

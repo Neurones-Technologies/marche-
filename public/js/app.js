@@ -91,6 +91,9 @@ var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','dep
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
   'mailFrom','mailSuffix','approvals','offers','circuitModele'];
 var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre'];
+/* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
+   (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
+var TARGETED = ['quality','justif','confirmed','excluded'];
 var synced = {}, revs = {}, serverRev = 0, flushing = false, dirty = false, flushTimer = null;
 var EMPTY_DRAFT = function(){ return { name:'', iso:'CI', devise:'XOF', montant:'', delai:'', garantie:'', refsCount:'', lots:[], docs:{} }; };
 function uiKey(){ return 'marcheplus.ui.'+(state?state.me:''); }
@@ -102,7 +105,7 @@ function applyServer(payload, keepPending){
   if(first){ state={ view:'dashboard', offerIndex:0, draft:EMPTY_DRAFT() }; }
   SYNC_KEYS.concat(SERVER_ONLY).concat(['me']).forEach(function(k){
     if(!(k in st)) return;
-    var pending = !first && keepPending && SYNC_KEYS.indexOf(k)>=0 && JSON.stringify(state[k])!==synced[k];
+    var pending = !first && keepPending && SYNC_KEYS.indexOf(k)>=0 && TARGETED.indexOf(k)<0 && JSON.stringify(state[k])!==synced[k];
     if(pending) return;
     if(k==='offers'){ SEED_OFFERS.length=0; st.offers.forEach(function(o){ SEED_OFFERS.push(o); }); state.offers=SEED_OFFERS; }
     else state[k]=st[k];
@@ -119,7 +122,7 @@ function save(){ saveUI(); dirty=true; if(flushTimer) clearTimeout(flushTimer); 
 function flush(){
   if(flushing || !dirty || !state) return;
   var changes={}, sent={};
-  SYNC_KEYS.forEach(function(k){ var j=JSON.stringify(state[k]); if(j!==synced[k]){ changes[k]=state[k]; sent[k]=j; } });
+  SYNC_KEYS.forEach(function(k){ if(TARGETED.indexOf(k)>=0) return; var j=JSON.stringify(state[k]); if(j!==synced[k]){ changes[k]=state[k]; sent[k]=j; } });
   dirty=false;
   if(!Object.keys(changes).length) return;
   flushing=true;
@@ -131,6 +134,32 @@ function flush(){
     return MP.api('GET',MP.url('/state')).then(function(p){ applyServer(p,false); render(); });
   }).then(function(){ flushing=false; if(dirty) flush(); });
 }
+/* Écriture ciblée : la réponse porte les valeurs enregistrées par le serveur. En cas de refus, message et
+   rechargement ; la promesse renvoie alors null (l'appelant ne journalise rien). */
+function retenir(r){
+  Object.keys(r.values||{}).forEach(function(k){ state[k]=r.values[k]; synced[k]=JSON.stringify(r.values[k]); if(r.revs && r.revs[k]) revs[k]=r.revs[k]; });
+  if(r.rev) serverRev=r.rev;
+}
+function cibler(method, path, body){
+  // toujours un corps JSON : une écriture sans en-tête JSON est refusée (protection CSRF du serveur)
+  return MP.api(method, MP.url(path), body||{}).then(function(r){ retenir(r); render(); return r; })
+    .catch(function(err){
+      toast(err.message||'Enregistrement impossible.');
+      return MP.api('GET',MP.url('/state')).then(function(p){ applyServer(p,false); render(); return null; }).catch(function(){ return null; });
+    });
+}
+/* Remplacement de clés entières (« Rétablir les scores IA ») : refusé si quelqu'un a écrit entre-temps. */
+function ecrireBloc(changes){
+  var base={}; Object.keys(changes).forEach(function(k){ base[k]=revs[k]; });
+  return MP.api('PATCH',MP.url('/state'),{changes:changes, base:base}).then(function(r){
+    Object.keys(changes).forEach(function(k){ synced[k]=JSON.stringify(changes[k]); if(r.revs && r.revs[k]) revs[k]=r.revs[k]; });
+    if(r.rev) serverRev=r.rev; return r;
+  }).catch(function(err){
+    toast(err.message||'Enregistrement impossible.');
+    return MP.api('GET',MP.url('/state')).then(function(p){ applyServer(p,false); render(); return null; }).catch(function(){ return null; });
+  });
+}
+var enc=encodeURIComponent;
 function poll(){
   if(!state || flushing || dirty) return Promise.resolve();
   return MP.api('GET',MP.url('/state?since='+serverRev)).then(function(p){
@@ -1637,10 +1666,13 @@ function vDepouille(m){
       b.setAttribute('aria-label','Confirmer — '+f.k);
       fk(b,'conf-'+key); guard('depouille.confirm',b);
       b.addEventListener('click',function(){
-        state.confirmed[key]=true; logit('Champ confirmé — '+o.name+' : '+f.k);
-        if(flagsRemaining()===0) notify('verif.requise','Vérification des extractions terminée',
-          "Tous les champs signalés de la procédure "+REF()+" ont été confirmés. Le dépouillement peut être clôturé.");
-        save(); render();
+        cibler('PUT','/confirmations/'+enc(o.id)+'/'+i,{confirme:true}).then(function(r){
+          if(!r) return;
+          logit('Champ confirmé — '+o.name+' : '+f.k);
+          if(flagsRemaining()===0) notify('verif.requise','Vérification des extractions terminée',
+            "Tous les champs signalés de la procédure "+REF()+" ont été confirmés. Le dépouillement peut être clôturé.");
+          save(); render();
+        });
       });
     } else chip(act,'ok', f.flag ? 'Confirmé' : 'Fiable','check');
   });
@@ -1690,12 +1722,14 @@ function vConformite(m){
       var q = ex ? ('L\u2019offre sera de nouveau notée et classée.'+(mis.length?' Elle présente encore '+mis.length+' pièce(s) manquante(s) : la réintégration devra être motivée au procès-verbal.':''))
                  : ('L\u2019offre ne sera plus notée ni classée. La décision reste réversible et sera consignée à la piste d\u2019audit.');
       ask(q, function(){
-        state.excluded[o.id]=!ex;
+        cibler('PUT','/conformite/'+enc(o.id),{exclue:!ex}).then(function(r){
+        if(!r) return;
         logit((ex?'Réintégration':'Exclusion administrative')+' — '+o.name);
         notify('offre.ecartee', (ex?'Offre réintégrée — ':'Offre écartée — ')+o.name,
           ex ? ("L'offre de "+o.name+" est réintégrée à l'évaluation de la procédure "+REF()+".")
              : ("L'offre de "+o.name+" est écartée pour non-conformité administrative. Motif : "+(mis.length?mis.map(function(x){return x.label;}).join(' ; '):'décision du comité')+"."));
         save(); render();
+        });
       }, (ex?'Réintégrer « ':'Écarter « ')+o.name+' » ?', ex?'Réintégrer':'Écarter');
     });
   });
@@ -1729,12 +1763,16 @@ function vEvaluation(m){
   add(l,'p','lede',"Montants convertis en francs CFA, puis corrigés de la marge de préférence communautaire lorsqu'elle est active. Toute modification d'un score proposé par l'IA exige une justification écrite, horodatée et attribuée.");
   var rs=add(h,'button','btn btn-ghost btn-sm','Rétablir les scores IA');
   rs.addEventListener('click',function(){
+    var quality={};
     SEED_OFFERS.forEach(function(o){
       var q={metho:o.aiMetho,refs:o.aiRefs};
       state.criteria.forEach(function(x){ if(x.kind==='qual'&&q[x.id]==null) q[x.id]=70; });
-      state.quality[o.id]=q;
+      quality[o.id]=q;
     });
-    state.justif={}; logit('Scores IA rétablis'); save(); render();
+    ecrireBloc({quality:quality, justif:{}}).then(function(r){
+      if(!r) return;
+      state.quality=quality; state.justif={}; logit('Scores IA rétablis'); render();
+    });
   });
 
   var banner=add(m,'div', c.prefActive?'warn':'note'); banner.style.marginTop='0';
@@ -1776,16 +1814,16 @@ function vEvaluation(m){
         fk(mi,'dec-'+o.id+'-'+cr.id); guard('eval.score',mi);
         if(coiBloque){ mi.disabled=true; mi.setAttribute('title','Déclaration de conflit d\u2019intérêts requise avant toute notation.'); }
         mi.addEventListener('click',function(){
-          state.quality[o.id][cr.id]=Math.max(0,cur-5);
-          logit('Score « '+cr.label+' » ajusté à '+Math.max(0,cur-5)+' — '+o.name); save(); render();
+          var v=Math.max(0,cur-5);
+          cibler('PUT','/scores/'+enc(o.id)+'/'+enc(cr.id),{note:v}).then(function(r){ if(r) logit('Score « '+cr.label+' » ajusté à '+v+' — '+o.name); });
         });
         add(st,'span','step-v', cur.toFixed(0)+'/100');
         var pl=add(st,'button','step-btn','+'); pl.setAttribute('aria-label','Augmenter '+cr.label+' pour '+o.name);
         fk(pl,'inc-'+o.id+'-'+cr.id); guard('eval.score',pl);
         if(coiBloque){ pl.disabled=true; pl.setAttribute('title','Déclaration de conflit d\u2019intérêts requise avant toute notation.'); }
         pl.addEventListener('click',function(){
-          state.quality[o.id][cr.id]=Math.min(100,cur+5);
-          logit('Score « '+cr.label+' » ajusté à '+Math.min(100,cur+5)+' — '+o.name); save(); render();
+          var v=Math.min(100,cur+5);
+          cibler('PUT','/scores/'+enc(o.id)+'/'+enc(cr.id),{note:v}).then(function(r){ if(r) logit('Score « '+cr.label+' » ajusté à '+v+' — '+o.name); });
         });
       }
       if(cr.kind==='qual'){
@@ -1800,13 +1838,14 @@ function vEvaluation(m){
           ta.setAttribute('aria-label','Justification — '+o.name+' / '+cr.label);
           fk(ta,'just-'+o.id+'-'+cr.id);
           ta.addEventListener('change',function(){
-            state.justif[jk]=ta.value.trim();
-            if(ta.value.trim()){
+            var motif=ta.value.trim();
+            cibler('PUT','/scores/'+enc(o.id)+'/'+enc(cr.id),{justification:motif}).then(function(r){
+              if(!r || !motif) return;
               logit('Justification saisie — '+o.name+' / '+cr.label);
               notify('ecart.ia','Écart motivé avec un score proposé par l\u2019IA',
-                o.name+" — "+cr.label+" : score proposé "+ai+", score retenu "+cur2+". Motif : "+ta.value.trim());
-            }
-            save(); render();
+                o.name+" — "+cr.label+" : score proposé "+ai+", score retenu "+cur2+". Motif : "+motif);
+              save(); render();
+            });
           });
         }
       }
@@ -1884,7 +1923,9 @@ function vDecision(m){
       fk(btn,'appr-'+i); guard('decision.approve',btn);
       btn.addEventListener('click',function(){
         ask('Cette approbation est horodatée, nominative et consignée à la piste d\u2019audit.', function(){
-          a.done=true; logit('Approbation — '+a.role+' ('+a.who+')');
+          cibler('POST','/approbations/'+i).then(function(r){
+          if(!r) return;
+          logit('Approbation — '+a.role+' ('+a.who+')');
           if(allApproved()){
             logit('Attribution prononcée — '+win.o.name);
             notify('attribution','Attribution prononcée',
@@ -1895,6 +1936,7 @@ function vDecision(m){
           if(nxt) notify('appro.attendue','Approbation attendue — '+nxt.role,
             "Le niveau « "+a.role+" » a approuvé. Niveau suivant attendu : "+nxt.role+" ("+nxt.who+").");
           save(); render();
+          });
         }, 'Approuver au titre « '+a.role+' » ?', 'Approuver');
       });
     } else add(row,'span','chip c-grey','En attente');

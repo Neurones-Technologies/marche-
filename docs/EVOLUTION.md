@@ -119,6 +119,10 @@ Non couvert par un test automatique : le refus de signature pendant un recours o
 
 ## Lot B — Écritures ciblées (1 semaine)
 
+> **Réalisé le 02/10/2026** (deuxième incrément de l'étape 2 de [CADRAGE.md](CADRAGE.md)). Les routes sont
+> celles du tableau ci-dessous, sous `/api/procedures/:id/`, avec une variante : la conformité se décide par
+> `PUT /conformite/:offre` et la confirmation d'un champ par `PUT` (elle peut être retirée avant la clôture).
+
 Aujourd'hui, une note modifiée renvoie **toutes les notes** (`quality`). Deux évaluateurs qui notent en même
 temps provoquent une erreur 409 pour l'un des deux, qui doit recharger.
 
