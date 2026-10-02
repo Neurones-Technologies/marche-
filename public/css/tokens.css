@@ -1,0 +1,220 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Marché+ — design tokens. SEULE source des couleurs, tailles, espacements,
+   rayons et polices. Aucun autre fichier n'écrit de valeur en dur : il lit
+   ces variables. Exception technique : les points de rupture des @media, que
+   CSS ne permet pas d'exprimer en variables (480 / 720 / 980 px).
+
+   Trois palettes, mêmes variables :
+     chaleureux     (par défaut, proche des couleurs Neurones)
+     institutionnel (bleu marine et or)
+     vivant         (indigo)
+   Choisie par l'utilisateur (menu Compte), posée sur <html data-theme="…">
+   par js/theme.js avant l'affichage.
+
+   Contrastes WCAG AA vérifiés pour chaque palette par scripts/contrastes.js.
+   --color-text-3 est réservé aux éléments non textuels et aux états désactivés.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../fonts/source-sans-3-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Source Sans 3"; font-style: italic; font-weight: 400; font-display: swap;
+  src: url("../fonts/source-sans-3-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("../fonts/source-sans-3-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+
+/* ── Valeurs communes aux trois palettes ── */
+:root {
+  --font-sans: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --fs-display: 24px;
+  --fs-title: 17px;
+  --fs-body: 15px;
+  --fs-table: 14px;
+  --fs-small: 13px;
+  --fs-tiny: 12px;
+  --fw-regular: 400;
+  --fw-strong: 600;
+  --lh-tight: 1.25;
+  --lh-body: 1.5;
+
+  /* Grille de 4 px */
+  --space-half: 2px;
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+
+  --border-w: 1px;
+  --focus-w: 2px;
+  --dot: 8px;
+  --icon-sm: 16px;
+  --icon: 18px;
+  --icon-lg: 22px;
+  --step: 32px;              /* pastille numérotée du parcours */
+  --avatar: 32px;
+  --avatar-lg: 48px;
+  --tile: 34px;              /* tuile d'icône d'un champ */
+  --tile-lg: 44px;           /* tuile d'icône de la carte « Prochaine étape » */
+
+  --control-h: 40px;
+  --control-h-sm: 32px;
+  --control-h-touch: 44px;
+
+  --sidebar-w: 248px;
+  --topbar-h: 60px;
+  --content-max: 1240px;
+  --col-min: 240px;
+  --field-col: 96px;
+  --label-col: 120px;
+  --text-max: 72ch;
+  --tip-max: 280px;
+  --progress-h: 8px;
+  --menu-w: 240px;
+
+  --print-margin: 18mm;
+  --duration: 120ms;
+}
+
+/* ── A · Chaleureux — palette par défaut ── */
+:root, :root[data-theme="chaleureux"] {
+  --color-bg: #F7F5F2;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #FBF9F6;        /* aperçu de document */
+  --color-tile: #F4F1EC;             /* tuile d'icône neutre */
+  --color-border: #EEE9E2;
+  --color-border-strong: #E6E1DA;
+  --color-border-field: #8C847C;     /* contour de champ et de bouton secondaire : ≥ 3:1 */
+  --color-text: #1F2430;
+  --color-text-2: #5C6371;
+  --color-text-3: #A8A097;
+
+  --color-accent: #1F5F8B;           /* boutons principaux, étape en cours */
+  --color-accent-hover: #184C70;
+  --color-accent-soft: #E6F0F7;
+  --color-accent-ring: #D7E7F2;
+  --color-on-accent: #FFFFFF;
+
+  --color-brand: #C2531F;            /* logo, élément de menu actif */
+  --color-brand-soft: #FFF1E6;
+  --color-brand-text: #A3461A;
+  --color-on-brand: #FFFFFF;
+  --color-badge-bg: #FFE3CF;
+  --color-badge-text: #8A3A12;
+
+  --color-side-bg: #FFFFFF;
+  --color-side-text: #1F2430;
+  --color-side-muted: #6B7280;
+  --color-side-line: #EFEAE3;
+  --color-side-on-bg: var(--color-brand-soft);
+  --color-side-on-text: var(--color-brand-text);
+
+  --color-ok: #2A7148;       --color-ok-bg: #E5F3EA;
+  --color-blocked: #A3392B;  --color-blocked-bg: #FBEAE7;
+  --color-pending: #8A5205;  --color-pending-bg: #FFF5E3;  --color-pending-solid: #E39A1C;
+  --color-draft: #5C6371;    --color-draft-bg: #F0EDE8;
+  --color-info: #1F5F8B;     --color-info-bg: #E6F0F7;
+
+  --color-overlay: rgba(31, 36, 48, .40);
+  --shadow-card: 0 1px 2px rgba(60, 40, 20, .05), 0 4px 14px rgba(60, 40, 20, .05);
+  --shadow-overlay: 0 8px 28px rgba(60, 40, 20, .14);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-btn: 10px;
+  --radius-pill: 999px;
+}
+
+/* ── B · Institutionnel ── */
+:root[data-theme="institutionnel"] {
+  --color-bg: #F2F4F7;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F7F9FB;
+  --color-tile: #EEF2F6;
+  --color-border: #E3E7EC;
+  --color-border-strong: #DDE2E8;
+  --color-border-field: #7D8897;
+  --color-text: #16202E;
+  --color-text-2: #556072;
+  --color-text-3: #A3ADB9;
+
+  --color-accent: #1C4E80;
+  --color-accent-hover: #163E66;
+  --color-accent-soft: #E3ECF6;
+  --color-accent-ring: #D5E2F0;
+  --color-on-accent: #FFFFFF;
+
+  --color-brand: #C9A227;
+  --color-brand-soft: #1E3E63;
+  --color-brand-text: #FFFFFF;
+  --color-on-brand: #0F2742;
+  --color-badge-bg: #C9A227;
+  --color-badge-text: #0F2742;
+
+  --color-side-bg: #0F2742;
+  --color-side-text: #E8EEF5;
+  --color-side-muted: #9FB1C5;
+  --color-side-line: #1F3A5A;
+  --color-side-on-bg: #1E3E63;
+  --color-side-on-text: #FFFFFF;
+
+  --color-ok: #1F6A45;       --color-ok-bg: #E2F1E8;
+  --color-blocked: #9A3A2E;  --color-blocked-bg: #F6E9E6;
+  --color-pending: #875608;  --color-pending-bg: #FDF3DF;  --color-pending-solid: #D99A1E;
+  --color-draft: #556072;    --color-draft-bg: #EEF1F4;
+  --color-info: #1C4E80;     --color-info-bg: #E3ECF6;
+
+  --color-overlay: rgba(15, 39, 66, .45);
+  --shadow-card: 0 1px 3px rgba(15, 39, 66, .07);
+  --shadow-overlay: 0 8px 24px rgba(15, 39, 66, .16);
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-btn: 6px;
+  --radius-pill: 999px;
+}
+
+/* ── C · Vivant ── */
+:root[data-theme="vivant"] {
+  --color-bg: #F4F6FB;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F8F9FD;
+  --color-tile: #F1F3FA;
+  --color-border: #E8EBF4;
+  --color-border-strong: #E1E5F0;
+  --color-border-field: #7B84A3;
+  --color-text: #18203A;
+  --color-text-2: #566080;
+  --color-text-3: #A6ADC4;
+
+  --color-accent: #4F46E5;
+  --color-accent-hover: #4338CA;
+  --color-accent-soft: #E0E7FF;
+  --color-accent-ring: #E0E7FF;
+  --color-on-accent: #FFFFFF;
+
+  --color-brand: #4F46E5;
+  --color-brand-soft: #4F46E5;
+  --color-brand-text: #FFFFFF;
+  --color-on-brand: #FFFFFF;
+  --color-badge-bg: #FFE4E6;
+  --color-badge-text: #9F1239;
+
+  --color-side-bg: #FFFFFF;
+  --color-side-text: #18203A;
+  --color-side-muted: #6A7290;
+  --color-side-line: #EBEEF6;
+  --color-side-on-bg: #4F46E5;
+  --color-side-on-text: #FFFFFF;
+
+  --color-ok: #04694B;       --color-ok-bg: #D1FAE5;
+  --color-blocked: #B4232C;  --color-blocked-bg: #FDE8EA;
+  --color-pending: #9A4608;  --color-pending-bg: #FFF7E6;  --color-pending-solid: #F59E0B;
+  --color-draft: #566080;    --color-draft-bg: #EEF0F7;
+  --color-info: #4338CA;     --color-info-bg: #E0E7FF;
+
+  --color-overlay: rgba(24, 32, 58, .40);
+  --shadow-card: 0 2px 8px rgba(24, 32, 58, .06);
+  --shadow-overlay: 0 10px 30px rgba(24, 32, 58, .14);
+  --radius: 16px;
+  --radius-sm: 12px;
+  --radius-btn: 999px;
+  --radius-pill: 999px;
+}

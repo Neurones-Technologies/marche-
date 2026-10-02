@@ -4,12 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Marché+</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="/js/theme.js"></script>
+<link rel="stylesheet" href="/css/tokens.css">
 <link rel="stylesheet" href="/css/app.css">
 <link rel="stylesheet" href="/css/login.css">
-</head>
 </head>
 <body>
 <a class="skip" href="#main">Aller au contenu principal</a>
@@ -18,28 +16,33 @@
 <div class="shell">
 <aside class="side" id="side" aria-label="Navigation principale">
   <div class="brand">
-    <span class="brand-mark" aria-hidden="true">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-    </span>Marché+
+    <span class="brand-mark" aria-hidden="true">M+</span>Marché+
   </div>
-  <div class="side-sec">Procédure AO-2026-014</div>
   <div class="navs" id="navs"></div>
   <div class="side-foot">
-    <div class="tenant"><b>Banque Atlantique du Littoral</b>Instance dédiée · Abidjan · zone UEMOA</div>
-    <button class="btn btn-ghost btn-sm" id="btn-reset-all" style="width:100%">Réinitialiser la démo</button>
+    <div class="tenant" id="tenant"></div>
+    <button class="btn btn-ghost btn-sm" id="btn-reset-all">Réinitialiser</button>
   </div>
 </aside>
 <div class="wrap">
   <div class="topbar">
-    <button class="burger" id="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="side">☰ Menu</button>
-    <div style="min-width:0">
-      <div class="eyebrow">AO-2026-014 · Appel d'offres ouvert international</div>
-      <strong style="font-size:14px" id="top-obj">—</strong>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="chip c-grey" id="phase-chip">Phase</span>
-      <button class="btn btn-ghost btn-sm" id="bell" aria-label="Notifications">🔔 <span id="bell-n"></span></button>
-      <span class="usr" id="usr" hidden><span class="usr-name" id="usr-name"></span><button class="btn btn-ghost btn-sm" id="btn-pwd" type="button">Mot de passe</button><button class="btn btn-ghost btn-sm" id="btn-logout" type="button">Déconnexion</button></span>
+    <button class="btn btn-ghost btn-sm burger" id="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="side">Menu</button>
+    <div></div>
+    <div>
+      <span class="chip" id="phase-chip">Phase</span>
+      <span class="usr" id="usr" hidden>
+        <button class="acct" id="acct" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="acct-menu"><span class="usr-name" id="usr-name"></span><span class="avatar" id="usr-av" aria-hidden="true"></span></button>
+        <div class="acct-menu" id="acct-menu" hidden>
+          <label for="palette">Palette</label>
+          <select id="palette">
+            <option value="chaleureux">Chaleureux</option>
+            <option value="institutionnel">Institutionnel</option>
+            <option value="vivant">Vivant</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" id="btn-pwd" type="button">Mot de passe</button>
+          <button class="btn btn-ghost btn-sm" id="btn-logout" type="button">Déconnexion</button>
+        </div>
+      </span>
     </div>
   </div>
   <main id="main" tabindex="-1"></main>
@@ -51,21 +54,21 @@
   <form id="login-form" class="login-card" novalidate>
     <div class="login-brand">Marché+</div>
     <h1 id="login-t">Connexion</h1>
-    <p class="muted">Plateforme de gestion des appels d'offres.</p>
     <label for="lg-email">Courriel</label>
     <input id="lg-email" type="email" autocomplete="username" required>
     <label for="lg-pw">Mot de passe</label>
     <input id="lg-pw" type="password" autocomplete="current-password" required>
     <div id="lg-err" class="lg-err" role="alert" hidden></div>
-    <button class="btn btn-primary" type="submit" id="lg-go">Se connecter</button>
+    <button class="btn btn-primary" type="submit" id="lg-go">Connecter</button>
     <details class="lg-demo" id="lg-demo" hidden>
-      <summary>Comptes de démonstration</summary>
+      <summary>Comptes de démo</summary>
       <div id="lg-demo-list"></div>
     </details>
   </form>
 </div>
 <div id="dlg" class="dlg" hidden></div>
 
+<script src="/js/regles.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/app.js"></script>
 </body>

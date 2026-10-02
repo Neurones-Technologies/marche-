@@ -5,7 +5,7 @@
 var UEMOA_DEF = ['CI','BF','SN','ML','NE','TG','BJ','GW'];
 var RATES_DEF = { XOF:1, EUR:655.957, USD:601.4, GHS:41.2, NGN:0.39 };
 function UEMOA_L(){ return (state && state.org && state.org.uemoa) ? state.org.uemoa : UEMOA_DEF; }
-function RATE(d){ var r=(state && state.org && state.org.rates) ? state.org.rates : RATES_DEF; return r[d]||1; }
+function RATE(d){ var r=(state && state.fxFrozen && state.fxFrozen.rates) || (state && state.org && state.org.rates) || RATES_DEF; return r[d]||1; }
 function DOCS(){ return (state && state.docDefs) ? state.docDefs : DOC_DEFS; }
 
 /* --- Habilitations : catalogue des permissions --- */
@@ -92,7 +92,7 @@ var UI = { q:'', sort:'nom' };
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
   'mailFrom','mailSuffix','approvals','offers'];
-var SERVER_ONLY = ['audit','receipts'];
+var SERVER_ONLY = ['audit','receipts','fxFrozen'];
 var synced = {}, revs = {}, serverRev = 0, flushing = false, dirty = false, flushTimer = null;
 var EMPTY_DRAFT = function(){ return { name:'', iso:'CI', devise:'XOF', montant:'', delai:'', garantie:'', refsCount:'', lots:[], docs:{} }; };
 function uiKey(){ return 'marcheplus.ui.'+(state?state.me:''); }
@@ -219,51 +219,27 @@ function labelize(t){
 function add(p,t,c,x){ var e=el(t,c,x); p.appendChild(e); return e; }
 function sep(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,' '); }
 function xof(n){ return sep(n)+' XOF'; }
+/* Les calculs métier vivent dans regles.js, partagé avec le serveur : mêmes résultats des deux côtés. */
+var R = window.MPRegles;
+function RCTX(){
+  return { offers:SEED_OFFERS, org:state.org, fxFrozen:state.fxFrozen, cdc:state.cdc, criteria:state.criteria,
+    quality:state.quality, justif:state.justif, excluded:state.excluded, confirmed:state.confirmed, docDefs:DOCS() };
+}
+/* Référence de la procédure : une donnée du cahier des charges, jamais une valeur écrite dans le code. */
+function REF(){ return (state && state.cdc && state.cdc.ref) || '—'; }
 function isUemoa(o){ return UEMOA_L().indexOf(o.iso)>=0; }
-function isLocal(o){ return o.iso==='CI'; }
-function montantXOF(o){ return o.montant * RATE(o.devise); }
-function montantCorrige(o){
-  var m = montantXOF(o);
-  if (state.cdc.prefActive && !isUemoa(o)) m = m * (1 + Number(state.cdc.prefTaux||0)/100);
-  return m;
-}
-function requiredDocs(o){
-  return DOCS().filter(function(d){
-    if (d.scope==='tous') return true;
-    if (d.scope==='local') return isLocal(o);
-    return !isUemoa(o);
-  });
-}
-function missingDocs(o){
-  return requiredDocs(o).filter(function(d){ return !o.docs[d.id]; });
-}
-function autoNonConforme(o){ return missingDocs(o).length>0; }
-function excluded(o){
-  if (state.excluded[o.id]!=null) return state.excluded[o.id];
-  return autoNonConforme(o);
-}
-function conformes(){ return SEED_OFFERS.filter(function(o){ return !excluded(o); }); }
-function aiScore(o,c){ return c==='metho'?o.aiMetho:(c==='refs'?o.aiRefs:70); }
-function curScore(o,c){ var q=state.quality[o.id]||{}; return q[c]!=null?q[c]:70; }
-function flagsRemaining(){
-  var n=0; SEED_OFFERS.forEach(function(o){ o.fields.forEach(function(f,i){ if(f.flag&&!state.confirmed[o.id+'_'+i]) n++; }); });
-  return n;
-}
-function weightTotal(){ return state.criteria.reduce(function(s,c){ return s+Number(c.weight||0); },0); }
-
-function ranking(){
-  var list=conformes(); if(!list.length) return [];
-  var minPrix=Math.min.apply(null,list.map(montantCorrige));
-  var minDelai=Math.min.apply(null,list.map(function(o){return o.delai;}));
-  var rows=list.map(function(o){
-    var notes={ prix:Math.round(minPrix/montantCorrige(o)*1000)/10, delai:Math.round(minDelai/o.delai*1000)/10 };
-    state.criteria.forEach(function(c){ if(c.kind==='qual') notes[c.id]=curScore(o,c.id); });
-    var t=0; state.criteria.forEach(function(c){ t += (notes[c.id]||0)*Number(c.weight||0)/100; });
-    return { o:o, notes:notes, total:Math.round(t*10)/10 };
-  });
-  rows.sort(function(a,b){ return b.total-a.total; });
-  return rows;
-}
+function isLocal(o){ return R.isLocal(o); }
+function montantXOF(o){ return R.montantXOF(RCTX(),o); }
+function montantCorrige(o){ return R.montantCorrige(RCTX(),o); }
+function requiredDocs(o){ return R.requiredDocs(RCTX(),o); }
+function missingDocs(o){ return R.missingDocs(RCTX(),o); }
+function excluded(o){ return R.isExcluded(RCTX(),o); }
+function conformes(){ return R.conformes(RCTX()); }
+function aiScore(o,c){ return R.aiScore(o,c); }
+function curScore(o,c){ return R.curScore(RCTX(),o,c); }
+function flagsRemaining(){ return R.flagsRemaining(RCTX()); }
+function weightTotal(){ return R.weightTotal(RCTX()); }
+function ranking(){ return R.ranking(RCTX()); }
 
 function anomalies(){
   var out=[], c=state.cdc;
@@ -299,7 +275,7 @@ function anomalies(){
   return out;
 }
 
-function allApproved(){ return state.approvals.every(function(a){return a.done;}); }
+function allApproved(){ return R.allApproved(state.approvals); }
 function phase(){
   if (!state.cdc.cdcPublie) return {k:'Phase : préparation du DAO', c:'c-violet'};
   if (!state.depClosed) return {k:'Phase : dépouillement', c:'c-amber'};
@@ -307,16 +283,7 @@ function phase(){
   if (allApproved()) return {k:'Phase : attribuée', c:'c-green'};
   return {k:'Phase : approbation', c:'c-teal'};
 }
-function missingJustifs(){
-  var out=[];
-  state.criteria.filter(function(c){return c.kind==='qual';}).forEach(function(c){
-    conformes().forEach(function(o){
-      if (Math.abs(curScore(o,c.id)-aiScore(o,c.id))>0.01 && !(state.justif[o.id+'_'+c.id]||'').trim())
-        out.push(o.name+' / '+c.label);
-    });
-  });
-  return out;
-}
+function missingJustifs(){ return R.missingJustifs(RCTX()); }
 
 /* ============ Générateur de dossier d'appel d'offres ============ */
 function A(n,t,cat,paras){ return {n:n,t:t,cat:cat,p:paras}; }
@@ -329,7 +296,7 @@ function buildDAO(){
   /* ---------- PIÈCE 1 : AVIS ---------- */
   P.push({ id:'p1', titre:"Pièce 1 — Avis d'appel d'offres", cat:'admin', arts:[
     A('1.1',"Objet et identification",'admin',[
-      c.autorite+" lance un "+c.procedure.toLowerCase()+" sous la référence AO-2026-014 ayant pour objet : "+c.objet+".",
+      c.autorite+" lance un "+c.procedure.toLowerCase()+" sous la référence "+REF()+" ayant pour objet : "+c.objet+".",
       "Le marché est passé en "+lots.length+" lot(s) distinct(s), pouvant être attribués séparément. Un même soumissionnaire peut présenter une offre pour un seul lot, pour plusieurs lots ou pour l'ensemble des lots ; il précise dans son acte d'engagement les lots pour lesquels il soumissionne et, le cas échéant, les remises consenties en cas d'attribution multiple.",
       "La procédure est ouverte aux entreprises établies dans l'espace UEMOA comme aux entreprises établies hors de cet espace, sous réserve de la production des pièces exigées à l'article 2.4 du règlement de la consultation."
     ]),
@@ -705,7 +672,7 @@ function daoVolume(P){
 function vDAO(m){
   var c=state.cdc, P=buildDAO(), V=daoVolume(P);
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','AO-2026-014');
+  add(l,'div','eyebrow',REF());
   add(l,'h1',null,"Dossier d'appel d'offres généré");
   add(l,'p','lede',"Document complet assemblé à partir des paramètres du cahier des charges : "+P.length+" pièces, "+P.reduce(function(s,x){return s+x.arts.length;},0)+" articles, volume estimé à "+V.pages+" pages. Toute modification du cahier des charges régénère le document.");
   add(h,'button','btn btn-ghost btn-sm','Imprimer / exporter').addEventListener('click',function(){ imprimer(); });
@@ -759,7 +726,7 @@ function vDAO(m){
   var doc=add(m,'div','card'); doc.style.marginTop='18px';
   add(doc,'div','panel-head','Corps du dossier');
   var db=add(doc,'div','pad'); var pv=add(db,'div','pv');
-  add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — AO-2026-014').style.cssText='font-weight:700;font-size:16px;color:var(--ink)';
+  add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — '+REF()).style.cssText='font-weight:700;font-size:16px;color:var(--ink)';
   add(pv,'p',null, c.autorite+' — '+c.procedure);
   add(pv,'p',null, 'Objet : '+c.objet);
   add(pv,'p',null, 'Langue : '+c.langue+' · Devise : '+c.deviseSoumission+' · Date limite de dépôt : '+c.ouverture);
@@ -834,7 +801,7 @@ function notify(evId, titre, corps){
     var dest=destinataires(r.roles);
     state.emails.unshift({ id:'m'+Date.now()+Math.random().toString(36).slice(2,6), ev:evId,
       de:state.mailFrom, a:dest.map(mailAdr), noms:dest.map(function(u){return u.nom+' ('+roleLab(u.role)+')';}),
-      objet:'[AO-2026-014] '+titre, corps:corps+"\n\n—\n"+state.org.nom+" — plateforme Marché+\nCe message est généré automatiquement ; ne pas y répondre.",
+      objet:'['+REF()+'] '+titre, corps:corps+"\n\n—\n"+state.org.nom+" — plateforme Marché+\nCe message est généré automatiquement ; ne pas y répondre.",
       t:t, statut:'simulé' });
     if(state.emails.length>80) state.emails.length=80;
   }
@@ -883,11 +850,7 @@ function lifeStatus(){
   if(state.infructueux) { st.eval='blocked'; }
   return st;
 }
-function standstillReste(){
-  if(!state.standstill.startedAt) return state.standstill.days;
-  var ecoule=(Date.now()-state.standstill.startedAt)/86400000;
-  return Math.max(0, Math.ceil(state.standstill.days-ecoule));
-}
+function standstillReste(){ return R.standstillRemaining(state.standstill); }
 function recoursOuverts(){ return state.recours.filter(function(x){return x.statut==='ouvert';}); }
 function clarifsOuvertes(){ return state.clarifs.filter(function(x){return x.statut==='envoyee';}); }
 function coiDe(uid){ return state.coi[uid]||null; }
@@ -926,26 +889,26 @@ function vide(parent, ic, titre, texte){
 
 /* ============ Navigation ============ */
 var VIEWS=[
-  {id:'dashboard', label:'Tableau de bord',          grp:'Pilotage'},
-  {id:'notifs',    label:'Notifications',            grp:'Pilotage'},
-  {id:'cdc',       label:'Cahier des charges',       grp:'Préparation', perm:'cdc.edit'},
-  {id:'dao',       label:"Dossier d'appel d'offres", grp:'Préparation', perm:'cdc.edit'},
-  {id:'criteres',  label:'Grille de critères',       grp:'Préparation', perm:'criteres.edit'},
-  {id:'qa',        label:'Questions & additifs',      grp:'Préparation', perm:'offres.read'},
-  {id:'portail',   label:'Portail de dépôt',         grp:'Espace soumissionnaire', role:true, perm:'portail.use'},
-  {id:'reception', label:'Réception des offres',     grp:'Traitement des offres', perm:'offres.read'},
-  {id:'depouille', label:'Dépouillement',            grp:'Traitement des offres', perm:'offres.read'},
-  {id:'conformite',label:'Conformité & anomalies',   grp:'Traitement des offres', perm:'offres.read'},
-  {id:'clarifs',   label:'Clarifications',            grp:'Traitement des offres', perm:'offres.read'},
-  {id:'evaluation',label:'Évaluation',               grp:'Décision', perm:'offres.read'},
-  {id:'decision',  label:'Décision & approbation',   grp:'Décision', perm:'offres.read'},
-  {id:'recours',   label:'Notification & recours',   grp:'Décision', perm:'offres.read'},
-  {id:'pv',        label:'Procès-verbal',            grp:'Décision', perm:'pv.read'},
-  {id:'audit',     label:"Piste d'audit",            grp:'Décision', perm:'audit.read'},
-  {id:'roles',     label:'Rôles et habilitations',   grp:'Administration', perm:'roles.edit'},
-  {id:'comptes',   label:'Comptes utilisateurs',     grp:'Administration', perm:'roles.edit'},
-  {id:'params',    label:'Paramètres',               grp:'Administration', perm:'params.edit'},
-  {id:'regles',    label:'Règles de notification',   grp:'Administration', perm:'notif.manage'}
+  {id:'dashboard',  label:'Tableau de bord', grp:'Pilotage'},
+  {id:'notifs',     label:'Notifications', grp:'Pilotage'},
+  {id:'cdc',        label:'Cahier des charges', grp:'Préparation', perm:'cdc.edit'},
+  {id:'dao',        label:'DAO', grp:'Préparation', perm:'cdc.edit'},
+  {id:'criteres',   label:'Grille de critères', grp:'Préparation', perm:'criteres.edit'},
+  {id:'qa',         label:'Questions', grp:'Préparation', perm:'offres.read'},
+  {id:'portail',    label:'Portail de dépôt', grp:'Soumission', role:true, perm:'portail.use'},
+  {id:'reception',  label:'Réception', grp:'Offres', perm:'offres.read'},
+  {id:'depouille',  label:'Dépouillement', grp:'Offres', perm:'offres.read'},
+  {id:'conformite', label:'Conformité', grp:'Offres', perm:'offres.read'},
+  {id:'clarifs',    label:'Clarifications', grp:'Offres', perm:'offres.read'},
+  {id:'evaluation', label:'Évaluation', grp:'Décision', perm:'offres.read'},
+  {id:'decision',   label:'Décision', grp:'Décision', perm:'offres.read'},
+  {id:'recours',    label:'Recours', grp:'Décision', perm:'offres.read'},
+  {id:'pv',         label:'Procès-verbal', grp:'Décision', perm:'pv.read'},
+  {id:'audit',      label:"Journal d'audit", grp:'Décision', perm:'audit.read'},
+  {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit'},
+  {id:'comptes',    label:'Comptes', grp:'Administration', perm:'roles.edit'},
+  {id:'params',     label:'Paramètres', grp:'Administration', perm:'params.edit'},
+  {id:'regles',     label:'Alertes', grp:'Administration', perm:'notif.manage'}
 ];
 function lockReason(id){
   if(id==='portail' && !state.cdc.cdcPublie) return "Publiez le cahier des charges pour ouvrir le dépôt.";
@@ -958,6 +921,9 @@ function lockReason(id){
   if(id==='clarifs' && !state.cdc.cdcPublie) return "Les clarifications interviennent après réception des offres.";
   return null;
 }
+function viewAllowed(id){ return VIEWS.some(function(v){ return v.id===id && (!v.perm || can(v.perm)); }); }
+/* Le soumissionnaire n'a rien à faire sur le tableau de bord acheteur : il arrive sur son portail. */
+function homeView(){ return (!can('offres.read') && can('portail.use')) ? 'portail' : 'dashboard'; }
 function renderNav(){
   var box=document.getElementById('navs'); box.textContent='';
   var grp=null;
@@ -965,15 +931,15 @@ function renderNav(){
   vis.forEach(function(v){
     if(v.grp!==grp){ grp=v.grp; add(box,'div','navgrp',grp); }
     var b=el('button','navb'+(v.role?' role':''));
+    icon(b, NAV_ICONS[v.id]);
     b.appendChild(document.createTextNode(v.label));
     var reason=lockReason(v.id);
     if(reason){
       b.classList.add('lock');
       b.setAttribute('title',reason);
       b.setAttribute('aria-describedby','');
-      var lk=el('span','lk','🔒'); lk.setAttribute('aria-hidden','true'); b.appendChild(lk);
-      var sr=el('span',null,' — verrouillé : '+reason);
-      sr.style.cssText='position:absolute;left:-9999px'; b.appendChild(sr);
+      icon(b,'lock').setAttribute('class','ic lk');
+      b.appendChild(el('span','sr-only',' — verrouillé : '+reason));
     } else if(v.id==='depouille'&&flagsRemaining()>0){
       b.appendChild(el('span','n',String(flagsRemaining())));
     } else if(v.id==='notifs'&&nonLues().length>0){
@@ -1001,12 +967,9 @@ function go(v){
   state.view=v; save(); render(); window.scrollTo(0,0);
 }
 function locked(m,msg,t,l){
-  var c=add(m,'div','card pad'); c.style.cssText='text-align:center;padding:48px 24px';
-  var ic=add(c,'div',null,'🔒'); ic.style.cssText='font-size:26px;margin-bottom:6px'; ic.setAttribute('aria-hidden','true');
-  add(c,'h2',null,'Étape verrouillée').style.fontSize='18px';
-  add(c,'p','lede',msg).style.margin='8px auto 6px';
-  add(c,'p','muted','Le séquencement des étapes est une garantie de régularité de la procédure : il n\u2019est pas contournable.').style.margin='0 auto 18px';
-  var b=add(c,'button','btn btn-primary',l); fk(b,'unlock');
+  var c=add(m,'div','card empty');
+  add(c,'div',null,msg);
+  var b=add(c,'button','btn btn-primary btn-sm',l); fk(b,'unlock');
   b.addEventListener('click',function(){ go(t); });
 }
 function originChip(parent,o){
@@ -1039,7 +1002,8 @@ function vDashboard(m){
 
   var c1=add(g,'div','card');
   var ph=add(c1,'div','panel-head'); add(ph,'span',null,'Offres reçues');
-  add(ph,'span','chip c-grey','1 EUR = 655,957 XOF · 1 USD = 601,40 XOF');
+  var pivot=(state.org&&state.org.devisePivot)||'XOF', fr=function(n){ return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:3}); };
+  add(ph,'span','chip c-grey', ['EUR','USD'].map(function(d){ return '1 '+d+' = '+fr(RATE(d))+' '+pivot; }).join(' · ')+(state.fxFrozen?' (taux figés)':''));
   var fl=add(c1,'div','pad'); fl.style.cssText='padding:14px 18px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end';
   var fw=add(fl,'div'); fw.style.flex='1 1 220px';
   var flab=add(fw,'label',null,'Rechercher'); flab.setAttribute('for','offsearch');
@@ -1133,13 +1097,13 @@ function vDashboard(m){
     add(lf,'div','muted',x[4]);
     add(r,'span','chip '+x[3],x[2]);
   });
-  add(add(oth,'div','panel-foot'),'span','muted','Contexte de démonstration : seule la procédure AO-2026-014 est instrumentée dans ce prototype.');
+  add(add(oth,'div','panel-foot'),'span','muted','Contexte de démonstration : seule la procédure '+REF()+' est instrumentée dans ce prototype.');
 
   var n=add(m,'div','note');
   add(n,'strong',null,'Préférence communautaire. ');
   n.appendChild(document.createTextNode(
     state.cdc.prefActive
-      ? "Une marge de préférence de "+state.cdc.prefTaux+" % est appliquée à la comparaison : les offres hors UEMOA sont majorées de ce taux pour le seul classement, sans modification du prix contractuel. Désactivez-la depuis le cahier des charges pour mesurer son effet sur le classement."
+      ? "Une marge de préférence de "+state.cdc.prefTaux+" % est appliquée à la comparaison : les offres hors UEMOA sont majorées de ce taux pour le seul classement, sans modification du prix contractuel. Son activation et son taux se règlent au cahier des charges, et sont figés à la clôture du dépouillement."
       : "La marge de préférence communautaire est désactivée : les offres sont comparées à leur valeur convertie, sans correction d'origine."));
 }
 
@@ -1154,7 +1118,7 @@ function vCDC(m){
     ask('Le dossier devient opposable aux candidats et le portail de dépôt s\u2019ouvre.', function(){
       c.cdcPublie=true; logit('Cahier des charges publié — ouverture aux soumissions');
       notify('cdc.publie', 'Cahier des charges publié',
-        "Le dossier d'appel d'offres AO-2026-014 est publié. Objet : "+c.objet+". Date limite de dépôt : "+c.ouverture+" à 10 h 00.");
+        "Le dossier d'appel d'offres "+REF()+" est publié. Objet : "+c.objet+". Date limite de dépôt : "+c.ouverture+" à 10 h 00.");
       save(); render();
     }, 'Publier le cahier des charges ?', 'Publier');
   });
@@ -1172,6 +1136,7 @@ function vCDC(m){
     i.addEventListener('change',function(){ cb(i.value); save(); render(); });
     return i;
   }
+  txt(f1,"Référence de la procédure",c.ref,function(v){ c.ref=String(v).trim(); logit('Référence de la procédure : '+c.ref); });
   txt(f1,"Objet du marché",c.objet,function(v){ c.objet=v; logit('Objet du marché modifié'); },'textarea').style.gridColumn='1/-1';
   txt(f1,"Autorité contractante",c.autorite,function(v){ c.autorite=v; });
   txt(f1,"Type de procédure",c.procedure,function(v){ c.procedure=v; });
@@ -1268,6 +1233,10 @@ function vCDC(m){
     c.prefTaux=Math.max(0,Math.min(25,Number(pi.value)||0));
     logit('Taux de préférence communautaire porté à '+c.prefTaux+' %'); save(); render();
   });
+  if(state.depClosed){
+    pill.disabled=true; pi.disabled=true;
+    add(b6,'p','muted',"Dépouillement clôturé : la marge est figée, elle conditionne le classement.").style.marginTop='12px';
+  }
   add(b6,'p','muted',"Mécanisme : les offres de soumissionnaires établis hors de l'espace communautaire sont majorées du taux retenu pour les seuls besoins de la comparaison. Le prix contractuel du titulaire reste son prix d'offre.").style.marginTop='12px';
 
   /* Pièces */
@@ -1294,7 +1263,7 @@ function vCDC(m){
   var prb=add(ph8,'button','btn btn-ghost btn-sm','Imprimer l\u2019extrait');
   prb.addEventListener('click',function(){ imprimer(); });
   var b8=add(k8,'div','pad'); var pv=add(b8,'div','pv');
-  add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — AO-2026-014').style.cssText='font-weight:700;font-size:15px;color:var(--ink)';
+  add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — '+REF()).style.cssText='font-weight:700;font-size:15px;color:var(--ink)';
   add(pv,'p',null, c.autorite+' — '+c.procedure+' — langue : '+c.langue+' — ouverture des plis : '+c.ouverture);
   add(pv,'h4',null,'Objet'); add(pv,'p',null,c.objet);
   add(pv,'h4',null,'Allotissement');
@@ -1358,10 +1327,16 @@ function vCriteres(m){
   msg.style.cssText='font-size:12.5px;color:'+(wt===100?'var(--muted)':'var(--red)');
   add(foot,'button','btn btn-ghost btn-sm','+ Ajouter un critère qualitatif').addEventListener('click',function(){
     var id='c'+Date.now();
+    // Pas d'écriture dans les notes : un critère sans note vaut 70 (curScore), et noter relève de l'évaluateur.
     state.criteria.push({id:id,label:'Nouveau critère',weight:0,kind:'qual',hint:'Notation proposée par IA, validée par un évaluateur'});
-    SEED_OFFERS.forEach(function(o){ state.quality[o.id][id]=70; });
     logit('Critère ajouté à la grille'); save(); render();
   });
+  if(state.depClosed){
+    Array.prototype.forEach.call(card.querySelectorAll('input,button'),function(x){ x.disabled=true; });
+    var lk=add(m,'div','warn'); lk.style.marginTop='18px';
+    add(lk,'strong',null,'Grille figée. ');
+    lk.appendChild(document.createTextNode("Le dépouillement est clôturé : la grille publiée au dossier ne peut plus être modifiée. La changer après l'ouverture des plis serait un motif d'annulation."));
+  }
 
   var n=add(m,'div','note');
   add(n,'strong',null,'Pourquoi ce paramétrage. ');
@@ -1375,7 +1350,7 @@ function vReception(m){
 
   var card=add(m,'div','card');
   var ph=add(card,'div','panel-head'); add(ph,'span',null,'Plis reçus et traitement');
-  add(ph,'span','chip c-grey','Taux figés à l\u2019ouverture — 15/10/2026');
+  add(ph,'span','chip c-grey', state.fxFrozen ? 'Taux figés le '+state.fxFrozen.at : 'Taux figés à la clôture du dépouillement');
   var b=add(card,'div','pad');
   SEED_OFFERS.forEach(function(o){
     var row=add(b,'div'); row.style.cssText='padding:14px 0;border-top:1px solid var(--line-2)';
@@ -1407,116 +1382,266 @@ function vReception(m){
   w.appendChild(document.createTextNode("Aucun montant n'est retenu sans confirmation humaine dès que sa confiance passe sous le seuil. Et le taux de conversion appliqué est celui arrêté à la date d'ouverture des plis, figé pour toute la procédure : recalculer au fil de l'eau rendrait le classement contestable."));
 }
 
-function vDepouille(m){
-  if (!state.cdc.cdcPublie) return locked(m,"Le dépouillement s'ouvre une fois le cahier des charges publié.",'cdc','Aller au cahier des charges');
-  var o=SEED_OFFERS[state.offerIndex];
-  var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Dépouillement');
-  var t=add(l,'h1',null,'Offre — '+o.name);
-  var sub=add(l,'div'); sub.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px';
-  originChip(sub,o);
-  if(o.devise!=='XOF') add(sub,'span','chip c-grey','Conversion : '+sep(o.montant)+' '+o.devise+' = '+xof(montantXOF(o)));
-  var r=add(h,'div'); r.style.cssText='display:flex;align-items:center;gap:12px;flex-wrap:wrap';
-  add(r,'span','muted','Offre '+(state.offerIndex+1)+' sur '+SEED_OFFERS.length);
-  var flags=o.fields.filter(function(f){return f.flag;}).length;
-  var done=o.fields.filter(function(f,i){return f.flag&&state.confirmed[o.id+'_'+i];}).length;
-  var pr=add(r,'div','progress'); add(pr,'span').style.width=(flags?done/flags*100:100)+'%';
-  add(r,'span','chip '+(flags===0?'c-green':(done===flags?'c-green':'c-amber')),
-      flags===0 ? 'Saisie structurée — aucune vérification requise' : done+' / '+flags+' champs confirmés');
+/* ============ Composants de présentation (styles : css/app.css, valeurs : css/tokens.css) ============ */
+/* Icônes : traits vectoriels intégrés, couleur héritée du texte. */
+var ICONS = {
+  home:'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+  bell:'M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8|M10 20a2 2 0 0 0 4 0',
+  file:'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z|M14 3v5h5M9 13h6M9 17h6',
+  book:'M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5z|M4 19.5A1.5 1.5 0 0 0 5.5 21H20v-3',
+  sliders:'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0|M16 4v4M10 10v4M18 16v4',
+  chat:'M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z',
+  upload:'M12 15V4M7 9l5-5 5 5|M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4',
+  inbox:'M3 13h5l1.5 3h5L16 13h5|M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z',
+  search:'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z|m20 20-4-4',
+  shield:'M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z|m9 12 2 2 4-4',
+  help:'M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z|M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 16.5h.01',
+  chart:'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  gavel:'m14 5 5 5M11 8l5 5M9 10l5-5 5 5-5 5zM4 20l7-7',
+  scale:'M12 3v18M7 21h10M5 7h14|M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z',
+  stamp:'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z|M14 3v5h5|m9 15 2 2 4-4',
+  list:'M9 6h11M9 12h11M9 18h11|M4 6h.01M4 12h.01M4 18h.01',
+  key:'M15 7a4 4 0 1 0 0 .01|M12 10 3 19v2h3l1-1v-2h2v-2h2l1.5-1.5',
+  users:'M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1|M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z|M22 20v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  cog:'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z|M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1',
+  ring:'M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8|M10 20a2 2 0 0 0 4 0|M2 8c0-2 1-4 2.5-5M22 8c0-2-1-4-2.5-5',
+  check:'m5 12 5 5 9-10',
+  coin:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z|M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.8 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2',
+  clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z|M12 7v5l3 2',
+  info:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z|M12 11v5M12 8h.01',
+  arrow:'M5 12h14M13 6l6 6-6 6',
+  lock:'M6 11h12v10H6z|M8 11V7a4 4 0 0 1 8 0v4'
+};
+function icon(parent, name){
+  var NS='http://www.w3.org/2000/svg', s=document.createElementNS(NS,'svg');
+  s.setAttribute('class','ic'); s.setAttribute('viewBox','0 0 24 24'); s.setAttribute('aria-hidden','true');
+  s.setAttribute('fill','none'); s.setAttribute('stroke','currentColor'); s.setAttribute('stroke-width','1.8');
+  s.setAttribute('stroke-linecap','round'); s.setAttribute('stroke-linejoin','round');
+  (ICONS[name]||ICONS.info).split('|').forEach(function(d){ var p=document.createElementNS(NS,'path'); p.setAttribute('d',d); s.appendChild(p); });
+  if(parent) parent.appendChild(s);
+  return s;
+}
+/* Icône de chaque écran du menu. */
+var NAV_ICONS = { dashboard:'home', notifs:'bell', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
+  reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
+  recours:'scale', pv:'stamp', audit:'list', roles:'key', comptes:'users', params:'cog', regles:'ring' };
 
-  var sp=add(m,'div','split');
-  var dc=add(sp,'div','card');
-  add(dc,'div','panel-head',o.doc);
-  if (o.submitted){
-    var sb=add(dc,'div','pad');
-    var bx=add(sb,'div'); bx.style.cssText='background:var(--green-bg);border-radius:10px;padding:16px';
-    add(bx,'strong',null,'Dépôt dématérialisé — aucune extraction nécessaire');
-    add(bx,'p','muted',"Cette offre a été saisie directement par le soumissionnaire sur le portail. Les valeurs sont structurées à la source : ni OCR, ni interprétation de tableau, ni champ à confiance faible. Aucune vérification manuelle n'est requise.").style.marginTop='6px';
-    var mi=add(sb,'div'); mi.style.marginTop='14px';
-    [['Contact', o.contact||'—'],['Déposé le', o.depot||'—'],['Validité de l\u2019offre', (o.validite||'—')+' jours'],
-     ['Modalités de paiement', o.paiement||'—']].forEach(function(x){
-      var r=add(mi,'div','docline');
-      add(r,'div','muted',x[0]); add(r,'div',null,x[1]).style.fontWeight='600';
-    });
+/* Pastille de statut : kind = ok | blocked | pending | draft | info. */
+function chip(parent, kind, text, ic){ var c=add(parent,'span','chip chip-'+kind); if(ic) icon(c,ic); c.appendChild(document.createTextNode(text)); return c; }
+/* Infobulle d'aide, lisible au survol et au clavier. */
+function tip(parent, text){
+  var b=add(parent,'button','tip','?'); b.type='button';
+  b.setAttribute('aria-label',text); b.setAttribute('data-tip',text);
+  return b;
+}
+/* Bandeau d'une ligne : kind = ok | blocked | pending | info. */
+function banner(parent, kind, titre, detail, aide){
+  var d=add(parent,'div','banner banner-'+kind);
+  d.setAttribute('role', kind==='blocked' ? 'alert' : 'status');
+  add(d,'strong',null,titre);
+  if(detail) add(d,'span',null,detail);
+  if(aide) tip(d,aide);
+  return d;
+}
+/* Bouton avec icône. */
+function ibtn(parent, cls, text, ic, apres){
+  var b=add(parent,'button','btn '+cls); b.type='button';
+  if(ic && !apres) icon(b,ic);
+  b.appendChild(document.createTextNode(text));
+  if(ic && apres) icon(b,ic);
+  return b;
+}
+/* Carte « Prochaine étape » : ce qu'il faut faire maintenant, en une phrase et un bouton. */
+function guideCard(m, g){
+  var c=add(m,'section','card guide'+(g.ok?' ok':'')); c.setAttribute('aria-label','Prochaine étape');
+  icon(add(c,'span','guide-ico'), g.ok ? 'check' : (g.icon||'arrow'));
+  var t=add(c,'div'); add(t,'h2',null,g.titre); if(g.texte) add(t,'p',null,g.texte);
+  if(g.action){ var b=ibtn(c,'btn-primary',g.action,'arrow',true); fk(b,'guide'); if(g.go) b.addEventListener('click',g.go); }
+  return c;
+}
+/* Montant « 84 660 000 XOF » : chiffres en mono, devise en gris, contre-valeur au taux de la procédure. */
+function montant(parent, texte){
+  var mt=/^([\d\s  ]+(?:[.,]\d+)?)\s+([A-Z]{3})$/.exec(String(texte));
+  if(!mt){ parent.appendChild(document.createTextNode(texte)); return; }
+  add(parent,'span','num',mt[1]); add(parent,'span','ccy',mt[2]);
+  if(mt[2]!=='XOF'){
+    var n=Number(mt[1].replace(/[\s  ]/g,'').replace(',','.'));
+    add(parent,'span','alt','≈ '+sep(n*RATE(mt[2]))+' XOF · taux '+Number(RATE(mt[2])).toLocaleString('fr-FR')+(state.fxFrozen?' figé':''));
+  }
+}
+function initiales(nom){ return String(nom).replace(/[^A-Za-zÀ-ÿ ]/g,' ').split(/\s+/).filter(function(x){ return x.length>2 || /^[A-Z]/.test(x); }).map(function(x){ return x[0]; }).join('').slice(0,2).toUpperCase(); }
+
+/* Parcours de la procédure, en tête de chaque écran de procédure. */
+var FLOW = [
+  {id:'prep',    lab:'Préparer',   view:'cdc'},
+  {id:'recv',    lab:'Recevoir',   view:'reception'},
+  {id:'depouil', lab:'Dépouiller', view:'depouille'},
+  {id:'conf',    lab:'Conformité', view:'conformite'},
+  {id:'eval',    lab:'Évaluer',    view:'evaluation'},
+  {id:'decide',  lab:'Décider',    view:'decision'},
+  {id:'close',   lab:'Clore',      view:'recours'}
+];
+var FLOW_LAB = { done:'terminé', now:'en cours', blocked:'bloqué', todo:'à venir' };
+function flowStatus(){
+  var s=lifeStatus();
+  // Une seule étape « en cours » : dès que des offres sont arrivées, on est au dépouillement.
+  return { prep:s.prep, recv: (state.depClosed || (state.cdc.cdcPublie && SEED_OFFERS.length)) ? 'done' : s.depot, depouil:s.depouil,
+    conf: s.clarif==='blocked' ? 'blocked' : (state.depClosed ? 'done' : 'todo'),
+    eval:s.eval, decide:s.appro,
+    close: state.contractSigned ? 'done' : (s.recours==='blocked' ? 'blocked' : (allApproved() ? 'now' : 'todo')) };
+}
+function stepper(m){
+  var st=flowStatus();
+  var ol=add(m,'ol','flow'); ol.setAttribute('aria-label','Parcours de la procédure');
+  FLOW.forEach(function(f,i){
+    var li=add(ol,'li','flow-step '+st[f.id]);
+    var ok=viewAllowed(f.view);
+    var b=add(li, ok?'button':'span');
+    var n=add(b,'span','flow-n');
+    if(st[f.id]==='done') icon(n,'check'); else n.textContent=String(i+1);
+    add(b,'span','flow-label',f.lab);
+    if(ok){ b.type='button'; b.addEventListener('click',function(){ go(f.view); }); }
+    if(state.view===f.view) b.setAttribute('aria-current','step');
+    add(b,'span','sr-only',' — '+FLOW_LAB[st[f.id]]);
+  });
+}
+
+/* Icône d'un champ extrait, d'après son libellé. */
+function fieldIcon(k){
+  if(/montant|prix/i.test(k)) return 'coin';
+  if(/délai/i.test(k)) return 'clock';
+  if(/garantie/i.test(k)) return 'shield';
+  if(/caution|pièce|document/i.test(k)) return 'file';
+  return 'info';
+}
+function aVerifier(o){ return o.fields.filter(function(f,i){ return f.flag && !state.confirmed[o.id+'_'+i]; }).length; }
+
+function vDepouille(m){
+  stepper(m);
+  if (!state.cdc.cdcPublie) return locked(m,"Le dépouillement s'ouvre une fois le cahier des charges publié.",'cdc','Ouvrir le cahier des charges');
+  var o=SEED_OFFERS[state.offerIndex], nb=SEED_OFFERS.length;
+  var seuil=Number(state.seuils.confianceMin)||0;
+  var reste=flagsRemaining(), restIci=aVerifier(o);
+  var total=0; SEED_OFFERS.forEach(function(x){ total+=x.fields.filter(function(f){return f.flag;}).length; });
+
+  /* Prochaine étape */
+  var suivante=null;
+  for(var j=1;j<=nb;j++){ var x=SEED_OFFERS[(state.offerIndex+j)%nb]; if(aVerifier(x)>0){ suivante=x; break; } }
+  if(state.depClosed){
+    guideCard(m,{ ok:true, titre:'Dépouillement clôturé', texte: state.fxFrozen ? 'Données figées le '+state.fxFrozen.at+'. Les offres conformes peuvent maintenant être évaluées.' : 'Les offres conformes peuvent maintenant être évaluées.',
+      action: viewAllowed('evaluation') ? 'Passer à l’évaluation' : null, go:function(){ go('evaluation'); } });
+  } else if(restIci>0){
+    guideCard(m,{ icon:'check', titre:'Prochaine étape : vérifier '+restIci+' valeur'+(restIci>1?'s':'')+' de '+o.name,
+      texte:'Le lecteur automatique n’est pas sûr de ces valeurs. Comparez-les au document, puis confirmez.',
+      action: can('depouille.confirm') ? 'Commencer' : null,
+      go:function(){ var b=document.querySelector('.xf-row.pending .btn'); if(b){ b.scrollIntoView({block:'center'}); b.focus(); } } });
+  } else if(suivante){
+    guideCard(m,{ icon:'arrow', titre:'Cette offre est vérifiée', texte:'Offre suivante à vérifier : '+suivante.name+' ('+aVerifier(suivante)+' valeur'+(aVerifier(suivante)>1?'s':'')+').',
+      action:'Ouvrir l’offre suivante', go:function(){ state.offerIndex=SEED_OFFERS.indexOf(suivante); save(); render(); } });
   } else {
-  var stage=add(dc,'div','doc-stage'); var sheet=add(stage,'div','doc-sheet');
-  add(sheet,'div',null, o.devise==='XOF'?'BORDEREAU DES PRIX UNITAIRES':'PRICE SCHEDULE — BILL OF QUANTITIES')
-    .style.cssText='font-weight:700;font-size:13px;margin-bottom:12px';
-  var hd=add(sheet,'div','doc-row'); hd.style.cssText+=';font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:8px';
-  (o.devise==='XOF'?['Désignation','Unité','Qté','P.U.']:['Description','Unit','Qty','Unit price']).forEach(function(x){ add(hd,'span',null,x); });
-  [[o.devise==='XOF'?'Commutateurs réseau 24 ports':'Network switches, 24 ports','U','18','—',false],
-   [o.devise==='XOF'?'Poste concerné par l\u2019alerte':'Item flagged for review','U','6','voir →',true],
-   [o.devise==='XOF'?'Câblage cuivre cat. 6A':'Copper cabling cat. 6A','ml','2 400','—',false],
-   [o.devise==='XOF'?'Mise en service et tests':'Commissioning and testing','Fft','1','—',false]
-  ].forEach(function(rw){
-    var d=add(sheet,'div','doc-row'+(rw[4]?' doc-hl':''));
-    for(var i=0;i<4;i++){ var s=add(d,'span',null,rw[i]); if(rw[4]&&i===3) s.style.fontWeight='700'; }
-  });
-  add(sheet,'p',null, o.devise==='XOF'
-      ? 'Zone surlignée : extraction de faible confiance (scan dégradé). Confirmation humaine requise.'
-      : 'Zone surlignée : document en anglais, montants en '+o.devise+'. Confirmation humaine requise avant conversion.')
-    .style.cssText='margin:14px 0 0;font-size:11px;color:var(--amber);font-weight:600';
-  var mi2=add(dc,'div','pad');
-  [['Contact', o.contact||'—'],['Déposé le', o.depot||'—'],['Validité de l\u2019offre', (o.validite||'—')+' jours'],
-   ['Incoterm', o.incoterm||'Sans objet'],['Modalités de paiement', o.paiement||'—']].forEach(function(x){
-    var r=add(mi2,'div','docline');
-    add(r,'div','muted',x[0]); add(r,'div',null,x[1]).style.fontWeight='600';
-  });
+    guideCard(m,{ icon:'check', titre:'Tout est vérifié : vous pouvez clôturer', texte:'La clôture fige les données lues dans les offres et ouvre l’évaluation.',
+      action: can('depouille.close') ? 'Clôturer le dépouillement' : null, go:function(){ var b=document.querySelector('[data-fk="close-dep"]'); if(b) b.click(); } });
   }
 
-  var fc=add(sp,'div','card');
-  add(fc,'div','panel-head','Données extraites');
-  var fb=add(fc,'div','pad');
+  /* Offre affichée */
+  var h=add(m,'div','head'); var l=add(h,'div','who-head');
+  add(l,'span','initials',initiales(o.name)).setAttribute('aria-hidden','true');
+  var lt=add(l,'div');
+  add(lt,'h1',null,o.name);
+  var ml=add(lt,'div','meta-line');
+  chip(ml,'info',(isUemoa(o)?'UEMOA · ':'Hors UEMOA · ')+o.pays);
+  if(o.submitted) chip(ml,'ok','Saisie en ligne','check');
+  else if(restIci>0) chip(ml,'pending',restIci+' valeur'+(restIci>1?'s':'')+' à vérifier');
+  else chip(ml,'ok','Vérifiée','check');
+  var nav=add(h,'div','actions');
+  add(nav,'span','muted','Offre '+(state.offerIndex+1)+' sur '+nb);
+  var pv=add(nav,'button','btn btn-ghost','Précédente'); pv.type='button'; fk(pv,'prev-offer');
+  pv.addEventListener('click',function(){ state.offerIndex=(state.offerIndex-1+nb)%nb; save(); render(); });
+  var nx=add(nav,'button','btn btn-ghost','Suivante'); nx.type='button'; fk(nx,'next-offer');
+  nx.addEventListener('click',function(){ state.offerIndex=(state.offerIndex+1)%nb; save(); render(); });
+
+  /* Progression de l'ensemble */
+  var pc=add(m,'div','card progress-card');
+  add(pc,'strong',null,'Vérification de l’ensemble des offres');
+  var pg=add(pc,'progress','meter'+(reste===0?' full':'')); pg.max=total||1; pg.value=total-reste;
+  pg.setAttribute('aria-label','Valeurs vérifiées');
+  add(pc,'span','muted',(total-reste)+' sur '+total+' valeurs vérifiées');
+
+  var sp=add(m,'div','split');
+
+  /* Document reçu */
+  var dc=add(sp,'section','card'); dc.setAttribute('aria-label','Document reçu');
+  var dh=add(dc,'div','panel-head'); var dht=add(dh,'span','h'); icon(dht,'file'); dht.appendChild(document.createTextNode('Document reçu')); add(dh,'small',null,o.doc);
+  if(o.submitted){
+    var hs=add(dc,'p','hint top'); icon(hs,'info');
+    hs.appendChild(document.createTextNode('Offre saisie en ligne par le soumissionnaire : aucune lecture automatique, rien à vérifier.'));
+  } else {
+    var en=o.devise!=='XOF';
+    var sheet=add(add(dc,'div','doc-stage'),'div','doc-sheet');
+    add(sheet,'div','doc-head', en?'PRICE SCHEDULE — BILL OF QUANTITIES':'BORDEREAU DES PRIX UNITAIRES');
+    var th=add(sheet,'div','doc-row doc-th');
+    (en?['Description','Unit','Qty','Unit price']:['Désignation','Unité','Qté','P.U.']).forEach(function(x){ add(th,'span',null,x); });
+    [[en?'Network switches, 24 ports':'Commutateurs réseau 24 ports','U','18','—',false],
+     [en?'Item flagged for review':'Poste concerné par l’alerte','U','6','voir →',true],
+     [en?'Copper cabling cat. 6A':'Câblage cuivre cat. 6A','ml','2 400','—',false],
+     [en?'Commissioning and testing':'Mise en service et tests','Fft','1','—',false]
+    ].forEach(function(rw){
+      var d=add(sheet,'div','doc-row'+(rw[4]?' doc-hl':''));
+      for(var i=0;i<4;i++) add(d,'span',null,rw[i]);
+    });
+    var hi=add(dc,'p','hint'); icon(hi,'info');
+    hi.appendChild(document.createTextNode(en ? 'Document en '+o.devise+' : les lignes encadrées sont à vérifier avant conversion.' : 'Les lignes encadrées sont celles que vous devez vérifier.'));
+  }
+  var dl=add(dc,'dl','dl');
+  [['Contact',o.contact],['Déposé le',o.depot],['Validité',o.validite?o.validite+' jours':null],
+   ['Incoterm',o.submitted?null:(o.incoterm||'Sans objet')],['Paiement',o.paiement]].forEach(function(x){
+    if(x[1]==null) return;
+    add(dl,'dt',null,x[0]); add(dl,'dd',null,x[1]);
+  });
+
+  /* Informations lues dans l'offre */
+  var fc=add(sp,'section','card'); fc.setAttribute('aria-label','Informations lues dans l’offre');
+  var fh=add(fc,'div','panel-head'); var fht=add(fh,'span','h'); icon(fht,'search'); fht.appendChild(document.createTextNode('Informations lues dans l’offre'));
+  add(fh,'small',null,'Confiance attendue : '+seuil+' %');
+  var ul=add(fc,'ul','xf');
   o.fields.forEach(function(f,i){
-    var key=o.id+'_'+i, ok=!f.flag||state.confirmed[key];
-    var row=add(fb,'div','field'+(ok?'':' flag'));
-    var lf=add(row,'div');
-    add(lf,'div','field-k',f.k);
-    add(lf,'div','field-v',f.v);
-    var extra='Confiance extraction : '+f.conf+' %';
-    if(i===0&&o.devise!=='XOF') extra+=' · équivalent '+xof(montantXOF(o));
-    add(lf,'div','muted',extra);
-    if(ok){
-      var s=add(row,'span','ok'); add(s,'span','dot','✓');
-      s.appendChild(document.createTextNode(f.flag?'Confirmé':'Confiance haute'));
-    } else {
-      var b=add(row,'button','btn btn-primary btn-sm','Confirmer la valeur');
+    var key=o.id+'_'+i, aConfirmer=f.flag && !state.confirmed[key];
+    var li=add(ul,'li','xf-row'+(aConfirmer?' pending':''));
+    icon(add(li,'span','tile'), fieldIcon(f.k));
+    var c1=add(li,'div','xf-main');
+    add(c1,'div','xf-k',f.k);
+    montant(add(c1,'div','xf-v'), f.v);
+    var act=add(li,'div','xf-act');
+    var cf=add(act,'span','conf'+(f.conf<seuil?' low':''),f.conf+' %'); cf.setAttribute('title','Confiance de lecture');
+    cf.setAttribute('aria-label','Confiance de lecture : '+f.conf+' %');
+    if(aConfirmer){
+      var b=ibtn(act,'btn-primary','Confirmer','check');
+      b.setAttribute('aria-label','Confirmer — '+f.k);
       fk(b,'conf-'+key); guard('depouille.confirm',b);
       b.addEventListener('click',function(){
         state.confirmed[key]=true; logit('Champ confirmé — '+o.name+' : '+f.k);
         if(flagsRemaining()===0) notify('verif.requise','Vérification des extractions terminée',
-          "Tous les champs signalés de l'AO-2026-014 ont été confirmés. Le dépouillement peut être clôturé.");
+          "Tous les champs signalés de la procédure "+REF()+" ont été confirmés. Le dépouillement peut être clôturé.");
         save(); render();
       });
-    }
+    } else chip(act,'ok', f.flag ? 'Confirmé' : 'Fiable','check');
   });
   var foot=add(fc,'div','panel-foot');
-  add(foot,'span','muted', flagsRemaining()>0 ? flagsRemaining()+' champ(s) restant(s) sur l\u2019ensemble des offres.' : 'Tous les champs signalés ont été confirmés.');
-  var btns=add(foot,'div'); btns.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
-  var nxb=add(btns,'button','btn btn-ghost btn-sm','Offre suivante →'); fk(nxb,'next-offer');
-  nxb.addEventListener('click',function(){
-    state.offerIndex=(state.offerIndex+1)%SEED_OFFERS.length; save(); render();
-  });
-  var cl=add(btns,'button','btn btn-dark btn-sm', state.depClosed?'Dépouillement clôturé ✓':'Clôturer le dépouillement');
-  cl.disabled=flagsRemaining()>0||state.depClosed; guard('depouille.close',cl);
+  add(foot,'span',null, reste>0 ? 'Encore '+reste+' valeur'+(reste>1?'s':'')+' à vérifier sur l’ensemble des offres' : 'Toutes les valeurs sont vérifiées');
+  var cl=add(foot,'button','btn btn-primary', state.depClosed?'Dépouillement clôturé':'Clôturer le dépouillement'); cl.type='button';
+  cl.disabled=reste>0||state.depClosed; guard('depouille.close',cl);
   fk(cl,'close-dep');
   cl.addEventListener('click',function(){
-    ask('Les données extraites seront figées et l\u2019évaluation s\u2019ouvrira.', function(){
+    ask('Les données lues dans les offres seront figées et l’évaluation s’ouvrira.', function(){
       state.depClosed=true; logit('Dépouillement clôturé — évaluation ouverte');
       notify('dep.cloture','Dépouillement clôturé',
-        "Le dépouillement de l'AO-2026-014 est clôturé : "+conformes().length+" offre(s) conforme(s) sur "+SEED_OFFERS.length+". L'évaluation est ouverte aux évaluateurs désignés.");
+        "Le dépouillement de la procédure "+REF()+" est clôturé : "+conformes().length+" offre(s) conforme(s) sur "+SEED_OFFERS.length+". L'évaluation est ouverte aux évaluateurs désignés.");
       var anoR=anomalies().filter(function(x){return x.lvl==='red';});
       if(anoR.length) notify('anomalie',''+anoR.length+' anomalie(s) critique(s) à instruire',
         anoR.slice(0,4).map(function(x){return '• '+x.who+' — '+x.t;}).join("\n"));
       save(); go('evaluation');
     }, 'Clôturer le dépouillement ?', 'Clôturer');
   });
-
-  if(flagsRemaining()>0){
-    var w=add(m,'div','warn'); w.style.marginTop='18px';
-    add(w,'strong',null,'Verrou métier. ');
-    w.appendChild(document.createTextNode("L'évaluation reste fermée tant que les champs signalés ne sont pas confirmés : un évaluateur ne doit jamais noter une offre sur la base d'un montant mal extrait ou mal converti."));
-  }
 }
 
 function vConformite(m){
@@ -1550,7 +1675,7 @@ function vConformite(m){
         state.excluded[o.id]=!ex;
         logit((ex?'Réintégration':'Exclusion administrative')+' — '+o.name);
         notify('offre.ecartee', (ex?'Offre réintégrée — ':'Offre écartée — ')+o.name,
-          ex ? ("L'offre de "+o.name+" est réintégrée à l'évaluation de l'AO-2026-014.")
+          ex ? ("L'offre de "+o.name+" est réintégrée à l'évaluation de la procédure "+REF()+".")
              : ("L'offre de "+o.name+" est écartée pour non-conformité administrative. Motif : "+(mis.length?mis.map(function(x){return x.label;}).join(' ; '):'décision du comité')+"."));
         save(); render();
       }, (ex?'Réintégrer « ':'Écarter « ')+o.name+' » ?', ex?'Réintégrer':'Écarter');
@@ -1598,7 +1723,7 @@ function vEvaluation(m){
   banner.style.marginBottom='18px';
   if(c.prefActive){
     add(banner,'strong',null,'Préférence communautaire active — '+c.prefTaux+' %. ');
-    banner.appendChild(document.createTextNode("Les offres hors UEMOA sont majorées de "+c.prefTaux+" % pour la seule comparaison des prix. Le montant contractuel reste le montant d'offre. Désactivez la marge dans le cahier des charges pour voir l'effet sur le classement."));
+    banner.appendChild(document.createTextNode("Les offres hors UEMOA sont majorées de "+c.prefTaux+" % pour la seule comparaison des prix. Le montant contractuel reste le montant d'offre. La marge est figée depuis la clôture du dépouillement."));
   } else {
     add(banner,'strong',null,'Préférence communautaire désactivée. ');
     banner.appendChild(document.createTextNode("Les offres sont comparées à leur contre-valeur en francs CFA, sans correction d'origine."));
@@ -1695,9 +1820,9 @@ function vEvaluation(m){
       state.evalDone=true; logit('Évaluation validée — classement transmis au circuit d\u2019approbation');
       var rr=ranking();
       notify('eval.validee','Évaluation validée',
-        "Le classement de l'AO-2026-014 est arrêté. Premier : "+(rr[0]?rr[0].o.name+" ("+rr[0].total.toFixed(1)+"/100)":"—")+".");
+        "Le classement de la procédure "+REF()+" est arrêté. Premier : "+(rr[0]?rr[0].o.name+" ("+rr[0].total.toFixed(1)+"/100)":"—")+".");
       notify('appro.attendue','Approbation attendue',
-        "Le circuit d'approbation de l'AO-2026-014 est ouvert. Premier niveau attendu : "+(state.approvals[0]?state.approvals[0].role:'—')+".");
+        "Le circuit d'approbation de la procédure "+REF()+" est ouvert. Premier niveau attendu : "+(state.approvals[0]?state.approvals[0].role:'—')+".");
       save(); go('decision');
     }, 'Valider l\u2019évaluation ?', 'Valider');
   });
@@ -1745,7 +1870,7 @@ function vDecision(m){
           if(allApproved()){
             logit('Attribution prononcée — '+win.o.name);
             notify('attribution','Attribution prononcée',
-              "Le marché AO-2026-014 est attribué à "+win.o.name+" ("+win.o.pays+") pour "+xof(montantXOF(win.o))+", délai "+win.o.delai+" jours. Notification aux soumissionnaires non retenus à préparer, sous réserve du délai de recours.");
+              "Le marché "+REF()+" est attribué à "+win.o.name+" ("+win.o.pays+") pour "+xof(montantXOF(win.o))+", délai "+win.o.delai+" jours. Notification aux soumissionnaires non retenus à préparer, sous réserve du délai de recours.");
             save(); go('pv'); return;
           }
           var nxt=null; for(var z=0;z<state.approvals.length;z++) if(!state.approvals[z].done){ nxt=state.approvals[z]; break; }
@@ -1766,13 +1891,13 @@ function vPV(m){
   if(!allApproved()) return locked(m,"Le procès-verbal est généré une fois les niveaux d'approbation franchis.",'decision',"Aller au circuit d'approbation");
   var rows=ranking(), win=rows[0], c=state.cdc;
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','AO-2026-014'); add(l,'h1',null,"Procès-verbal d'attribution");
+  add(l,'div','eyebrow',REF()); add(l,'h1',null,"Procès-verbal d'attribution");
   add(l,'p','lede',"Brouillon généré à partir des données validées à chaque étape. Il reste à relire et à signer — le document produit par le système est un projet, jamais un acte définitif.");
   add(h,'button','btn btn-ghost btn-sm','Imprimer / exporter').addEventListener('click',function(){ imprimer(); });
 
   var card=add(m,'div','card pad'); var pv=add(card,'div','pv');
   add(pv,'div',null,'PROCÈS-VERBAL D\u2019ANALYSE ET D\u2019ATTRIBUTION').style.cssText='font-weight:700;font-size:15px;color:var(--ink)';
-  add(pv,'div',null,'Référence : AO-2026-014 — '+c.objet).style.marginTop='4px';
+  add(pv,'div',null,'Référence : '+REF()+' — '+c.objet).style.marginTop='4px';
   add(pv,'div',null, c.autorite+' — '+c.procedure+' — ouverture des plis : '+c.ouverture);
 
   add(pv,'h4',null,'1. Offres reçues et conversion');
@@ -1887,7 +2012,7 @@ function vPortail(m){
   if (!c.cdcPublie) return locked(m,"Le portail n'accepte les dépôts qu'une fois le cahier des charges publié.",'cdc','Aller au cahier des charges');
 
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','AO-2026-014 · '+c.procedure);
+  add(l,'div','eyebrow',REF()+' · '+c.procedure);
   add(l,'h1',null,c.objet);
   add(l,'p','lede','Autorité contractante : '+c.autorite+' · Langue : '+c.langue+' · Devise : '+c.deviseSoumission);
   add(h,'span','chip c-amber','Date limite de dépôt : '+c.ouverture);
@@ -2320,6 +2445,12 @@ function vParams(m){
     },'number');
   });
   add(add(k2,'div','panel-foot'),'span','muted','La parité EUR/XOF est fixe ; les autres taux sont à relever auprès de la banque centrale à la date d\u2019ouverture et à figer pour toute la procédure.');
+  if(state.fxFrozen){
+    var fz=add(add(k2,'div','pad'),'div','note'); fz.style.marginTop='0';
+    add(fz,'strong',null,'Taux de la procédure figés le '+state.fxFrozen.at+'. ');
+    fz.appendChild(document.createTextNode("Une modification ci-dessus ne change plus le classement en cours, calculé avec les taux figés : "+
+      Object.keys(state.fxFrozen.rates).filter(function(k){ return k!==o.devisePivot; }).map(function(k){ return k+' '+state.fxFrozen.rates[k]; }).join(', ')+'.'));
+  }
 
   var k3=add(m,'div','card'); k3.style.marginTop='18px';
   add(k3,'div','panel-head','3 · Seuils de détection et de contrôle');
@@ -2522,7 +2653,7 @@ function vQA(m){
             t:new Date().toLocaleString('fr-FR'), report:rep2});
           if(rep2) state.cdc.ouverture='2026-10-29';
           logit('Additif publié au dossier d\u2019appel d\u2019offres');
-          notify('additif.publie','Additif publié','Un additif modifie le dossier AO-2026-014.'+(rep2?' La date limite de dépôt est reportée au '+rep2+'.':''));
+          notify('additif.publie','Additif publié','Un additif modifie le dossier '+REF()+'.'+(rep2?' La date limite de dépôt est reportée au '+rep2+'.':''));
           save(); render();
         },"Publier un additif ?","Publier");
     });
@@ -2625,7 +2756,7 @@ function vRecours(m){
           state.standstill.startedAt=Date.now();
           logit('Notification d\u2019attribution — délai de recours ouvert');
           notify('standstill','Attribution notifiée — délai de recours ouvert',
-            "Le marché AO-2026-014 est attribué à "+win.o.name+". Les soumissionnaires non retenus disposent de "+state.standstill.days+" jours pour contester. La signature est suspendue jusqu'à l'expiration de ce délai.");
+            "Le marché "+REF()+" est attribué à "+win.o.name+". Les soumissionnaires non retenus disposent de "+state.standstill.days+" jours pour contester. La signature est suspendue jusqu'à l'expiration de ce délai.");
           save(); render();
         },"Notifier l'attribution ?","Notifier");
     });
@@ -2702,7 +2833,7 @@ function vRecours(m){
         objet:"Le requérant conteste la notation du critère « Méthodologie » et demande communication des éléments ayant fondé l'écart avec sa propre offre." });
       logit('Recours déposé — '+perdant+' — signature suspendue');
       notify('recours.depose','Recours déposé — signature suspendue',
-        perdant+" conteste l'attribution de l'AO-2026-014. La signature du marché est suspendue jusqu'à instruction du recours.");
+        perdant+" conteste l'attribution de la procédure "+REF()+". La signature du marché est suspendue jusqu'à instruction du recours.");
       save(); render();
     });
   }
@@ -2759,7 +2890,7 @@ function coiBanner(m){
       function(){
         state.coi[state.me]={declare:true, conflit:false, t:new Date().toLocaleString('fr-FR')};
         logit('Déclaration d\u2019absence de conflit d\u2019intérêts — '+me().nom);
-        notify('coi.declare','Déclaration de conflit d\u2019intérêts', me().nom+" ("+myRole().lab+") déclare n'avoir aucun conflit d'intérêts sur l'AO-2026-014.");
+        notify('coi.declare','Déclaration de conflit d\u2019intérêts', me().nom+" ("+myRole().lab+") déclare n'avoir aucun conflit d'intérêts sur la procédure "+REF()+".");
         save(); render();
       },"Confirmer la déclaration ?","Je déclare");
   });
@@ -2769,7 +2900,7 @@ function coiBanner(m){
       function(){
         state.coi[state.me]={declare:true, conflit:true, note:'Lien professionnel antérieur avec un soumissionnaire', t:new Date().toLocaleString('fr-FR')};
         logit('Conflit d\u2019intérêts déclaré — '+me().nom+' écarté de la notation');
-        notify('coi.declare','Conflit d\u2019intérêts déclaré', me().nom+" ("+myRole().lab+") se déporte de la notation de l'AO-2026-014. Un remplaçant doit être désigné.");
+        notify('coi.declare','Conflit d\u2019intérêts déclaré', me().nom+" ("+myRole().lab+") se déporte de la notation de la procédure "+REF()+". Un remplaçant doit être désigné.");
         save(); render();
       },"Déclarer un conflit d'intérêts ?","Je me déporte");
   });
@@ -2779,6 +2910,14 @@ function coiBanner(m){
 var ROUTER={dashboard:vDashboard, notifs:vNotifs, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit};
 
+/* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
+function isAdminView(id){ return VIEWS.some(function(v){ return v.id===id && v.grp==='Administration'; }); }
+function renderHeader(){
+  var org=state.org||{};
+  var t=document.getElementById('tenant'); t.textContent='';
+  add(t,'b',null,org.nom||'');
+  t.appendChild(document.createTextNode([org.ville, org.pays].filter(Boolean).join(' · ')));
+}
 function render(){
   var ae=document.activeElement;
   var prevFk = ae && ae.getAttribute ? ae.getAttribute('data-fk') : null;
@@ -2786,9 +2925,10 @@ function render(){
   var sy = window.scrollY;
 
   renderNav();
-  document.getElementById('top-obj').textContent=state.cdc.objet;
+  renderHeader();
   var ph=phase(), chip=document.getElementById('phase-chip');
   chip.textContent=ph.k; chip.className='chip '+ph.c;
+  chip.style.display = isAdminView(state.view) ? 'none' : '';
   var lbl=null;
   for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===state.view) lbl=VIEWS[i].label;
   document.title = (lbl? lbl+' — ' : '')+'Marché+';
@@ -2821,7 +2961,13 @@ resetBtn.addEventListener('click',function(){
   }, 'Réinitialiser la démonstration ?', 'Tout effacer');
 });
 window.MarchePlus = {
-  start:function(p){ PIECES_OK=false; state=null; synced={}; applyServer(p,false); resetBtn.style.display = can('params.edit')||can('roles.edit') ? '' : 'none'; render(); },
+  start:function(p, opts){
+    PIECES_OK=false; state=null; synced={}; applyServer(p,false);
+    // Après une connexion, on part de l'accueil du rôle ; après un rechargement, on reprend l'écran mémorisé,
+    // à condition qu'il figure encore dans le menu de ce rôle (le rôle a pu changer entre-temps).
+    if((opts && opts.fromLogin) || !viewAllowed(state.view)){ state.view=homeView(); state.offerIndex=0; saveUI(); }
+    resetBtn.style.display = can('params.edit')||can('roles.edit') ? '' : 'none'; render();
+  },
   poll:poll,
   stop:function(){ if(flushTimer) clearTimeout(flushTimer); state=null; synced={}; dirty=false; }
 };

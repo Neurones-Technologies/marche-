@@ -39,13 +39,15 @@
     setTimeout(function () { $('lg-email').focus(); }, 0);
   }
 
-  function enter() {
+  /* fromLogin : connexion explicite (on part de l'accueil) ; sinon rechargement de page (on reprend l'écran). */
+  function enter(fromLogin) {
     return api('GET', '/api/state').then(function (p) {
       return api('GET', '/api/auth/me').then(function (m) {
         $('login').hidden = true;
         $('usr').hidden = false;
         $('usr-name').textContent = m.user.nom + ' · ' + m.user.roleLab;
-        window.MarchePlus.start(p);
+        $('usr-av').textContent = m.user.nom.replace(/[^A-Za-zÀ-ÿ ]/g, ' ').split(/\s+/).filter(Boolean).map(function (x) { return x[0]; }).join('').slice(0, 2).toUpperCase();
+        window.MarchePlus.start(p, { fromLogin: fromLogin === true });
         if (!pollTimer) pollTimer = setInterval(function () { window.MarchePlus.poll(); }, 8000);
       });
     });
@@ -55,7 +57,7 @@
     e.preventDefault();
     var b = $('lg-go'); b.disabled = true;
     api('POST', '/api/auth/login', { email: $('lg-email').value, password: $('lg-pw').value })
-      .then(enter)
+      .then(function () { return enter(true); })
       .catch(function (err) { var er = $('lg-err'); er.hidden = false; er.textContent = err.message; })
       .then(function () { b.disabled = false; });
   });
@@ -86,7 +88,7 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('dlg').hidden = true; });
 
   // Démarrage : session existante ? sinon écran de connexion.
-  api('GET', '/api/auth/me').then(enter).catch(function () { showLogin(); });
+  api('GET', '/api/auth/me').then(function () { return enter(false); }).catch(function () { showLogin(); });
 
   // Comptes de démonstration (affichés seulement si l'instance les expose)
   api('GET', '/api/auth/demo').then(function (r) {

@@ -1,23 +1,30 @@
-.login{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--bg)}
-.login[hidden]{display:none}
-.login-card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 30px rgba(20,33,61,.08)}
-.login-brand{font-weight:700;font-size:20px;color:var(--teal)}
-.login-card h1{margin:4px 0 0;font-size:22px}
-.login-card label{font-size:13px;font-weight:600;margin-top:8px}
-.login-card input{min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font:inherit}
-.login-card button[type=submit]{margin-top:14px;min-height:44px}
-.lg-err{color:var(--red);background:var(--red-bg);border:1px solid var(--red-line);border-radius:8px;padding:8px 12px;font-size:13px}
-.lg-demo{margin-top:14px;font-size:13px;color:var(--muted)}
-.lg-demo button{display:block;width:100%;text-align:left;padding:6px 8px;margin-top:4px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);color:var(--ink-2);font:inherit;cursor:pointer}
-.usr{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.usr[hidden]{display:none}
-.usr-name{font-size:13px;font-weight:600}
-.dlg{position:fixed;inset:0;z-index:210;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(10,15,25,.5)}
-.dlg[hidden]{display:none}
-.dlg form{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;display:flex;flex-direction:column;gap:8px}
-.dlg input{min-height:42px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font:inherit}
-.dlg .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-.tbl{border-collapse:collapse}
-.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 10px}
-.tbl td{padding:9px 10px;border-top:1px solid var(--line-2);font-size:13px;vertical-align:middle}
-.tbl select{min-height:36px}
+/* Connexion, changement de mot de passe. Valeurs : tokens.css. */
+.login { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: var(--color-bg); }
+.login[hidden] { display: none; }
+.login-card {
+  width: 100%; max-width: calc(var(--col-min) * 1.5); background: var(--color-surface); border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius); padding: var(--space-8) var(--space-6); display: flex; flex-direction: column; gap: var(--space-1);
+}
+.login-brand { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--fw-strong); }
+.login-brand::before { content: ""; width: var(--mark); height: var(--mark); border-radius: var(--space-1); background: var(--color-accent); }
+.login-card h1 { margin: var(--space-4) 0 var(--space-2); }
+.login-card label { font-size: var(--fs-small); color: var(--color-text-2); margin-top: var(--space-3); }
+.login-card input { width: 100%; }
+.login-card button[type=submit] { margin-top: var(--space-5); }
+.lg-err { color: var(--color-blocked); background: var(--color-blocked-bg); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-top: var(--space-3); font-size: var(--fs-table); }
+.lg-err[hidden] { display: none; }
+.lg-demo { margin-top: var(--space-5); font-size: var(--fs-table); color: var(--color-text-2); }
+.lg-demo summary { cursor: pointer; }
+.lg-demo button {
+  display: block; width: 100%; text-align: left; padding: var(--space-1) var(--space-2); margin-top: var(--space-1);
+  border: var(--border-w) solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text); font-size: var(--fs-table);
+}
+.lg-demo button:hover { background: var(--color-bg); }
+.dlg { position: fixed; inset: 0; z-index: 210; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: var(--color-overlay); }
+.dlg[hidden] { display: none; }
+.dlg form {
+  width: 100%; max-width: calc(var(--col-min) * 1.5); background: var(--color-surface); border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius); box-shadow: var(--shadow-overlay); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2);
+}
+.dlg input { width: 100%; }
+.dlg .acts { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-3); }
