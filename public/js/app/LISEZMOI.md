@@ -28,5 +28,6 @@ Avant eux, `profils.js`, `regles.js` (partagés avec le serveur) et `api.js` (co
 2. L'ajouter dans `index.html`, avant `demarrage.js`.
 3. Déclarer l'écran dans `VIEWS` (`noyau.js`), son icône dans `NAV_ICONS` (`composants.js`) et sa fonction dans
    `ROUTER` (`demarrage.js`). Le groupe (`grp`) range l'écran dans le menu : `Accueil`, `Registres` (écrans de
-   l'organisation), `Procédure` (écrans de la procédure ouverte, sous son sélecteur) ou `Administration`. Un écran
+   l'organisation), `Procédure` (écrans de la procédure ouverte : hors du menu, dans le cadre à étapes ; les ranger aussi dans une
+   étape de `ETAPES` ou dans `OUTILS_PROCEDURE`, `composants.js`) ou `Administration`. Un écran
    utilisable sans procédure ouverte est aussi listé dans `SANS_PROCEDURE`.

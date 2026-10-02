@@ -39,7 +39,10 @@ Organisation de l'interface (menu) :
 - **Registres** : besoins, appels d'offres (toutes les procédures, en cours et passées : phase, titulaire, montant
   attribué, besoin d'origine, commandes ; filtres par phase, année et recherche), commandes et réceptions,
   partenaires (ou « Mon référencement » pour un prestataire).
-- **Procédure** : les écrans de la procédure ouverte, de la vue d'ensemble au procès-verbal, avec son sélecteur.
+- **En cours** : une seule entrée, la procédure ouverte. Dans la page, une frise de six étapes (Préparer, Publication
+  et offres, Dépouiller, Évaluer, Décider, Clore) montre ce qui est fait, en cours ou à venir ; une étape à plusieurs
+  écrans les présente en sous-onglets ; « Étape suivante » en bas, avec les outils (vue d'ensemble, journal d'audit)
+  et le changement de procédure en en-tête.
 - **Administration** : comptes, rôles, paramètres, alertes.
 
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :

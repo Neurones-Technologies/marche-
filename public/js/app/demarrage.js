@@ -6,18 +6,6 @@ var ROUTER={accueil:vAccueil, dashboard:vDashboard, notifs:vNotifs, procedures:v
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
-/* Écran de la procédure ouverte (groupe « Procédure » du menu) : la pastille de phase et le bandeau d'archivage s'y rapportent. */
-function vueDeProcedure(id){ return VIEWS.some(function(v){ return v.id===id && v.grp==='Procédure'; }); }
-/* Sélecteur de la procédure courante, en tête du menu. Les procédures archivées n'y figurent que si l'une est ouverte. */
-function renderProcSel(){
-  var box=document.getElementById('side-proc'); if(!box) return; box.textContent='';
-  var list=MP.procs().filter(function(p){ return !p.archive || p.id===MP.pid(); });
-  if(!list.length) return;
-  var s=add(box,'select'); s.id='proc-sel'; s.setAttribute('aria-label','Procédure ouverte');
-  list.forEach(function(p){ var o=add(s,'option',null,p.ref+(p.archive?' (archivée)':'')+' — '+(p.objet||'')); o.value=p.id; });
-  s.value=MP.pid();
-  s.addEventListener('change',function(){ ouvrirProcedure(s.value); });
-}
 /* Ouvre une autre procédure : les saisies en attente partent d'abord, l'écran courant est conservé s'il existe. */
 function ouvrirProcedure(id, vue){
   if(id===MP.pid()){ if(vue) go(vue); return; }
@@ -39,22 +27,29 @@ function render(){
   var sy = window.scrollY;
 
   renderNav();
-  renderProcSel();
   renderHeader();
   var chip=document.getElementById('phase-chip');
   if(avecProcedure()){ var ph=phase(); chip.textContent=ph.k; chip.className='chip '+ph.c; }
-  chip.style.display = !avecProcedure() || !vueDeProcedure(state.view) ? 'none' : '';
+  // la phase figure dans l'en-tête des écrans de procédure ; la pastille du haut ne sert plus que sans ce cadre
+  chip.style.display = !avecProcedure() || !vueDeProcedure(state.view) || avecCadreProcedure() ? 'none' : '';
   if(!viewAllowed(state.view)) state.view=homeView();
   var lbl=null;
   for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===state.view) lbl=VIEWS[i].label;
   document.title = (lbl? lbl+' — ' : '')+'Marché+';
   var m=document.getElementById('main'); m.textContent='';
-  var cur=MP.current();
-  if(cur && cur.archive && vueDeProcedure(state.view)){
-    var na=add(m,'div','note'); add(na,'strong',null,'Procédure archivée. ');
-    na.appendChild(document.createTextNode('Elle se consulte mais ne se modifie plus.'));
+  if(vueDeProcedure(state.view) && avecCadreProcedure()){
+    // écran de procédure : en-tête, frise des étapes, sous-onglets, puis l'écran, puis précédente / suivante
+    UI.derniereVueProc=state.view;
+    (ROUTER[state.view]||vDashboard)(cadreProcedureHaut(m));
+    cadreProcedureBas(m);
+  } else {
+    var cur=MP.current();
+    if(cur && cur.archive && vueDeProcedure(state.view)){
+      var na=add(m,'div','note'); add(na,'strong',null,'Procédure archivée. ');
+      na.appendChild(document.createTextNode('Elle se consulte mais ne se modifie plus.'));
+    }
+    (ROUTER[state.view]||vDashboard)(m);
   }
-  (ROUTER[state.view]||vDashboard)(m);
 
   if(prevFk){
     var t=document.querySelector('[data-fk="'+prevFk+'"]');
@@ -85,6 +80,7 @@ resetBtn.addEventListener('click',function(){
 window.MarchePlus = {
   start:function(p, opts){
     PIECES_OK=false; state=null; synced={}; applyServer(p,false);
+    UI.derniereVueProc=null; // l'écran où reprendre est propre à une session et à une procédure
     // Après une connexion, on part de l'accueil du rôle ; après un rechargement, on reprend l'écran mémorisé,
     // à condition qu'il figure encore dans le menu de ce rôle (le rôle a pu changer entre-temps).
     if((opts && opts.fromLogin) || !viewAllowed(state.view)){ state.view=homeView(); state.offerIndex=0; saveUI(); }

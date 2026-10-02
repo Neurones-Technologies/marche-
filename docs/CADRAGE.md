@@ -407,6 +407,11 @@ bord » était celui d'une procédure, sans vue d'ensemble ni historique. Réorg
 - **Menu en quatre groupes** : Accueil, Registres, Procédure (écrans de la procédure ouverte, sous son sélecteur ;
   l'ancien tableau de bord devient sa « Vue d'ensemble »), Administration. La pastille de phase n'apparaît plus que
   sur les écrans de la procédure.
+- **Procédure présentée comme un déroulé** (second retour d'usage : quatorze écrans dans la barre latérale,
+  c'était encombrant) : une seule entrée « En cours » dans le menu ; dans la page, une frise de six étapes
+  (Préparer · Publication et offres · Dépouiller · Évaluer · Décider · Clore) avec leur état, des sous-onglets quand
+  une étape compte plusieurs écrans, « Étape suivante » en pied, et les outils (vue d'ensemble, journal d'audit).
+  Un prestataire ou un demandeur, qui ne voient qu'un ou deux écrans de la procédure, y accèdent directement.
 
 ## 8. Bilan au 02/10/2026
 

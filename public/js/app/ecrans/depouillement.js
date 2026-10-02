@@ -3,7 +3,6 @@
 "use strict";
 
 function vDepouille(m){
-  stepper(m);
   if (!state.cdc.cdcPublie) return locked(m,"Le dépouillement s'ouvre une fois le cahier des charges publié.",'cdc','Ouvrir le cahier des charges');
   var o=SEED_OFFERS[state.offerIndex], nb=SEED_OFFERS.length;
   var seuil=Number(state.seuils.confianceMin)||0;

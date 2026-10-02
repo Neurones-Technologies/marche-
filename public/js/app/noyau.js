@@ -552,13 +552,28 @@ function homeView(){ return 'accueil'; }
 function renderNav(){
   var box=document.getElementById('navs'); box.textContent='';
   var grp=null;
-  var vis=VIEWS.filter(vueVisible);
+  // les écrans de la procédure ne figurent pas dans le menu : une seule entrée « En cours » y mène (frise dans la page)
+  var vis=VIEWS.filter(vueVisible), procVues=vis.filter(function(v){ return v.grp==='Procédure'; }), enCoursPose=false;
+  vis=vis.filter(function(v){ return v.grp!=='Procédure'; });
+  function enCours(){
+    enCoursPose=true;
+    if(!procVues.length) return;
+    add(box,'div','navgrp','En cours');
+    var b=el('button','navb');
+    icon(b,'folder');
+    var seul = procVues.length===1 ? procVues[0] : null; // prestataire : « Déposer une offre » ; demandeur : vue d'ensemble
+    b.appendChild(document.createTextNode(seul && seul.id!=='dashboard' ? seul.label+' — '+REF() : REF()));
+    b.title=(state.cdc&&state.cdc.objet)||'';
+    if(vueDeProcedure(state.view)) b.setAttribute('aria-current','page');
+    fk(b,'nav-en-cours');
+    b.addEventListener('click',function(){ closeMenu(); go(seul ? seul.id : vueProcedureCourante()); });
+    box.appendChild(b);
+  }
   vis.forEach(function(v){
+    if(v.grp==='Administration' && !enCoursPose) enCours();
     if(v.grp!==grp){
       grp=v.grp;
       add(box,'div','navgrp',grp);
-      // le groupe de la procédure porte son sélecteur (rempli par renderProcSel)
-      if(grp==='Procédure'){ var sp=add(box,'div','side-proc'); sp.id='side-proc'; }
     }
     var b=el('button','navb'+(v.role?' role':''));
     icon(b, NAV_ICONS[v.id]);
@@ -579,7 +594,10 @@ function renderNav(){
     b.addEventListener('click',function(){ closeMenu(); go(v.id); });
     box.appendChild(b);
   });
+  if(!enCoursPose) enCours();
 }
+/* Écran de la procédure ouverte (groupe « Procédure ») : frise, sous-onglets, pastille de phase s'y rapportent. */
+function vueDeProcedure(id){ return VIEWS.some(function(v){ return v.id===id && v.grp==='Procédure'; }); }
 function closeMenu(){
   var sd=document.getElementById('side'), bd=document.getElementById('backdrop'), bg=document.getElementById('burger');
   if(!sd.classList.contains('open')) return;

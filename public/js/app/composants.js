@@ -96,37 +96,98 @@ function montant(parent, texte){
 function initiales(nom){ return String(nom).replace(/[^A-Za-zÀ-ÿ ]/g,' ').split(/\s+/).filter(function(x){ return x.length>2 || /^[A-Z]/.test(x); }).map(function(x){ return x[0]; }).join('').slice(0,2).toUpperCase(); }
 
 /* Parcours de la procédure, en tête de chaque écran de procédure. */
-var FLOW = [
-  {id:'prep',    lab:'Préparer',   view:'cdc'},
-  {id:'recv',    lab:'Recevoir',   view:'reception'},
-  {id:'depouil', lab:'Dépouiller', view:'depouille'},
-  {id:'conf',    lab:'Conformité', view:'conformite'},
-  {id:'eval',    lab:'Évaluer',    view:'evaluation'},
-  {id:'decide',  lab:'Décider',    view:'decision'},
-  {id:'close',   lab:'Clore',      view:'recours'}
+/* Le déroulé d'une procédure, en six étapes. Une étape regroupe un ou plusieurs écrans (sous-onglets). La vue
+   d'ensemble et le journal d'audit ne sont pas des étapes : ce sont des outils, en pied de page. */
+var ETAPES = [
+  {id:'prep',    lab:'Préparer',              vues:['cdc','dao','criteres']},
+  {id:'publi',   lab:'Publication et offres', vues:['qa','reception']},
+  {id:'depouil', lab:'Dépouiller',            vues:['depouille','conformite','clarifs']},
+  {id:'eval',    lab:'Évaluer',               vues:['evaluation']},
+  {id:'decide',  lab:'Décider',               vues:['decision']},
+  {id:'close',   lab:'Clore',                 vues:['recours','pv']}
 ];
-var FLOW_LAB = { done:'terminé', now:'en cours', blocked:'bloqué', todo:'à venir' };
-function flowStatus(){
-  var s=lifeStatus();
-  // Une seule étape « en cours » : dès que des offres sont arrivées, on est au dépouillement.
-  return { prep:s.prep, recv: (state.depClosed || (state.cdc.cdcPublie && SEED_OFFERS.length)) ? 'done' : s.depot, depouil:s.depouil,
-    conf: s.clarif==='blocked' ? 'blocked' : (state.depClosed ? 'done' : 'todo'),
+var OUTILS_PROCEDURE = ['dashboard','audit'];
+var FLOW_LAB = { done:'terminée', now:'en cours', blocked:'bloquée', todo:'à venir' };
+function etapesStatut(){
+  var s=lifeStatus(), recu=state.depClosed || (state.cdc.cdcPublie && SEED_OFFERS.length);
+  return { prep:s.prep, publi: state.depClosed ? 'done' : (state.cdc.cdcPublie ? 'now' : 'todo'),
+    depouil: s.clarif==='blocked' ? 'blocked' : (state.depClosed ? 'done' : (recu ? 'now' : 'todo')),
     eval:s.eval, decide:s.appro,
     close: state.contractSigned ? 'done' : (s.recours==='blocked' ? 'blocked' : (allApproved() ? 'now' : 'todo')) };
 }
-function stepper(m){
-  var st=flowStatus();
-  var ol=add(m,'ol','flow'); ol.setAttribute('aria-label','Parcours de la procédure');
-  FLOW.forEach(function(f,i){
-    var li=add(ol,'li','flow-step '+st[f.id]);
-    var ok=viewAllowed(f.view);
-    var b=add(li, ok?'button':'span');
+function etapeDe(vue){ for(var i=0;i<ETAPES.length;i++) if(ETAPES[i].vues.indexOf(vue)>=0) return ETAPES[i]; return null; }
+function vuesPermises(etape){ return etape.vues.filter(viewAllowed); }
+/* Écran où reprendre une procédure : le dernier ouvert, sinon le premier écran de l'étape en cours. */
+function vueProcedureCourante(){
+  if(UI.derniereVueProc && viewAllowed(UI.derniereVueProc)) return UI.derniereVueProc;
+  var st=etapesStatut();
+  for(var i=0;i<ETAPES.length;i++){ var v=vuesPermises(ETAPES[i]); if(v.length && (st[ETAPES[i].id]==='now' || st[ETAPES[i].id]==='blocked')) return v[0]; }
+  return viewAllowed('dashboard') ? 'dashboard' : (VIEWS.filter(function(x){ return x.grp==='Procédure' && vueVisible(x); })[0]||{}).id;
+}
+/* Le cadre (frise, sous-onglets) s'adresse à ceux qui conduisent la procédure ; un prestataire ou un demandeur
+   n'en voit qu'un ou deux écrans, sans cadre. */
+function avecCadreProcedure(){ return VIEWS.filter(function(v){ return v.grp==='Procédure' && vueVisible(v); }).length>=3; }
+
+/* En-tête, frise des étapes et sous-onglets ; retourne le conteneur où l'écran se dessine. */
+function cadreProcedureHaut(m){
+  var c=state.cdc||{}, cur=MP.current();
+  var hd=add(m,'div','proc-head');
+  var g=add(hd,'div'); g.style.cssText='min-width:0;flex:1 1 320px';
+  var t=add(g,'div'); add(t,'strong',null,REF()); add(t,'span','muted',' — '+(c.objet||''));
+  var ch=add(g,'div'); ch.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-top:4px';
+  var ph=phase(); add(ch,'span','chip '+ph.c,ph.k);
+  add(ch,'span','chip c-grey',MPProfils.profil(R.profilId(RCTX())).lab);
+  var autres=MP.procs().filter(function(p){ return !p.archive || p.id===MP.pid(); });
+  if(autres.length>1){
+    var s=add(hd,'select'); s.setAttribute('aria-label','Changer de procédure'); fk(s,'proc-sel'); s.id='proc-sel';
+    autres.forEach(function(p){ var o=add(s,'option',null,p.ref+(p.archive?' (archivée)':'')+' — '+(p.objet||'')); o.value=p.id; });
+    s.value=MP.pid();
+    s.addEventListener('change',function(){ ouvrirProcedure(s.value, state.view); });
+  }
+  if(cur && cur.archive){ var na=add(m,'div','note'); add(na,'strong',null,'Procédure archivée. '); na.appendChild(document.createTextNode('Elle se consulte mais ne se modifie plus.')); }
+
+  var st=etapesStatut(), etape=etapeDe(state.view);
+  var ol=add(m,'ol','flow'); ol.setAttribute('aria-label','Étapes de la procédure');
+  ETAPES.forEach(function(e,i){
+    var li=add(ol,'li','flow-step '+st[e.id]);
+    var vues=vuesPermises(e), b=add(li, vues.length?'button':'span');
     var n=add(b,'span','flow-n');
-    if(st[f.id]==='done') icon(n,'check'); else n.textContent=String(i+1);
-    add(b,'span','flow-label',f.lab);
-    if(ok){ b.type='button'; b.addEventListener('click',function(){ go(f.view); }); }
-    if(state.view===f.view) b.setAttribute('aria-current','step');
-    add(b,'span','sr-only',' — '+FLOW_LAB[st[f.id]]);
+    if(st[e.id]==='done') icon(n,'check'); else n.textContent=String(i+1);
+    add(b,'span','flow-label',e.lab);
+    if(vues.length){ b.type='button'; fk(b,'etape-'+e.id); b.addEventListener('click',function(){ go(vues[0]); }); }
+    if(etape===e) b.setAttribute('aria-current','step');
+    add(b,'span','sr-only',' — '+FLOW_LAB[st[e.id]]);
+  });
+  if(etape){
+    var vues=vuesPermises(etape);
+    if(vues.length>1){
+      var tabs=add(m,'div','proc-tabs'); tabs.setAttribute('role','tablist');
+      vues.forEach(function(v){
+        var def=VIEWS.filter(function(x){ return x.id===v; })[0];
+        var bt=add(tabs,'button','pill'+(v===state.view?' on':''),def.label); fk(bt,'onglet-'+v);
+        bt.setAttribute('role','tab'); bt.setAttribute('aria-selected',v===state.view?'true':'false');
+        var verrou=lockReason(v); if(verrou) bt.title=verrou;
+        bt.addEventListener('click',function(){ go(v); });
+      });
+    }
+  }
+  return add(m,'div');
+}
+/* Pied : étape précédente et suivante, et les outils de la procédure. */
+function cadreProcedureBas(m){
+  var etape=etapeDe(state.view), pied=add(m,'div','proc-foot');
+  var nav=add(pied,'div'); nav.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+  if(etape){
+    var i=ETAPES.indexOf(etape);
+    var prec=ETAPES[i-1], suiv=ETAPES[i+1];
+    if(prec && vuesPermises(prec).length){ var bp=add(nav,'button','btn btn-ghost btn-sm','← '+prec.lab); fk(bp,'etape-prec'); bp.addEventListener('click',function(){ go(vuesPermises(prec)[0]); }); }
+    if(suiv && vuesPermises(suiv).length){ var bs=add(nav,'button','btn btn-primary btn-sm','Étape suivante : '+suiv.lab+' →'); fk(bs,'etape-suiv'); bs.addEventListener('click',function(){ go(vuesPermises(suiv)[0]); }); }
+  }
+  var outils=add(pied,'div'); outils.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+  OUTILS_PROCEDURE.filter(viewAllowed).forEach(function(v){
+    var def=VIEWS.filter(function(x){ return x.id===v; })[0];
+    var bo=add(outils,'button','btn btn-ghost btn-sm'+(v===state.view?' on':''),def.label); fk(bo,'outil-'+v);
+    bo.addEventListener('click',function(){ go(v); });
   });
 }
 

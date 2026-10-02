@@ -10,7 +10,7 @@ function vDashboard(m){
   add(l,'p','lede',[state.cdc.procedure, 'profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' »', state.cdc.objet].filter(Boolean).join(' — ')+'.');
   var b=add(h,'button','btn btn-primary', state.cdc.cdcPublie?'Reprendre le dépouillement':'Préparer le cahier des charges');
   b.addEventListener('click',function(){ go(state.cdc.cdcPublie?'depouille':'cdc'); });
-  frise(m);
+  if(!avecCadreProcedure()) frise(m); // sinon, la frise des étapes du cadre suffit
 
   var st=add(m,'div','stats');
   var etr=SEED_OFFERS.filter(function(o){return !isUemoa(o);}).length;
