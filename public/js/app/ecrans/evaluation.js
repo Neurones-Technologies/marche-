@@ -42,6 +42,9 @@ function vEvaluation(m){
     add(top,'span','rank'+(idx===0?' lead':''),'Rang '+(idx+1));
     originChip(top,o);
     add(card,'div',null,o.name).style.cssText='font-size:15px;font-weight:700';
+    var evo=(state.evaluationsOffres||{})[o.id];
+    if(evo){ var ce=add(card,'span','chip '+(evo.alerte?'c-red':'c-grey'),'Exécution passée : '+evo.moyenne+'/100 sur '+evo.nb+' commande(s)');
+      ce.title='Note du partenaire sur ses commandes réceptionnées ; information pour l\u2019évaluateur, sans effet sur le classement.'; }
     add(card,'div','muted', sep(o.montant)+' '+o.devise+' · '+o.delai+' j');
     var corr = montantCorrige(o);
     var mline = add(card,'div','muted', 'Contre-valeur : '+xof(montantXOF(o)) + (Math.abs(corr-montantXOF(o))>1 ? ' → comparé à '+xof(corr) : ''));

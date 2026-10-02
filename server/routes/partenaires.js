@@ -8,7 +8,7 @@
 const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
-const { db, kvGet, partenairesAll, partenaireGet, partenaireSave, partenaireDe, auditAppend, frDate } = require('../db');
+const { db, kvGet, partenairesAll, partenaireGet, partenaireSave, partenaireDe, commandesAll, auditAppend, frDate } = require('../db');
 const { requireAuth, whoLabel } = require('../auth');
 const { lireFichier, corpsBrut, diskPath } = require('./files');
 const C = require('../../public/js/circuits.js');
@@ -41,7 +41,10 @@ function vue(p) {
     const etat = !x ? 'manquante' : (x.expire && x.expire < aujourdhui() ? 'expiree' : x.statut);
     return { id: d.id, label: d.label, etat, piece: x || null };
   });
-  return { ...p, exigees };
+  // évaluations reçues (module 5) : une par commande clôturée
+  const evaluations = commandesAll().filter((c) => c.evaluation && c.evaluation.partenaire === p.id)
+    .map((c) => ({ commande: c.numero, procedure: c.procedure.ref, date: c.receptionDefinitive && c.receptionDefinitive.date, ...c.evaluation }));
+  return { ...p, exigees, evaluations };
 }
 
 r.get('/', (req, res) => {

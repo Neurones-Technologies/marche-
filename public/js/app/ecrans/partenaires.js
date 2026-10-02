@@ -43,6 +43,22 @@ function historiquePartenaire(parent, p){
   });
 }
 
+/* Évaluations reçues (module 5) : une par commande clôturée, et la note moyenne. */
+function evaluationsPartenaire(parent, p){
+  if(!p.evaluations || !p.evaluations.length) return;
+  var k=add(parent,'div','card'); k.style.marginTop='18px';
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,'Évaluation sur les commandes exécutées');
+  if(p.evaluation) add(ph,'span','chip '+(p.evaluation.alerte?'c-red':'c-green'),p.evaluation.moyenne+'/100 sur '+p.evaluation.nb+' commande(s)'+(p.evaluation.alerte?' — sous le seuil de '+p.evaluation.seuil:''));
+  var b=add(k,'div','pad');
+  p.evaluations.slice().reverse().forEach(function(e){
+    var row=add(b,'div','docline'); var lf=add(row,'div'); lf.style.flex='1 1 260px';
+    add(lf,'strong',null,(e.commande||'')+' — '+e.procedure);
+    add(lf,'div','muted','Délais '+e.scores.delais+' · conformité '+e.scores.conformite+' · complétude '+e.scores.completude+' · qualité '+e.scores.qualite+(e.retard?' · '+e.retard+' jour(s) de retard':'')+(e.commentaire?' · « '+e.commentaire+' »':''));
+    add(row,'span','chip c-grey',e.note+'/100');
+  });
+  add(add(k,'div','panel-foot'),'span','muted','Une note sous le seuil lève une alerte ; elle n\u2019entraîne jamais de suspension automatique. Les évaluateurs des offres la voient, sans effet sur le classement.');
+}
+
 /* ============ Mon référencement (prestataire) ============ */
 function vReferencement(m){
   var h=add(m,'div','head'); var l=add(h,'div');
@@ -143,6 +159,7 @@ function vReferencement(m){
         },'Soumettre le dossier de référencement ?','Soumettre');
       });
     }
+    evaluationsPartenaire(zone,p);
     circuitPartenaire(zone,p,null);
     historiquePartenaire(zone,p);
   }
@@ -186,6 +203,7 @@ function vPartenaires(m){
       add(lf,'strong',null,p.id+' — '+p.raisonSociale);
       var alerte=p.exigees.filter(function(e){ return e.etat==='expiree'||e.etat==='a_verifier'; }).length;
       add(lf,'div','muted',[p.pays, p.immatriculation, (p.domaines||[]).join(', '), alerte ? alerte+' pièce(s) à examiner' : ''].filter(Boolean).join(' · '));
+      if(p.evaluation && p.evaluation.nb) add(row,'span','chip '+(p.evaluation.alerte?'c-red':'c-grey'),'Note '+p.evaluation.moyenne+'/100'+(p.evaluation.alerte?' · alerte':''));
       chipStatutPartenaire(row,p.statut);
       var bo=add(row,'button','btn btn-ghost btn-sm', UI.partenaire===p.id?'Affiché':'Ouvrir'); fk(bo,'prt-open-'+p.id);
       bo.disabled=UI.partenaire===p.id;
@@ -236,6 +254,7 @@ function vPartenaires(m){
     });
     add(add(kp,'div','panel-foot'),'span','muted','Pendant l’instruction, les pièces sont validées en bloc au dernier niveau du parcours ; ensuite, chaque pièce renouvelée se valide ici.');
 
+    evaluationsPartenaire(zone,p);
     circuitPartenaire(zone,p,function(row,e,i){
       var ba=add(row,'button','btn btn-primary btn-sm','Franchir'); fk(ba,'prt-app-'+i);
       ba.addEventListener('click',function(){

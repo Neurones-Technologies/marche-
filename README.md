@@ -33,6 +33,10 @@ server/
 
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 
+- **Évaluation des partenaires** : à la réception définitive, chaque commande reçoit une note sur 100 (délais,
+  conformité, complétude à la date prévue, qualité appréciée par le réceptionnaire, pondérés par l'organisation) ; la
+  note du partenaire est la moyenne de ses commandes. Sous le seuil, une alerte est consignée, sans suspension
+  automatique. Les évaluateurs des offres voient la note, qui n'entre pas dans le classement.
 - **Bons de commande et réceptions** : commande établie à partir de l'offre retenue (attribution prononcée et, en
   marché public, marché signé), plafonnée au montant restant de l'offre, validée par un circuit selon le montant, puis
   émise sous un numéro continu et sans trou, avec l'empreinte SHA-256 du document ; imprimable et enregistrable en PDF
@@ -81,7 +85,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 79 tests (Node 22 requis pour better-sqlite3)
+npm test             # 80 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :

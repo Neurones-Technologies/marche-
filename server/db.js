@@ -301,6 +301,9 @@ function partenaireDemo() {
 }
 
 /* ---- bons de commande (module 4) : rattachés à une procédure, numérotés à l'émission ---- */
+/** Évaluation des partenaires (module 5) : poids des critères (total 100), seuil d'alerte, retard qui annule la note
+    « délais ». Réglages de l'organisation, Paramètres → 13. */
+const EVALUATION_PARTENAIRES = { criteres: { delais: 30, conformite: 30, completude: 20, qualite: 20 }, seuilAlerte: 60, plafondRetardJours: 30 };
 /** Circuit de validation d'une commande par défaut : l'engagement, puis le comité au-delà de 100 millions. */
 const CIRCUIT_COMMANDE = [
   { role: 'Contrôle de l’engagement', who: 'Direction Financière' },
@@ -327,7 +330,7 @@ function defaultOrgKv() {
       rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {}, inscriptionOuverte: true, prefixeCommande: 'BC' },
     seuils: { confianceMin: 75, prixBas: 25, structureEcart: 0.8, refsMin: 3, validiteMin: 90, ecartIaMax: 0 },
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
-    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT), circuitCommande: clone(CIRCUIT_COMMANDE),
+    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT), circuitCommande: clone(CIRCUIT_COMMANDE), evaluationPartenaires: clone(EVALUATION_PARTENAIRES),
     mailFrom: 'marches@bal.ci', mailSuffix: '@bal.ci',
   };
 }
@@ -411,6 +414,8 @@ db.transaction(function migrate() {
   if (kvGet('org') && !kvGet('circuitReferencement')) kvSet('circuitReferencement', clone(CIRCUIT_REFERENCEMENT), 'migration');
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.
   if (kvGet('org') && !kvGet('circuitCommande')) kvSet('circuitCommande', clone(CIRCUIT_COMMANDE), 'migration');
+  // 02/10/2026 : module 5 (évaluation des partenaires). Réglages par défaut.
+  if (kvGet('org') && !kvGet('evaluationPartenaires')) kvSet('evaluationPartenaires', clone(EVALUATION_PARTENAIRES), 'migration');
   if (kvGet('org') && db.prepare("SELECT COUNT(*) c FROM partenaires").get().c === 0) {
     const soums = db.prepare("SELECT id, nom, email FROM users WHERE role='soum' AND partenaire_id IS NULL").all();
     for (const u of soums) {

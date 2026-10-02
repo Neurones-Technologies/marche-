@@ -97,8 +97,8 @@ var UI = { q:'', sort:'nom' };
 /* Clés partagées avec le serveur ; view / offerIndex / draft restent propres à chaque session. */
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
-  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','circuitCommande'];
-var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets','monPartenaire'];
+  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','circuitCommande','evaluationPartenaires'];
+var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
 var TARGETED = ['quality','justif','confirmed','excluded'];

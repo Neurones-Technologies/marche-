@@ -147,6 +147,7 @@ function vParams(m){
   vParamsCircuitOrg(m,'circuitReferencement','9 · Parcours de référencement des partenaires','Un dossier de référencement suit ces étapes ; les pièces déposées sont validées au dernier niveau.');
   vParamsInscription(m,o);
   vParamsCircuitOrg(m,'circuitCommande','11 · Circuit de validation des bons de commande','Une commande suit ce circuit avant émission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (en XOF). Celui qui établit la commande ne la valide pas.');
+  vParamsEvaluation(m);
   var kc=add(m,'div','card'); kc.style.marginTop='18px';
   add(kc,'div','panel-head','12 · Numérotation des bons de commande');
   var fc=add(add(kc,'div','pad'),'div','frm');
@@ -244,6 +245,28 @@ function vParamsCircuitOrg(m, cle, titre, note){
   add(f,'button','btn btn-ghost btn-sm','+ Ajouter un niveau').addEventListener('click',function(){
     c.push({role:'Nouveau niveau de validation', who:'À désigner'}); logit(titre.replace(/^\d+ · /,'')+' — niveau ajouté'); save(); render();
   });
+}
+
+/* Évaluation des partenaires (module 5) : poids des critères (total 100), seuil d'alerte, retard plafond. */
+function vParamsEvaluation(m){
+  var e=state.evaluationPartenaires=state.evaluationPartenaires||{criteres:{delais:30,conformite:30,completude:20,qualite:20},seuilAlerte:60,plafondRetardJours:30};
+  var k=add(m,'div','card'); k.style.marginTop='18px';
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,'13 · Évaluation des partenaires');
+  var somme=['delais','conformite','completude','qualite'].reduce(function(t,x){ return t+Number(e.criteres[x]||0); },0);
+  add(ph,'span','chip '+(somme===100?'c-green':'c-red'),'Total des poids : '+somme);
+  var f=add(add(k,'div','pad'),'div','frm');
+  function nb(lab, val, cb, id){
+    var w=add(f,'div'); add(w,'label',null,lab).setAttribute('for',id);
+    var i=add(w,'input'); i.type='number'; i.id=id; i.value=val; fk(i,id);
+    i.addEventListener('change',function(){ cb(Number(i.value)); save(); render(); });
+  }
+  nb('Poids — respect des délais',e.criteres.delais,function(v){ e.criteres.delais=v; },'ev-delais');
+  nb('Poids — conformité (réceptions sans réserve)',e.criteres.conformite,function(v){ e.criteres.conformite=v; },'ev-conformite');
+  nb('Poids — complétude à la date prévue',e.criteres.completude,function(v){ e.criteres.completude=v; },'ev-completude');
+  nb('Poids — qualité appréciée par le réceptionnaire',e.criteres.qualite,function(v){ e.criteres.qualite=v; },'ev-qualite');
+  nb('Seuil d\u2019alerte (sur 100)',e.seuilAlerte,function(v){ e.seuilAlerte=v; logit('Seuil d\u2019alerte des partenaires : '+v+'/100'); },'ev-seuil');
+  nb('Retard qui annule la note « délais » (jours)',e.plafondRetardJours,function(v){ e.plafondRetardJours=v; },'ev-plafond');
+  add(add(k,'div','panel-foot'),'span','muted','La note d\u2019une commande est calculée à sa réception définitive, avec les réglages en vigueur ce jour-là. Les poids doivent totaliser 100 pour être enregistrés.');
 }
 
 /* Inscription en ligne des prestataires : ouverte ou fermée par l'organisation. */

@@ -6,7 +6,7 @@
    Rejet motivé → rejete (de nouveau modifiable) ; annulee (motivée, avant toute réception ; le numéro est conservé). */
 const crypto = require('crypto');
 const express = require('express');
-const { db, kvGet, store, proceduresAll, partenaireDe, commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero, auditAppend, frDate } = require('../db');
+const { db, kvGet, store, proceduresAll, partenaireDe, partenairesAll, partenaireGet, partenaireSave, commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero, auditAppend, frDate } = require('../db');
 const { requireAuth, whoLabel } = require('../auth');
 const C = require('../../public/js/circuits.js');
 const R = require('../../public/js/regles.js');
@@ -264,14 +264,69 @@ r.post('/:id/receptions/:n/levee', (req, res) => {
   res.json({ commande: vue(c) });
 });
 
-/** Réception définitive : après la réception provisoire, sans réserve ouverte. Clôt l'exécution dans Marché+. */
+/* ---- Évaluation des partenaires (module 5) ----
+   À la réception définitive, la commande reçoit une note sur 100 : quatre critères pondérés par l'organisation.
+     délais      : 100 sans retard, 0 au-delà du retard plafond, linéaire entre les deux ;
+     conformité  : part des réceptions sans réserve ;
+     complétude  : part des quantités livrées à la date prévue ;
+     qualité     : appréciation du réceptionnaire, de 1 à 5.
+   La note du partenaire est la moyenne de ses commandes évaluées ; sous le seuil, une alerte est levée (jamais de
+   suspension automatique). La note est montrée aux évaluateurs des offres, sans entrer dans le classement. */
+function evaluer(c, qualite) {
+  const reglages = (kvGet('evaluationPartenaires') || { value: {} }).value, poids = reglages.criteres || {};
+  const v = vue(c), commande = c.lignes.reduce((t, l) => t + Number(l.quantite), 0);
+  const aTemps = c.receptions.filter((x) => x.date <= c.dateLivraison).reduce((t, x) => t + x.quantites.reduce((s, q) => s + Number(q), 0), 0);
+  const scores = {
+    delais: Math.max(0, 100 * (1 - v.retard / (Number(reglages.plafondRetardJours) || 30))),
+    conformite: 100 * c.receptions.filter((x) => !x.reserves).length / c.receptions.length,
+    completude: commande ? 100 * Math.min(1, aTemps / commande) : 0,
+    qualite: (qualite.note - 1) * 25,
+  };
+  const note = Object.keys(scores).reduce((t, k) => t + scores[k] * (Number(poids[k]) || 0) / 100, 0);
+  Object.keys(scores).forEach((k) => { scores[k] = Math.round(scores[k]); });
+  return { scores, poids: { ...poids }, note: Math.round(note), qualite: qualite.note, commentaire: qualite.commentaire || null, retard: v.retard };
+}
+/** Fiche partenaire du titulaire : celle de l'offre, sinon celle de même raison sociale. */
+function partenaireDuTitulaire(c) {
+  if (c.titulaire.partenaire) return partenaireGet(c.titulaire.partenaire);
+  const nom = String(c.titulaire.nom || '').trim().toLowerCase();
+  return partenairesAll().find((p) => String(p.raisonSociale || '').trim().toLowerCase() === nom) || null;
+}
+/** Recalcule la note d'un partenaire à partir de toutes ses commandes évaluées ; alerte sous le seuil. */
+function recalculer(req, p) {
+  const seuil = Number(((kvGet('evaluationPartenaires') || { value: {} }).value).seuilAlerte) || 0;
+  const notes = commandesAll().filter((x) => x.evaluation && x.evaluation.partenaire === p.id).map((x) => x.evaluation.note);
+  const avant = p.evaluation || {};
+  const moyenne = notes.length ? Math.round(notes.reduce((t, n) => t + n, 0) / notes.length) : null;
+  p.evaluation = { moyenne, nb: notes.length, seuil, alerte: moyenne != null && moyenne < seuil, maj: frDate() };
+  if (p.evaluation.alerte && !avant.alerte) {
+    p.historique.push({ t: frDate(), who: 'Système', action: `alerte : note ${moyenne}/100, sous le seuil de ${seuil}` });
+    auditAppend(req.user.id, whoLabel(req.user), `Partenaire ${p.id} (${p.raisonSociale}) — alerte d’évaluation : ${moyenne}/100 sous le seuil de ${seuil}`);
+  }
+  partenaireSave(p);
+  return p.evaluation;
+}
+
+/** Réception définitive : après la réception provisoire, sans réserve ouverte, avec l'appréciation de la qualité.
+    Clôt l'exécution dans Marché+ et évalue le titulaire. */
 r.post('/:id/definitive', (req, res) => {
-  const c = req.commande;
+  const c = req.commande, d = req.body || {};
   if (!estReceptionnaire(req, c)) return err(res, 403, 'NOT_RECEIVER', 'Seul le réceptionnaire désigné prononce la réception définitive.');
   if (c.statut !== 'receptionnee') return err(res, 409, 'NOT_PROVISIONALLY_RECEIVED', 'La réception définitive suit la réception provisoire.');
   if (vue(c).reservesOuvertes) return err(res, 409, 'RESERVES_OPEN', 'Des réserves sont encore ouvertes : levez-les avant la réception définitive.');
-  db.transaction(() => { c.statut = 'cloturee'; c.receptionDefinitive = { date: jour(), t: frDate() }; journal(req, c, 'réception définitive prononcée'); commandeSave(c); })();
-  res.json({ commande: vue(c) });
+  const note = Number(d.qualite);
+  if (!Number.isInteger(note) || note < 1 || note > 5) return err(res, 422, 'QUALITY_REQUIRED', 'Appréciation de la qualité attendue, de 1 (insuffisante) à 5 (excellente).');
+  const commentaire = String(d.commentaire || '').trim().slice(0, 1000);
+  let alerte = null;
+  db.transaction(() => {
+    c.statut = 'cloturee'; c.receptionDefinitive = { date: jour(), t: frDate() };
+    const p = partenaireDuTitulaire(c);
+    c.evaluation = { ...evaluer(c, { note, commentaire }), partenaire: p ? p.id : null, par: { id: req.user.id, nom: req.user.nom }, t: frDate() };
+    journal(req, c, `réception définitive prononcée — évaluation du titulaire : ${c.evaluation.note}/100`);
+    commandeSave(c);
+    if (p) alerte = recalculer(req, p);
+  })();
+  res.json({ commande: vue(c), evaluationPartenaire: alerte });
 });
 
 module.exports = r;

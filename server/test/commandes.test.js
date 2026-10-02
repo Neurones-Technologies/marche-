@@ -99,9 +99,17 @@ test('réceptions : par le réceptionnaire, rapprochement, réserves, retard et 
   refusé(await call('POST', U + '/definitive', {}, demandeur), 409, 'RESERVES_OPEN');
   refusé(await call('POST', U + '/receptions/1/levee', { motif: '' }, demandeur), 422);
   ok(await call('POST', U + '/receptions/1/levee', { motif: 'Écrans remplacés.' }, demandeur));
-  r = await call('POST', U + '/definitive', {}, demandeur);
+  refusé(await call('POST', U + '/definitive', {}, demandeur), 422, 'QUALITY_REQUIRED');
+  r = await call('POST', U + '/definitive', { qualite: 4, commentaire: 'Bon matériel, livraison tardive.' }, demandeur);
   ok(r);
   assert.equal(r.json.commande.statut, 'cloturee');
+  // évaluation du titulaire : délais 0 (retard), conformité 50 (une réception sur deux avec réserves),
+  // complétude 0 (rien livré à la date prévue), qualité 75 (4 sur 5) ; poids 30/30/20/20 → 30/100, sous le seuil de 60
+  const ev = r.json.commande.evaluation;
+  assert.deepEqual(ev.scores, { delais: 0, conformite: 50, completude: 0, qualite: 75 });
+  assert.equal(ev.note, 30);
+  assert.equal(ev.partenaire, 'PRT-0001');
+  assert.deepEqual([r.json.evaluationPartenaire.moyenne, r.json.evaluationPartenaire.alerte], [30, true]);
   refusé(await call('POST', U + '/annuler', { motif: 'x' }, achats), 409, 'ORDER_NOT_CANCELLABLE');
 });
 
@@ -123,6 +131,20 @@ test('annulation motivée : le numéro reste attribué, pas de trou dans la num�
   assert.equal(a.json.commande.numero, c2.numero);
   const c3 = await emettre();
   assert.match(c3.numero, /-0003$/);
+});
+
+test('évaluation : visible des acheteurs et des évaluateurs, hors classement ; réglages contrôlés', async () => {
+  const p = (await call('GET', '/api/partenaires', null, achats)).json.partenaires.find((x) => x.id === 'PRT-0001');
+  assert.equal(p.evaluation.moyenne, 30);
+  assert.equal(p.evaluations.length, 1);
+  const st = await getState(achats, pid);
+  assert.ok(st.audit.some((e) => e.a.includes('alerte d’évaluation : 30/100')), 'alerte consignée à la piste d’audit');
+  const parOffre = Object.values(st.evaluationsOffres);
+  assert.deepEqual(parOffre.map((x) => [x.partenaire, x.moyenne, x.alerte]), [['PRT-0001', 30, true]]);
+  assert.equal((await getState(sotrap, pid)).evaluationsOffres, undefined, 'le soumissionnaire ne voit pas les notes');
+  const reg = st.evaluationPartenaires;
+  refusé(await patch(admin, { evaluationPartenaires: { ...reg, criteres: { ...reg.criteres, qualite: 50 } } }, pid), 422, 'EVALUATION_INVALID');
+  ok(await patch(admin, { evaluationPartenaires: { ...reg, seuilAlerte: 25 } }, pid));
 });
 
 test('export comptable des commandes émises', async () => {

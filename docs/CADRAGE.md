@@ -373,7 +373,40 @@ commandes, avec des seuils de montant.
 - Non couvert : **avenants** (une commande émise ne se modifie pas ; il faut aujourd'hui l'annuler, si rien n'a été
   reçu, et en émettre une autre), lignes reprises du détail de l'offre (l'offre ne porte qu'un montant global).
 
-Prochaine étape : **module 5** (évaluation des partenaires à partir des réceptions).
+### Étape 7 : module 5, évaluation des partenaires, réalisé le 02/10/2026
+
+Choix validés le 02/10/2026 : note calculée à partir des réceptions plus une appréciation qualitative ; alerte sous un
+seuil, jamais de suspension automatique ; note montrée aux évaluateurs, hors du classement.
+
+- **Note d'une commande**, calculée à sa réception définitive avec les réglages du jour (clé `evaluationPartenaires`,
+  Paramètres → 13) : délais (100 sans retard, 0 au-delà du retard plafond, 30 jours par défaut), conformité (part des
+  réceptions sans réserve), complétude (part des quantités livrées à la date prévue), qualité (appréciation de 1 à 5
+  du réceptionnaire, obligatoire). Poids par défaut 30 / 30 / 20 / 20, total 100 contrôlé par le serveur.
+- **Note du partenaire** : moyenne de ses commandes évaluées, sur sa fiche, avec l'historique par commande. Le
+  titulaire est rattaché à sa fiche par l'offre ou, à défaut, par sa raison sociale.
+- **Alerte** sous le seuil (60 par défaut) : consignée à la fiche et à la piste d'audit, signalée aux achats. Aucune
+  suspension automatique ; la suspension reste une décision motivée (module 1).
+- **Usage dans les appels d'offres** : les lecteurs des offres voient la note du partenaire sur l'écran Évaluation, à
+  titre d'information ; elle n'entre pas dans le classement. Le soumissionnaire ne voit pas les notes des autres ;
+  il voit la sienne dans « Mon référencement ».
+- Tests : 80 au total ; parcours dans Chrome jusqu'à la réception définitive notée.
+
+## 8. Bilan au 02/10/2026
+
+Les cinq modules du cadrage existent, sur le socle (plusieurs procédures, écritures ciblées, interface découpée) et
+le moteur de circuits, avec les profils réglementaires public et privé. Restent, par ordre d'importance :
+
+1. **Envoi réel des courriels** : sans lui, l'inscription en ligne ne fonctionne pas en production, et les
+   notifications restent simulées.
+2. **Validation juridique** des valeurs du profil public (délai de recours, marge de préférence, pièces imposées) et
+   des seuils de type de procédure, provisoires.
+3. **IA réelle** : extraction des offres et des pièces, aujourd'hui simulée (`docs/EXTRACTION.md` de la branche
+   `conception`), à chiffrer avec le coût par document.
+4. **Avenants** aux bons de commande ; lignes de commande reprises du détail des offres.
+5. Restes du prototype : calendrier du tableau de bord en dur, procédure de démonstration créée même avec
+   `SEED_DEMO=0`.
+6. **Déploiement** sur le VPS : les migrations reprennent les données existantes (procédure p1, rôles, fiches
+   partenaires), à faire précéder d'une sauvegarde du volume.
 
 Restes du prototype
 repérés en chemin, non traités : le calendrier du tableau de bord (dates écrites en dur) et le texte « Prototype de

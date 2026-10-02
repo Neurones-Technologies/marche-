@@ -19,7 +19,7 @@ const WRITE_PERMS = {
   evalDone: ['eval.validate', 'recours.handle'],
   approvals: ['decision.approve', 'params.edit', 'recours.handle'],
   org: ['params.edit'], seuils: ['params.edit'], docDefs: ['params.edit'],
-  mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'], circuitReferencement: ['params.edit'], circuitCommande: ['params.edit'],
+  mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'], circuitReferencement: ['params.edit'], circuitCommande: ['params.edit'], evaluationPartenaires: ['params.edit'],
   offers: ['params.edit'],
   roles: ['roles.edit'], users: ['roles.edit'], delegations: ['roles.edit'],
   notifRules: ['notif.manage'],
@@ -346,6 +346,17 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         value[i] = e;
       });
       break;
+    case 'evaluationPartenaires': {
+      const c = isObj(value) && isObj(value.criteres) ? value.criteres : null;
+      const ids = ['delais', 'conformite', 'completude', 'qualite'];
+      if (!c || ids.some((k) => !(Number(c[k]) >= 0)) || Object.keys(c).some((k) => !ids.includes(k)))
+        return refus(422, 'EVALUATION_INVALID', 'Poids attendus pour les critères délais, conformité, complétude et qualité.');
+      const somme = ids.reduce((t, k) => t + Number(c[k]), 0);
+      if (Math.round(somme) !== 100) return refus(422, 'EVALUATION_INVALID', `Les poids des critères doivent totaliser 100 (ici ${somme}).`);
+      if (!(Number(value.seuilAlerte) >= 0 && Number(value.seuilAlerte) <= 100)) return refus(422, 'EVALUATION_INVALID', 'Seuil d’alerte entre 0 et 100.');
+      if (!(Number(value.plafondRetardJours) >= 1 && Number(value.plafondRetardJours) <= 365)) return refus(422, 'EVALUATION_INVALID', 'Retard plafond entre 1 et 365 jours.');
+      break;
+    }
     case 'docDefs': {
       if (!Array.isArray(value) || value.some((d) => !isObj(d) || !d.id)) return 'Liste de pièces invalide.';
       const ids = new Set(value.map((d) => d.id));

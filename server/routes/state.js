@@ -1,7 +1,7 @@
 /* Routes d'une procédure, montées sous /api/procedures/:pid (voir routes/procedures.js, qui pose req.pid et
    req.store). L'état renvoyé réunit les clés de l'organisation et celles de la procédure. */
 const express = require('express');
-const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, offersReplace, frDate, isProcKey, partenaireDe } = require('../db');
+const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, offersReplace, frDate, isProcKey, partenaireDe, partenairesAll } = require('../db');
 const { whoLabel } = require('../auth');
 const { validateChange, effectsOf } = require('../rules');
 const R = require('../../public/js/regles.js');
@@ -24,6 +24,16 @@ function buildState(req) {
     audit: req.pid && (req.can('audit.read') || req.can('pv.read')) ? auditList(200, req.pid) : [],
   };
   delete st._sod; // historique de séparation des fonctions : interne au serveur
+  // évaluation des partenaires (module 5) : montrée aux lecteurs des offres, jamais intégrée au classement
+  if (canSeeOffers && req.pid) {
+    const fiches = partenairesAll(), par = {};
+    for (const o of st.offers) {
+      const p = o.partenaire ? fiches.find((x) => x.id === o.partenaire)
+        : fiches.find((x) => String(x.raisonSociale || '').trim().toLowerCase() === String(o.name || '').trim().toLowerCase());
+      if (p && p.evaluation && p.evaluation.nb) par[o.id] = { partenaire: p.id, moyenne: p.evaluation.moyenne, nb: p.evaluation.nb, alerte: p.evaluation.alerte };
+    }
+    st.evaluationsOffres = par;
+  }
   // le soumissionnaire voit l'état de son référencement et les pièces qui en tiennent lieu au dépôt
   if (req.can('portail.use')) {
     const p = partenaireDe(req.user.id);

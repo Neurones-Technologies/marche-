@@ -236,9 +236,31 @@ function vCommandes(m){
     }
     if(c.receptionProvisoire) add(b,'p',null,'Réception provisoire le '+c.receptionProvisoire.date+'.'+(c.receptionDefinitive?' Réception définitive le '+c.receptionDefinitive.date+'.':'')).style.marginTop='10px';
     if(moi && c.statut==='receptionnee'){
+      add(b,'h3',null,'Réception définitive et appréciation').style.marginTop='14px';
+      var fq=add(b,'div','frm');
+      var wq=add(fq,'div'); add(wq,'label',null,'Qualité de la prestation').setAttribute('for','cmd-qualite');
+      var sq=add(wq,'select'); sq.id='cmd-qualite'; fk(sq,'cmd-qualite');
+      [['','Choisir…'],['5','5 — Excellente'],['4','4 — Bonne'],['3','3 — Correcte'],['2','2 — Médiocre'],['1','1 — Insuffisante']].forEach(function(x){ add(sq,'option',null,x[1]).value=x[0]; });
+      var wc=add(fq,'div'); wc.style.gridColumn='1/-1'; add(wc,'label',null,'Commentaire (facultatif)').setAttribute('for','cmd-commentaire');
+      var tc=add(wc,'textarea'); tc.id='cmd-commentaire'; tc.rows=2; tc.style.width='100%'; fk(tc,'cmd-commentaire');
+      add(b,'p','muted','Avec les délais, la conformité et la complétude des livraisons, cette appréciation forme la note du titulaire.').style.marginTop='8px';
       var bd=add(b,'button','btn btn-primary btn-sm','Prononcer la réception définitive'); fk(bd,'cmd-definitive'); bd.disabled=c.reservesOuvertes>0;
-      if(c.reservesOuvertes) bd.title='Levez d’abord les réserves ouvertes.';
-      bd.addEventListener('click',function(){ ask('La réception définitive clôt l’exécution de la commande dans Marché+.',function(){ agir('POST',enc(c.id)+'/definitive',{},'Réception définitive prononcée.'); },'Prononcer la réception définitive ?','Prononcer'); });
+      if(c.reservesOuvertes) bd.title='Levez d\u2019abord les réserves ouvertes.';
+      bd.addEventListener('click',function(){
+        if(!sq.value){ toast('Choisissez l\u2019appréciation de la qualité.'); sq.focus(); return; }
+        ask('La réception définitive clôt l\u2019exécution de la commande dans Marché+ et évalue le titulaire.',function(){
+          agir('POST',enc(c.id)+'/definitive',{qualite:Number(sq.value), commentaire:tc.value},'Réception définitive prononcée.').then(function(r){
+            var ep=r && r.evaluationPartenaire;
+            if(ep && ep.alerte) toast('Alerte : la note du titulaire ('+ep.moyenne+'/100) passe sous le seuil de '+ep.seuil+'.');
+          });
+        },'Prononcer la réception définitive ?','Prononcer');
+      });
+    }
+    if(c.evaluation){
+      var ev=c.evaluation, ke=add(b,'div','note'); ke.style.marginTop='12px';
+      add(ke,'strong',null,'Évaluation du titulaire : '+ev.note+'/100. ');
+      ke.appendChild(document.createTextNode('Délais '+ev.scores.delais+' · conformité '+ev.scores.conformite+' · complétude '+ev.scores.completude+' · qualité '+ev.scores.qualite+
+        ' (poids '+ev.poids.delais+'/'+ev.poids.conformite+'/'+ev.poids.completude+'/'+ev.poids.qualite+')'+(ev.commentaire?' — « '+ev.commentaire+' »':'')+'.'));
     }
     if(!moi) add(b,'p','muted','Réceptionnaire désigné : '+c.receptionnaire.nom+'. Seul le réceptionnaire constate les livraisons.').style.marginTop='10px';
   }
