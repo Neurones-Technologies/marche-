@@ -17,4 +17,6 @@ module.exports = {
   seedPassword: process.env.SEED_PASSWORD || 'Marche+2026!',
   seedDemo: process.env.SEED_DEMO !== '0',
   allowReset: process.env.ALLOW_RESET !== '0',
+  // Inscription publique des prestataires : tentatives par adresse IP et par heure
+  inscriptionParHeure: Number(process.env.INSCRIPTION_RATE_LIMIT) || 5,
 };

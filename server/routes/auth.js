@@ -15,6 +15,8 @@ r.post('/login', limiter, (req, res) => {
   const u = db.prepare('SELECT * FROM users WHERE lower(email)=lower(?)').get(String(email || '').trim());
   // même coût et même message, que le compte existe ou non
   const ok = bcrypt.compareSync(String(password || ''), u ? u.pass_hash : '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvali');
+  // compte créé par inscription en ligne, courriel pas encore vérifié : on le dit, mais seulement à qui a le bon mot de passe
+  if (u && ok && !u.active && u.a_verifier) return res.status(403).json({ error: 'Adresse courriel non vérifiée : ouvrez le lien reçu par courriel pour activer votre compte.', code: 'EMAIL_NOT_VERIFIED' });
   if (!u || !u.active || !ok) return res.status(401).json({ error: 'Identifiants incorrects.' });
   db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
   const user = { ...u, roleLab: roleDef(u.role).lab };

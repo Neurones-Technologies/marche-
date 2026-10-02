@@ -26,6 +26,7 @@
     { id: 'niveauxApprobationMin', lab: 'Niveaux d’approbation minimum', type: 'nombre' },
     { id: 'separationFonctions', lab: 'Séparation des fonctions (noter ≠ approuver)', type: 'bool' },
     { id: 'piecesImposees', lab: 'Pièces qui ne peuvent pas être retirées', type: 'pieces' },
+    { id: 'depotReserveReferences', lab: 'Dépôt d’offre réservé aux partenaires référencés', type: 'bool' },
     { id: 'seuilConsultation', lab: 'Montant à partir duquel un appel d’offres est requis (XOF)', type: 'nombre' },
     { id: 'seuilAppelOffresOuvert', lab: 'Montant à partir duquel l’appel d’offres est ouvert (XOF)', type: 'nombre' },
   ];
@@ -60,6 +61,7 @@
         niveauxApprobationMin: { v: 2, impose: false, min: 2, max: 10 },
         separationFonctions: { v: true, impose: true },
         piecesImposees: { v: ['registre', 'fiscal', 'cnps', 'caution'], impose: true },
+        depotReserveReferences: { v: false, impose: true },
         seuilConsultation: { v: 10000000, impose: false, min: 0, max: 1000000000000 },
         seuilAppelOffresOuvert: { v: 100000000, impose: false, min: 0, max: 1000000000000 },
       },
@@ -77,6 +79,7 @@
         niveauxApprobationMin: { v: 1, impose: false, min: 1, max: 10 },
         separationFonctions: { v: true, impose: false },
         piecesImposees: { v: [], impose: true },
+        depotReserveReferences: { v: true, impose: false },
         seuilConsultation: { v: 10000000, impose: false, min: 0, max: 1000000000000 },
         seuilAppelOffresOuvert: { v: 100000000, impose: false, min: 0, max: 1000000000000 },
       },

@@ -105,8 +105,10 @@ function vPortail(m){
     if(x.scope==='local') return loc;
     return !uem;
   });
+  // pièces validées au référencement : elles tiennent lieu de pièce du dossier (le serveur les reprend au dépôt)
+  var mp=state.monPartenaire, couvertes=(mp && mp.statut==='reference' && mp.piecesValables) || {};
   req.forEach(function(doc){
-    var meta=(d.files||{})[doc.id], on=!!meta;
+    var meta=(d.files||{})[doc.id], on=!!meta, cov=couvertes[doc.id];
     var row=add(b3,'div','docline');
     var lf=add(row,'div');
     add(lf,'div',null,doc.label).style.fontWeight='600';
@@ -114,6 +116,7 @@ function vPortail(m){
       (doc.id==='contreGarantie' ? 'Émise ou contre-garantie par un établissement agréé dans l’UEMOA' :
       (doc.id==='traduction' ? 'Traduction française certifiée conforme' : 'Pièce exigée au règlement de consultation')));
     if(on) add(lf,'div','muted','Fichier : '+meta.name+' ('+taille(meta.size)+') · empreinte '+meta.sha256.slice(0,12)+'…').title=meta.sha256;
+    else if(cov) add(lf,'div','muted','Couverte par votre référencement : '+cov.nom+(cov.expire?' (valable jusqu\u2019au '+cov.expire+')':'')+'. Joindre un fichier ici remplace cette pièce pour cette offre.');
     var act=add(row,'div'); act.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
     var inp=el('input'); inp.type='file'; inp.accept='.pdf,.png,.jpg,.jpeg,.docx,.xlsx'; inp.hidden=true; inp.setAttribute('aria-label','Choisir le fichier : '+doc.label);
     act.appendChild(inp);
@@ -151,7 +154,9 @@ function vPortail(m){
   if(!Number(d.montant)) errs.push('Montant total non renseigné.');
   if(!Number(d.delai)) errs.push("Délai d'exécution non renseigné.");
   if(!d.lots.length) errs.push('Aucun lot sélectionné.');
-  req.forEach(function(x){ if(!d.docs[x.id]) errs.push('Pièce manquante : '+x.label+'.'); });
+  req.forEach(function(x){ if(!d.docs[x.id] && !couvertes[x.id]) errs.push('Pièce manquante : '+x.label+'.'); });
+  if(CADRE().depotReserveReferences && !(mp && mp.statut==='reference'))
+    errs.push('Dépôt réservé aux partenaires référencés : complétez et soumettez votre dossier dans « Mon référencement ».');
   if(Number(d.delai) > c.delaiMax) warns.push('Délai proposé ('+d.delai+' j) supérieur au plafond du cahier des charges ('+c.delaiMax+' j).');
   if(Number(d.garantie) && Number(d.garantie) < c.garantieMin) warns.push('Garantie proposée ('+d.garantie+' mois) inférieure au minimum exigé ('+c.garantieMin+' mois).');
   if(Number(d.refsCount) && Number(d.refsCount) < 3) warns.push('Références déclarées : '+d.refsCount+' pour 3 exigées.');

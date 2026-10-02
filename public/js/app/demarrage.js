@@ -2,7 +2,7 @@
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
-var ROUTER={dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, besoins:vBesoins, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
+var ROUTER={dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */

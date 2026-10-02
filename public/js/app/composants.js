@@ -32,6 +32,7 @@ var ICONS = {
   arrow:'M5 12h14M13 6l6 6-6 6',
   lock:'M6 11h12v10H6z|M8 11V7a4 4 0 0 1 8 0v4',
   folder:'M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z',
+  badge:'M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z|M9 12h6M9 15h4',
   clipboard:'M9 4h6v3H9z|M9 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-3|M9 12h6M9 16h4'
 };
 function icon(parent, name){
@@ -44,7 +45,7 @@ function icon(parent, name){
   return s;
 }
 /* Icône de chaque écran du menu. */
-var NAV_ICONS = { dashboard:'home', notifs:'bell', procedures:'folder', besoins:'clipboard', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
+var NAV_ICONS = { dashboard:'home', notifs:'bell', procedures:'folder', besoins:'clipboard', referencement:'badge', partenaires:'users', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
   reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
   recours:'scale', pv:'stamp', audit:'list', roles:'key', comptes:'users', params:'cog', regles:'ring' };
 

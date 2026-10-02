@@ -131,6 +131,11 @@
    "id": "besoin.manage",
    "lab": "Instruire les besoins et en faire des procédures",
    "grp": "Besoins"
+  },
+  {
+   "id": "partenaires.manage",
+   "lab": "Référencer les partenaires",
+   "grp": "Partenaires"
   }
  ],
  "INCOMPAT": [
@@ -176,7 +181,8 @@
     "contract.sign": true,
     "besoin.create": true,
     "besoin.approve": true,
-    "besoin.manage": true
+    "besoin.manage": true,
+    "partenaires.manage": true
    }
   },
   "achats": {
@@ -204,7 +210,8 @@
     "contract.sign": false,
     "besoin.create": true,
     "besoin.approve": false,
-    "besoin.manage": true
+    "besoin.manage": true,
+    "partenaires.manage": true
    }
   },
   "evaltech": {
@@ -232,7 +239,8 @@
     "contract.sign": false,
     "besoin.create": false,
     "besoin.approve": false,
-    "besoin.manage": false
+    "besoin.manage": false,
+    "partenaires.manage": false
    }
   },
   "evalfin": {
@@ -260,7 +268,8 @@
     "contract.sign": false,
     "besoin.create": false,
     "besoin.approve": false,
-    "besoin.manage": false
+    "besoin.manage": false,
+    "partenaires.manage": false
    }
   },
   "approb": {
@@ -288,7 +297,8 @@
     "contract.sign": true,
     "besoin.create": false,
     "besoin.approve": true,
-    "besoin.manage": false
+    "besoin.manage": false,
+    "partenaires.manage": false
    }
   },
   "audit": {
@@ -316,7 +326,8 @@
     "contract.sign": false,
     "besoin.create": false,
     "besoin.approve": false,
-    "besoin.manage": false
+    "besoin.manage": false,
+    "partenaires.manage": false
    }
   },
   "soum": {
@@ -344,7 +355,8 @@
     "contract.sign": false,
     "besoin.create": false,
     "besoin.approve": false,
-    "besoin.manage": false
+    "besoin.manage": false,
+    "partenaires.manage": false
    }
   },
   "demandeur": {
@@ -372,7 +384,8 @@
     "contract.sign": false,
     "besoin.create": true,
     "besoin.approve": false,
-    "besoin.manage": false
+    "besoin.manage": false,
+    "partenaires.manage": false
    }
   }
  },

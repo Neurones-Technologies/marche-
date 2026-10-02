@@ -20,7 +20,8 @@ server/
                    jeu de données initial, migrations, audit chaîné
   auth.js          JWT en cookie HttpOnly/SameSite=Strict, middleware d'habilitations
   rules.js         règles métier côté serveur : qui peut écrire quoi, et dans quel ordre
-  routes/          /api/auth/*, /api/besoins (expression, validation, transformation en procédure),
+  routes/          /api/auth/*, /api/inscription (publique), /api/partenaires (référencement),
+                   /api/besoins (expression, validation, transformation en procédure),
                    /api/organisation/state (état sans procédure ouverte), /api/procedures (liste, création, archivage),
                    /api/procedures/:id/{state,offers,audit,files},
                    écritures ciblées /api/procedures/:id/{scores,confirmations,conformite,approbations},
@@ -31,6 +32,11 @@ server/
 
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 
+- **Référencement des partenaires** : un prestataire crée le compte de son entreprise depuis l'écran de connexion
+  (limitation par adresse IP, champ piège, pas d'énumération des comptes, compte inactif jusqu'à la vérification du
+  courriel), dépose ses pièces administratives et soumet son dossier au parcours de référencement de l'organisation.
+  Une pièce validée et en cours de validité tient lieu de pièce du dossier à chaque dépôt d'offre ; en achats privés,
+  le dépôt est réservé aux partenaires référencés. Suspension et exclusion motivées.
 - **Besoins** : un service exprime un besoin, qui suit le circuit de validation de l'organisation (niveaux selon le
   budget, le demandeur ne valide jamais son propre besoin, rejet motivé) ; validé, il devient une procédure pré-remplie
   (objet, budget, type de procédure pressenti selon des seuils provisoires du profil), que le demandeur suit en lecture.
@@ -68,7 +74,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 66 tests (Node 22 requis pour better-sqlite3)
+npm test             # 72 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :
@@ -113,6 +119,8 @@ avec la base.
 ## Limites connues
 
 - L'extraction IA des offres (scores, champs à confiance faible) reste celle des données de démonstration.
-- Les courriels sont simulés (journalisés, non envoyés).
+- Les courriels sont simulés (journalisés, non envoyés). Conséquence pour l'inscription en ligne : en production,
+  le lien de vérification n'est ni envoyé ni affiché ; tant que l'envoi réel n'est pas branché, fermer l'inscription
+  (Paramètres → 10) ou activer les comptes à la main (Comptes → Réactiver).
 - Les signaux d'anomalie (prix anormalement bas, structures de prix similaires…) sont calculés dans le navigateur ;
   le classement, la conformité et les justifications le sont aussi par le serveur (`public/js/regles.js`).

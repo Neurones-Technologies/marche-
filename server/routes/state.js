@@ -1,10 +1,11 @@
 /* Routes d'une procédure, montées sous /api/procedures/:pid (voir routes/procedures.js, qui pose req.pid et
    req.store). L'état renvoyé réunit les clés de l'organisation et celles de la procédure. */
 const express = require('express');
-const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, offersReplace, frDate, isProcKey } = require('../db');
+const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, offersReplace, frDate, isProcKey, partenaireDe } = require('../db');
 const { whoLabel } = require('../auth');
 const { validateChange, effectsOf } = require('../rules');
 const R = require('../../public/js/regles.js');
+const { pieceValable } = require('./partenaires');
 const C = require('../../public/js/circuits.js');
 
 const r = express.Router({ mergeParams: true });
@@ -23,6 +24,12 @@ function buildState(req) {
     audit: req.pid && (req.can('audit.read') || req.can('pv.read')) ? auditList(200, req.pid) : [],
   };
   delete st._sod; // historique de séparation des fonctions : interne au serveur
+  // le soumissionnaire voit l'état de son référencement et les pièces qui en tiennent lieu au dépôt
+  if (req.can('portail.use')) {
+    const p = partenaireDe(req.user.id);
+    st.monPartenaire = p ? { id: p.id, raisonSociale: p.raisonSociale, pays: p.pays, statut: p.statut,
+      piecesValables: Object.keys(p.pieces).filter((k) => pieceValable(p.pieces[k])).reduce((o, k) => { o[k] = { nom: p.pieces[k].nom, expire: p.pieces[k].expire }; return o; }, {}) } : null;
+  }
   // Un soumissionnaire ne doit voir ni les notes, ni les décisions internes.
   if (!canSeeOffers) { st.quality = {}; st.justif = {}; st.confirmed = {}; st.excluded = {}; }
   return { state: st, revs, rev: getRev() };
@@ -221,17 +228,23 @@ r.post('/offers', (req, res) => {
   if (!Number.isFinite(montant) || montant <= 0) errs.push('Montant invalide.');
   if (!lots.length) errs.push('Au moins un lot est requis.');
   if (errs.length) return res.status(422).json({ error: errs.join(' ') });
+  // profil qui réserve le dépôt aux partenaires référencés (achats privés) : jamais en marché public
+  const partenaire = partenaireDe(req.user.id);
+  if (R.cadre({ org, cdc, cadre: req.store.get('cadre') }).depotReserveReferences && !(partenaire && partenaire.statut === 'reference'))
+    return res.status(403).json({ error: 'Le dépôt d’offre est réservé aux partenaires référencés : complétez et soumettez votre dossier de référencement.', code: 'PARTNER_NOT_REFERENCED' });
 
   const docDefs = req.store.get('docDefs');
   const pending = db.prepare('SELECT * FROM files WHERE owner=? AND procedure_id=? AND offer_id IS NULL').all(req.user.id, req.pid);
   const byDoc = new Map(pending.map((f) => [f.doc_id, f]));
   // pièces exigées selon le pays du soumissionnaire et le profil réglementaire (zone de préférence, pays local)
   const exigees = new Set(R.requiredDocs({ org, cdc, cadre: req.store.get('cadre'), docDefs }, { iso: d.iso }).map((x) => x.id));
+  // une pièce validée au référencement (et non expirée) tient lieu de pièce du dossier, sauf si une autre est jointe
+  const parRef = (doc) => !byDoc.has(doc) && partenaire && partenaire.statut === 'reference' && pieceValable(partenaire.pieces[doc]);
   const docs = {}, missing = [];
   docDefs.forEach((x) => {
     const need = exigees.has(x.id);
-    docs[x.id] = need ? byDoc.has(x.id) : true; // pièce non exigée pour ce profil : considérée fournie
-    if (need && !byDoc.has(x.id)) missing.push(x.label);
+    docs[x.id] = need ? (byDoc.has(x.id) || parRef(x.id)) : true; // pièce non exigée pour ce profil : considérée fournie
+    if (need && !docs[x.id]) missing.push(x.label);
   });
   if (missing.length) return res.status(422).json({ error: 'Pièces manquantes : ' + missing.join(' ; ') + '.' });
   const sep = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -251,7 +264,12 @@ r.post('/offers', (req, res) => {
   };
   let receipt;
   db.transaction(() => {
-    offer.pieces = pending.filter((f) => docs[f.doc_id] === true).map((f) => ({ id: f.id, doc: f.doc_id, name: f.name, size: f.size, sha256: f.sha256 }));
+    offer.pieces = pending.filter((f) => docs[f.doc_id] === true).map((f) => ({ id: f.id, doc: f.doc_id, name: f.name, size: f.size, sha256: f.sha256 }))
+      .concat(docDefs.filter((x) => exigees.has(x.id) && parRef(x.id)).map((x) => {
+        const pc = partenaire.pieces[x.id];
+        return { id: pc.fichier, doc: x.id, name: pc.nom, size: pc.taille, sha256: pc.sha256, referencement: partenaire.id, expire: pc.expire };
+      }));
+    if (partenaire) offer.partenaire = partenaire.id;
     offerInsert(offer, true, req.pid);
     db.prepare('UPDATE files SET offer_id=? WHERE owner=? AND procedure_id=? AND offer_id IS NULL').run(id, req.user.id, req.pid);
     const q = req.store.get('quality'); q[id] = { metho: offer.aiMetho, refs: offer.aiRefs }; req.store.set('quality', q, req.user.id);

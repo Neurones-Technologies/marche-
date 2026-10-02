@@ -324,7 +324,31 @@ rédigent et publient ; le type de procédure se déduit du montant par des seui
 - Tests : 66 au total, dont 7 sur les besoins ; parcours complet dans Chrome (demandeur, approbateur, achats, retour du
   demandeur).
 
-Prochaine étape : **module 1** (référencement des partenaires).
+### Étape 5 : module 1, référencement des partenaires, réalisé le 02/10/2026
+
+Choix validés le 02/10/2026 : inscription publique protégée ; parcours de qualification par le moteur de circuits,
+avec des statuts ; dépôt réservé aux partenaires référencés en achats privés, jamais en marché public.
+
+- **Inscription en ligne** (`/api/inscription`, seule route sans compte) : limitation par adresse IP
+  (`INSCRIPTION_RATE_LIMIT`, 5 par heure par défaut), champ piège, réponse identique que le courriel soit connu ou non,
+  politique de mot de passe, compte inactif jusqu'à la vérification du courriel par un jeton à usage unique valable
+  48 h (seule son empreinte est conservée). L'organisation peut fermer l'inscription (Paramètres → 10).
+- **Fiche partenaire** (table `partenaires`, `/api/partenaires`) : identité, contact, domaines ; pièces administratives
+  exigées selon le pays (les pièces propres à une offre, caution et contre-garantie, n'en font pas partie), avec date de
+  fin de validité et empreinte SHA-256. Une pièce remplacée reste archivée.
+- **Parcours** (clé `circuitReferencement`, Paramètres → 9) : vérification des pièces, puis décision ; rejet motivé avec
+  retour au partenaire. Statuts : candidat, en instruction, à corriger, référencé, suspendu, exclu. Suspension,
+  réactivation (pièces à jour exigées) et exclusion définitive, toujours motivées. Pièces renouvelées validées une à une.
+- **Lien avec les offres** : une pièce validée et non expirée tient lieu de pièce du dossier de candidature au dépôt
+  (l'offre garde la trace de la pièce de référencement reprise) ; règle `depotReserveReferences` du profil : vraie par
+  défaut en achats privés, imposée fausse en marché public. Les instances existantes reçoivent une fiche « candidat »
+  par compte soumissionnaire.
+- Tests : 72 au total, dont 6 sur le référencement ; parcours complet dans Chrome (inscription, lien de vérification,
+  dépôt des pièces par le sélecteur de fichiers, instruction par les achats).
+- **Limite** : les courriels sont simulés. Hors production, le lien de vérification est affiché pour la démonstration ;
+  en production il ne l'est pas, et l'inscription en ligne reste inutilisable tant que l'envoi réel n'est pas branché.
+
+Prochaine étape : **bon de commande et module 4** (suivi d'exécution jusqu'à la réception).
 
 Restes du prototype
 repérés en chemin, non traités : le calendrier du tableau de bord (dates écrites en dur) et le texte « Prototype de

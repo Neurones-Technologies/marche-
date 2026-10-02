@@ -22,7 +22,7 @@ app.use(helmet({
   },
 }));
 // Téléversement d'une pièce : corps binaire, ni analysé en JSON ni soumis à l'exigence JSON ci-dessous.
-const FILES = /^\/api\/(procedures\/[^/]+\/)?files(\/|$)/;
+const FILES = /^\/api\/((procedures\/[^/]+\/)?files|partenaires\/[^/]+\/fichiers)(\/|$)/;
 app.use((req, res, next) => (FILES.test(req.path) ? next() : express.json({ limit: '1mb' })(req, res, next)));
 
 // Les requêtes d'écriture doivent être du JSON (protection CSRF complémentaire au cookie SameSite=Strict)
@@ -35,6 +35,8 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/files', require('./routes/files').global);
 app.use('/api/procedures', require('./routes/procedures'));
 app.use('/api/besoins', require('./routes/besoins'));
+app.use('/api/partenaires', require('./routes/partenaires'));
+app.use('/api/inscription', require('./routes/inscription')); // seule route publique (sans compte)
 // État de l'organisation seule, quand aucune procédure n'est ouverte (demandeur, instance encore vide) :
 // lecture de l'état et écriture des seules clés d'organisation, par les mêmes routes que pour une procédure.
 app.use('/api/organisation', requireAuth, (req, res, next) => {

@@ -7,12 +7,20 @@
 }
 .login-brand { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--fw-strong); }
 .login-brand::before { content: ""; width: var(--mark); height: var(--mark); border-radius: var(--space-1); background: var(--color-accent); }
+.login-card[hidden] { display: none; }
 .login-card h1 { margin: var(--space-4) 0 var(--space-2); }
 .login-card label { font-size: var(--fs-small); color: var(--color-text-2); margin-top: var(--space-3); }
 .login-card input { width: 100%; }
 .login-card button[type=submit] { margin-top: var(--space-5); }
 .lg-err { color: var(--color-blocked); background: var(--color-blocked-bg); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-top: var(--space-3); font-size: var(--fs-table); }
 .lg-err[hidden] { display: none; }
+.lg-ok { color: var(--color-ok); background: var(--color-ok-bg); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin-top: var(--space-3); font-size: var(--fs-table); overflow-wrap: anywhere; }
+.lg-ok[hidden] { display: none; }
+.lg-ok a { color: inherit; font-weight: var(--fw-strong); }
+.lg-note { color: var(--color-text-2); font-size: var(--fs-small); margin: 0; }
+.lg-switch { margin-top: var(--space-4); background: none; border: none; padding: var(--space-1) 0; color: var(--color-brand-text); text-decoration: underline; cursor: pointer; font: inherit; font-size: var(--fs-table); text-align: left; }
+/* Piège à robots : hors de l'écran et hors du parcours clavier, sans display:none (que certains robots détectent). */
+.lg-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .lg-demo { margin-top: var(--space-5); font-size: var(--fs-table); color: var(--color-text-2); }
 .lg-demo summary { cursor: pointer; }
 .lg-demo button {

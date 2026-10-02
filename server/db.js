@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS files (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS partenaires (
+  id TEXT PRIMARY KEY, ord INTEGER NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS jetons (
+  hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL, expires_at INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS besoins (
   id TEXT PRIMARY KEY, ord INTEGER NOT NULL, data TEXT NOT NULL, created_by TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -60,6 +66,11 @@ function addColumn(table, col, def) {
   if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
 }
 ['offers', 'receipts', 'files', 'audit'].forEach((t) => addColumn(t, 'procedure_id', 'TEXT'));
+// 02/10/2026 : module 1. Un compte de soumissionnaire est rattaché à sa fiche partenaire ; une pièce de référencement
+// appartient à la fiche ; un compte créé par inscription publique reste inactif tant que son courriel n'est pas vérifié.
+addColumn('users', 'partenaire_id', 'TEXT');
+addColumn('users', 'a_verifier', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('files', 'partenaire_id', 'TEXT');
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const frDate = () => new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abidjan' });
@@ -233,21 +244,74 @@ function besoinNumero() {
   return 'B-' + new Date().getFullYear() + '-' + String(n).padStart(4, '0');
 }
 
+/* ---- partenaires (module 1) : propres à l'organisation ---- */
+/** Parcours de référencement par défaut : vérification des pièces, puis décision. */
+const CIRCUIT_REFERENCEMENT = [
+  { role: 'Vérification des pièces', who: 'Service achats' },
+  { role: 'Décision de référencement', who: 'Responsable des achats' },
+];
+const partenairesAll = () => db.prepare('SELECT data FROM partenaires ORDER BY ord').all().map((r) => JSON.parse(r.data));
+const partenaireGet = (id) => { const r = db.prepare('SELECT data FROM partenaires WHERE id=?').get(id); return r ? JSON.parse(r.data) : null; };
+function partenaireInsert(p) {
+  const ord = db.prepare('SELECT COALESCE(MAX(ord),0)+1 AS n FROM partenaires').get().n;
+  db.prepare('INSERT INTO partenaires(id,ord,data) VALUES(?,?,?)').run(p.id, ord, JSON.stringify(p));
+  bumpRev();
+}
+function partenaireSave(p) { db.prepare('UPDATE partenaires SET data=? WHERE id=?').run(JSON.stringify(p), p.id); bumpRev(); }
+function partenaireNumero() { return 'PRT-' + String(db.prepare('SELECT COUNT(*) c FROM partenaires').get().c + 1).padStart(4, '0'); }
+/** Fiche partenaire rattachée à un compte (null si aucune). */
+function partenaireDe(uid) {
+  const u = db.prepare('SELECT partenaire_id FROM users WHERE id=?').get(uid);
+  return u && u.partenaire_id ? partenaireGet(u.partenaire_id) : null;
+}
+/** Nouvelle fiche, rattachée au compte uid ; statut « candidat » tant qu'elle n'est pas soumise. */
+function partenaireCreer(champs, uid, statut) {
+  const p = { id: partenaireNumero(), ...champs, statut: statut || 'candidat', comptes: uid ? [uid] : [], pieces: {}, circuit: [], historique: [], cree: frDate() };
+  partenaireInsert(p);
+  if (uid) db.prepare('UPDATE users SET partenaire_id=? WHERE id=?').run(p.id, uid);
+  return p;
+}
+/** Jeton à usage unique (vérification du courriel) : seule son empreinte est conservée. */
+function jetonCreer(uid, type, heures) {
+  const brut = crypto.randomBytes(32).toString('hex');
+  db.prepare('INSERT INTO jetons(hash,user_id,type,expires_at) VALUES(?,?,?,?)')
+    .run(crypto.createHash('sha256').update(brut).digest('hex'), uid, type, Date.now() + heures * 3600000);
+  return brut;
+}
+/** Consomme un jeton valide ; retourne l'identifiant du compte, ou null. */
+function jetonUtiliser(brut, type) {
+  const hash = crypto.createHash('sha256').update(String(brut || '')).digest('hex');
+  const j = db.prepare('SELECT * FROM jetons WHERE hash=? AND type=?').get(hash, type);
+  if (!j || j.used || j.expires_at < Date.now()) return null;
+  db.prepare('UPDATE jetons SET used=1 WHERE hash=?').run(hash);
+  return j.user_id;
+}
+/** Fiche de démonstration : SOTRAP, déjà référencée, rattachée au compte contact.sotrap@bal.ci s'il existe. */
+function partenaireDemo() {
+  const u = db.prepare("SELECT id FROM users WHERE lower(email)='contact.sotrap@bal.ci'").get();
+  const p = partenaireCreer({ raisonSociale: 'SOTRAP Ingénierie SA', pays: 'CI', immatriculation: 'CI-ABJ-2009-B-14522',
+    adresse: 'Abidjan, Plateau', contact: { nom: 'K. Amani', email: 'contact.sotrap@bal.ci', tel: '' }, domaines: ['Réseaux et télécoms'] },
+  u ? u.id : null, 'reference');
+  p.referenceLe = frDate();
+  p.historique.push({ t: frDate(), who: 'Système', action: 'référencé (jeu de démonstration)' });
+  partenaireSave(p);
+}
+
 /* ---- jeu de données initial ---- */
 function defaultOrgKv() {
   return {
     org: { nom: 'Banque Atlantique du Littoral', pays: 'Côte d’Ivoire', ville: 'Abidjan', devisePivot: 'XOF', accent: '#1F6F6B', initiales: 'BAL',
-      rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {} },
+      rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {}, inscriptionOuverte: true },
     seuils: { confianceMin: 75, prixBas: 25, structureEcart: 0.8, refsMin: 3, validiteMin: 90, ecartIaMax: 0 },
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
-    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN),
+    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT),
     mailFrom: 'marches@bal.ci', mailSuffix: '@bal.ci',
   };
 }
 
 function seedAll(withUsers = true) {
   const tx = db.transaction(() => {
-    db.exec('DELETE FROM kv; DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins;');
+    db.exec('DELETE FROM kv; DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins; DELETE FROM partenaires; DELETE FROM jetons; UPDATE users SET partenaire_id=NULL;');
     for (const [k, v] of Object.entries(defaultOrgKv())) kvSet(k, v, 'seed');
     // procédure de démonstration : AO-2026-014, publiée telle que dans le prototype, avec ses offres
     const demo = procDefaults(clone(seed.CDC));
@@ -262,6 +326,7 @@ function seedAll(withUsers = true) {
         for (const u of seed.USERS) ins.run(u.id, u.nom, slug(u.nom) + '@bal.ci', u.role, h);
       }
     }
+    partenaireDemo();
     auditAppend(null, 'Système', 'Instance initialisée');
   });
   tx();
@@ -318,6 +383,17 @@ db.transaction(function migrate() {
     if (change) kvSet('roles', r, 'migration');
   }
   if (kvGet('org') && !kvGet('circuitBesoin')) kvSet('circuitBesoin', clone(CIRCUIT_BESOIN), 'migration');
+  // 02/10/2026 : module 1 (référencement). Parcours par défaut ; chaque compte soumissionnaire existant reçoit une fiche
+  // « candidat » à compléter (son référencement n'a jamais été instruit).
+  if (kvGet('org') && !kvGet('circuitReferencement')) kvSet('circuitReferencement', clone(CIRCUIT_REFERENCEMENT), 'migration');
+  if (kvGet('org') && db.prepare("SELECT COUNT(*) c FROM partenaires").get().c === 0) {
+    const soums = db.prepare("SELECT id, nom, email FROM users WHERE role='soum' AND partenaire_id IS NULL").all();
+    for (const u of soums) {
+      const p = partenaireCreer({ raisonSociale: u.nom, pays: '', immatriculation: '', adresse: '', contact: { nom: u.nom, email: u.email, tel: '' }, domaines: [] }, u.id);
+      p.historique.push({ t: frDate(), who: 'Système', action: 'fiche créée à la mise en place du référencement' });
+      partenaireSave(p);
+    }
+  }
 })();
 
 function resetDemo(uid, who) {
@@ -331,6 +407,7 @@ function resetDemo(uid, who) {
 module.exports = {
   db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
   auditAppend, auditList, auditVerify, offersAll, offerInsert, offersReplace,
+  partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, jetonCreer, jetonUtiliser,
   proceduresAll, procedureGet, procedureCreate, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero,
   resetDemo, slug, frDate, seed,
 };

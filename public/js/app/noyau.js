@@ -31,7 +31,8 @@ var PERMS = [
   {id:'contract.sign',   lab:"Signer le marché",                    grp:'Décision'},
   {id:'besoin.create',   lab:"Exprimer un besoin",                  grp:'Besoins'},
   {id:'besoin.approve',  lab:"Valider un besoin",                   grp:'Besoins'},
-  {id:'besoin.manage',   lab:"Instruire les besoins et en faire des procédures", grp:'Besoins'}
+  {id:'besoin.manage',   lab:"Instruire les besoins et en faire des procédures", grp:'Besoins'},
+  {id:'partenaires.manage', lab:"Référencer les partenaires",          grp:'Partenaires'}
 ];
 /* Incompatibilites : separation des fonctions */
 var INCOMPAT = [
@@ -94,8 +95,8 @@ var UI = { q:'', sort:'nom' };
 /* Clés partagées avec le serveur ; view / offerIndex / draft restent propres à chaque session. */
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
-  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin'];
-var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets'];
+  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement'];
+var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets','monPartenaire'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
 var TARGETED = ['quality','justif','confirmed','excluded'];
@@ -499,6 +500,7 @@ var VIEWS=[
   {id:'dao',        label:'DAO', grp:'Préparation', perm:'cdc.edit'},
   {id:'criteres',   label:'Grille de critères', grp:'Préparation', perm:'criteres.edit'},
   {id:'qa',         label:'Questions', grp:'Préparation', perm:'offres.read'},
+  {id:'referencement', label:'Mon référencement', grp:'Soumission', role:true, perm:'portail.use'},
   {id:'portail',    label:'Portail de dépôt', grp:'Soumission', role:true, perm:'portail.use'},
   {id:'reception',  label:'Réception', grp:'Offres', perm:'offres.read'},
   {id:'depouille',  label:'Dépouillement', grp:'Offres', perm:'offres.read'},
@@ -509,6 +511,7 @@ var VIEWS=[
   {id:'recours',    label:'Recours', grp:'Décision', perm:'offres.read'},
   {id:'pv',         label:'Procès-verbal', grp:'Décision', perm:'pv.read'},
   {id:'audit',      label:"Journal d'audit", grp:'Décision', perm:'audit.read'},
+  {id:'partenaires', label:'Partenaires', grp:'Partenaires', perm:'partenaires.manage'},
   {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit'},
   {id:'comptes',    label:'Comptes', grp:'Administration', perm:'roles.edit'},
   {id:'params',     label:'Paramètres', grp:'Administration', perm:'params.edit'},
@@ -526,7 +529,7 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['notifs','procedures','besoins','comptes','roles','regles'];
+var SANS_PROCEDURE = ['notifs','procedures','besoins','referencement','partenaires','comptes','roles','regles'];
 function avecProcedure(){ return !!(state && state.procedure); }
 /* Un écran est visible si l'une de ses habilitations est accordée (perm, ou perms pour plusieurs), et, sans
    procédure ouverte, s'il ne dépend pas d'une procédure. */
@@ -538,7 +541,10 @@ function vueVisible(v){
 function viewAllowed(id){ return VIEWS.some(function(v){ return v.id===id && vueVisible(v); }); }
 /* Le soumissionnaire n'a rien à faire sur le tableau de bord acheteur : il arrive sur son portail. */
 function homeView(){
-  if(!avecProcedure()) return can('besoin.create')||can('besoin.approve')||can('besoin.manage') ? 'besoins' : 'procedures';
+  if(!avecProcedure()){
+    if(can('portail.use')) return 'referencement';
+    return can('besoin.create')||can('besoin.approve')||can('besoin.manage') ? 'besoins' : 'procedures';
+  }
   if(!can('offres.read') && can('portail.use')) return 'portail';
   if(!can('offres.read') && can('besoin.create')) return 'besoins';
   return 'dashboard';
