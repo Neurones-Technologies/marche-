@@ -21,6 +21,7 @@ server/
   auth.js          JWT en cookie HttpOnly/SameSite=Strict, middleware d'habilitations
   rules.js         règles métier côté serveur : qui peut écrire quoi, et dans quel ordre
   routes/          /api/auth/*, /api/inscription (publique), /api/partenaires (référencement),
+                   /api/commandes (bons de commande, réceptions, export CSV),
                    /api/besoins (expression, validation, transformation en procédure),
                    /api/organisation/state (état sans procédure ouverte), /api/procedures (liste, création, archivage),
                    /api/procedures/:id/{state,offers,audit,files},
@@ -32,6 +33,12 @@ server/
 
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 
+- **Bons de commande et réceptions** : commande établie à partir de l'offre retenue (attribution prononcée et, en
+  marché public, marché signé), plafonnée au montant restant de l'offre, validée par un circuit selon le montant, puis
+  émise sous un numéro continu et sans trou, avec l'empreinte SHA-256 du document ; imprimable et enregistrable en PDF
+  depuis le navigateur ; transmise au titulaire par le portail. Le réceptionnaire désigné constate les livraisons
+  (rapprochement commandé / reçu, réserves et levée, retard et pénalités plafonnées), puis la réception définitive.
+  Export CSV des commandes émises pour la comptabilité. La facture et le paiement restent dans l'ERP.
 - **Référencement des partenaires** : un prestataire crée le compte de son entreprise depuis l'écran de connexion
   (limitation par adresse IP, champ piège, pas d'énumération des comptes, compte inactif jusqu'à la vérification du
   courriel), dépose ses pièces administratives et soumet son dossier au parcours de référencement de l'organisation.
@@ -74,7 +81,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 72 tests (Node 22 requis pour better-sqlite3)
+npm test             # 79 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :

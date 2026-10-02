@@ -1,0 +1,247 @@
+/* Marché+ — Écran Commandes et réceptions (module 4 : bon de commande et suivi d'exécution).
+   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
+   Les commandes se chargent par /api/commandes ; le serveur filtre ce que chacun voit (achats, valideurs,
+   réceptionnaire désigné, titulaire par le portail). */
+"use strict";
+
+var STATUTS_COMMANDE = {
+  brouillon: ['Brouillon','c-grey'], validation: ['En validation','c-amber'], rejete: ['À corriger','c-red'],
+  validee: ['Validée, à émettre','c-teal'], emise: ['Émise','c-blue'], en_reception: ['Livraison partielle','c-amber'],
+  receptionnee: ['Réception provisoire','c-teal'], cloturee: ['Réception définitive','c-green'], annulee: ['Annulée','c-grey']
+};
+UI.commande = null;
+
+function montantDevise(n, devise){ return sep(Math.round(Number(n)||0))+' '+(devise||'XOF'); }
+
+function vCommandes(m){
+  var h=add(m,'div','head'); var l=add(h,'div');
+  add(l,'div','eyebrow','Exécution');
+  add(l,'h1',null,'Commandes et réceptions');
+  add(l,'p','lede',"Le bon de commande est établi à partir de l’offre retenue, validé, puis émis sous un numéro continu. Le réceptionnaire constate les livraisons : Marché+ rapproche ce qui a été commandé de ce qui a été reçu. La facture et le paiement restent dans la comptabilité.");
+  if(can('commande.manage')){
+    var ex=add(h,'a','btn btn-ghost btn-sm','Exporter pour la comptabilité (CSV)'); ex.href='/api/commandes/export.csv'; ex.setAttribute('download','commandes.csv');
+  }
+  var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
+
+  function charger(){
+    MP.api('GET','/api/commandes').then(function(r){
+      var suite = can('commande.manage') ? MP.api('GET','/api/commandes/eligibles') : Promise.resolve({procedures:[]});
+      return suite.then(function(e){ zone.textContent=''; dessiner(r.commandes, e.procedures); });
+    }).catch(function(e){ zone.textContent=''; add(zone,'p','muted',e.message); });
+  }
+  function agir(method, path, body, message){
+    return MP.api(method,'/api/commandes/'+path,body||{}).then(function(r){ if(message) toast(message); charger(); return r; })
+      .catch(function(e){ toast(e.message); charger(); return null; });
+  }
+
+  function dessiner(list, eligibles){
+    var k=add(zone,'div','card'); add(k,'div','panel-head','Commandes');
+    var b=add(k,'div','pad');
+    if(!list.length) vide(b,'🧾','Aucune commande', can('commande.manage') ? 'Établissez une commande à partir d’une procédure attribuée.' : 'Aucune commande ne vous concerne pour le moment.');
+    list.slice().reverse().forEach(function(c){
+      var row=add(b,'div','docline');
+      var lf=add(row,'div'); lf.style.flex='1 1 260px';
+      add(lf,'strong',null,(c.numero||'Brouillon')+' — '+c.titulaire.nom);
+      add(lf,'div','muted',[c.procedure.ref, montantDevise(c.total,c.devise), 'livraison prévue le '+c.dateLivraison].join(' · '));
+      var st=STATUTS_COMMANDE[c.statut]||[c.statut,'c-grey']; add(row,'span','chip '+st[1],st[0]);
+      var bo=add(row,'button','btn btn-ghost btn-sm', UI.commande===c.id?'Affichée':'Ouvrir'); fk(bo,'cmd-open-'+c.id);
+      bo.disabled=UI.commande===c.id;
+      bo.addEventListener('click',function(){ UI.commande=c.id; zone.textContent=''; dessiner(list,eligibles); });
+    });
+    if(can('commande.manage')){
+      var f=add(k,'div','panel-foot');
+      eligibles=eligibles.filter(function(e){ return e.restant>0; }); // montant déjà entièrement engagé : rien à commander
+      if(!eligibles.length) add(f,'span','muted','Aucune procédure ne permet encore d’établir une commande : attribution prononcée et, en marché public, marché signé.');
+      else {
+        var sel=add(f,'select'); sel.setAttribute('aria-label','Procédure attribuée'); fk(sel,'cmd-proc');
+        eligibles.forEach(function(e){ var o=add(sel,'option',null,e.ref+' — '+e.titulaire+' — reste '+montantDevise(e.restant,e.devise)); o.value=e.procedure; });
+        var bn=add(f,'button','btn btn-primary btn-sm','Établir une commande'); fk(bn,'cmd-new');
+        bn.addEventListener('click',function(){
+          MP.api('POST','/api/commandes',{procedure:sel.value}).then(function(r){ UI.commande=r.commande.id; toast('Brouillon de commande établi.'); charger(); })
+            .catch(function(e){ toast(e.message); });
+        });
+      }
+    }
+    var cur=list.filter(function(c){ return c.id===UI.commande; })[0];
+    if(cur) fiche(cur);
+  }
+
+  function fiche(c){
+    var modifiable = can('commande.manage') && (c.statut==='brouillon' || c.statut==='rejete');
+    if(c.rejet && c.statut==='rejete'){ var w=add(zone,'div','warn'); w.style.marginTop='18px'; add(w,'strong',null,'Rejetée ('+c.rejet.role+', '+c.rejet.at+') : '); w.appendChild(document.createTextNode(c.rejet.motif)); }
+    if(c.annulation){ var wa=add(zone,'div','warn'); wa.style.marginTop='18px'; add(wa,'strong',null,'Annulée le '+c.annulation.at+' : '); wa.appendChild(document.createTextNode(c.annulation.motif)); }
+    if(modifiable) brouillon(c); else documentCommande(c);
+    circuitCommande(c);
+    actions(c);
+    if(c.numero && c.statut!=='annulee') receptions(c);
+    var kh=add(zone,'div','card'); kh.style.marginTop='18px';
+    add(kh,'div','panel-head','Historique');
+    var bh=add(kh,'div','pad');
+    c.historique.slice().reverse().forEach(function(x){ var row=add(bh,'div','docline'); var lf=add(row,'div'); add(lf,'div',null,x.action); add(lf,'div','muted',x.who); add(row,'span','chip c-grey',x.t); });
+  }
+
+  /* Brouillon : lignes, jalons, date de livraison, réceptionnaire. */
+  function brouillon(c){
+    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    add(k,'div','panel-head','Brouillon — '+c.titulaire.nom+' ('+c.procedure.ref+')');
+    var b=add(k,'div','pad');
+    var lignes=JSON.parse(JSON.stringify(c.lignes)), jalons=JSON.parse(JSON.stringify(c.jalons));
+    var tl=add(b,'table','tbl'); tl.style.width='100%';
+    var hr=add(add(tl,'thead'),'tr'); ['Désignation','Quantité','Unité','Prix unitaire ('+c.devise+')',''].forEach(function(t){ add(hr,'th',null,t); });
+    var tb=add(tl,'tbody');
+    function ligne(lg,i){
+      var tr=add(tb,'tr');
+      var cell=function(prop,type,larg){ var td=add(tr,'td'); var i_=add(td,'input'); i_.type=type; i_.value=lg[prop]; i_.style.width=larg; i_.setAttribute('aria-label',prop+' ligne '+(i+1)); fk(i_,'cmd-l'+i+'-'+prop); i_.addEventListener('input',function(){ lg[prop]= type==='number'?Number(i_.value):i_.value; totalTxt(); }); };
+      cell('designation','text','100%'); cell('quantite','number','90px'); cell('unite','text','90px'); cell('prixUnitaire','number','150px');
+      var td=add(tr,'td'); var x=add(td,'button','icon-btn','×'); x.setAttribute('aria-label','Supprimer la ligne '+(i+1)); x.disabled=lignes.length<=1;
+      x.addEventListener('click',function(){ lignes.splice(i,1); redessiner(); });
+    }
+    function redessiner(){ tb.textContent=''; lignes.forEach(ligne); totalTxt(); }
+    var tot=add(b,'p',null,''); tot.style.fontWeight='600';
+    function totalTxt(){ var t=lignes.reduce(function(s,x){ return s+Number(x.quantite||0)*Number(x.prixUnitaire||0); },0); tot.textContent='Total : '+montantDevise(t,c.devise)+' — montant de l’offre retenue : '+montantDevise(c.montantOffre,c.devise); }
+    var al=add(b,'button','btn btn-ghost btn-sm','+ Ajouter une ligne'); fk(al,'cmd-add');
+    al.addEventListener('click',function(){ lignes.push({designation:'',quantite:1,unite:'unité',prixUnitaire:0}); redessiner(); });
+    redessiner();
+
+    add(b,'h3',null,'Jalons de paiement').style.marginTop='18px';
+    var bj=add(b,'div');
+    function dessinerJalons(){
+      bj.textContent='';
+      jalons.forEach(function(j,i){
+        var row=add(bj,'div','docline');
+        var li=add(row,'input'); li.type='text'; li.value=j.libelle; li.style.flex='1 1 240px'; li.setAttribute('aria-label','Jalon '+(i+1)); fk(li,'cmd-j'+i);
+        li.addEventListener('input',function(){ j.libelle=li.value; });
+        var pc=add(row,'input'); pc.type='number'; pc.value=j.pourcentage; pc.style.width='90px'; pc.setAttribute('aria-label','Pourcentage du jalon '+(i+1)); fk(pc,'cmd-jp'+i);
+        pc.addEventListener('input',function(){ j.pourcentage=Number(pc.value); });
+        add(row,'span','muted','%');
+      });
+    }
+    dessinerJalons();
+
+    var f=add(b,'div','frm'); f.style.marginTop='14px';
+    var w1=add(f,'div'); add(w1,'label',null,'Livraison prévue le').setAttribute('for','cmd-date');
+    var dl=add(w1,'input'); dl.type='date'; dl.id='cmd-date'; dl.value=c.dateLivraison; fk(dl,'cmd-date');
+    var w2=add(f,'div'); add(w2,'label',null,'Réceptionnaire').setAttribute('for','cmd-recep');
+    var rs=add(w2,'select'); rs.id='cmd-recep'; fk(rs,'cmd-recep');
+    (state.users||[]).filter(function(u){ return u.role!=='soum'; }).forEach(function(u){ var o=add(rs,'option',null,u.nom+' — '+roleLab(u.role)); o.value=u.id; });
+    rs.value=c.receptionnaire.id;
+    var cd=c.conditions||{};
+    add(b,'p','muted','Conditions reprises du cahier des charges : pénalité de retard de '+cd.penaliteParJour+' ‰ par jour, plafonnée à '+cd.plafondPenalite+' % ; garantie de '+cd.garantieMois+' mois ; avance de démarrage de '+cd.avance+' % ; TVA '+cd.tva+' %.').style.marginTop='10px';
+
+    var foot=add(k,'div','panel-foot');
+    var be=add(foot,'button','btn btn-ghost btn-sm','Enregistrer'); fk(be,'cmd-enr');
+    var corps=function(){ return { lignes:lignes, jalons:jalons, dateLivraison:dl.value, receptionnaire:rs.value }; };
+    be.addEventListener('click',function(){ agir('PUT',enc(c.id),corps(),'Brouillon enregistré.'); });
+    var bs=add(foot,'button','btn btn-primary btn-sm','Soumettre à validation'); fk(bs,'cmd-soum');
+    bs.addEventListener('click',function(){
+      MP.api('PUT','/api/commandes/'+enc(c.id),corps()).then(function(){ return agir('POST',enc(c.id)+'/soumettre',{},'Commande soumise.'); })
+        .catch(function(e){ toast(e.message); });
+    });
+  }
+
+  /* Document : la pièce telle qu'elle est (ou sera) émise ; imprimable et enregistrable en PDF depuis le navigateur. */
+  function documentCommande(c){
+    var k=add(zone,'div','card pad bc-doc'); k.id='bc-doc'; k.style.marginTop='18px';
+    var t=add(k,'div'); t.style.cssText='display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap';
+    var g=add(t,'div'); add(g,'strong',null,(c.emetteur||state.org||{}).nom||''); add(g,'div','muted',[(c.emetteur||state.org||{}).ville,(c.emetteur||state.org||{}).pays].filter(Boolean).join(' · '));
+    var d=add(t,'div'); d.style.textAlign='right';
+    add(d,'h2',null, c.numero ? 'Bon de commande '+c.numero : 'Projet de bon de commande');
+    add(d,'div','muted', c.emiseLe ? 'Émis le '+c.emiseLe+(c.emisePar?' par '+c.emisePar.nom:'') : 'Non émis : sans valeur d’engagement');
+    add(k,'p',null,'Titulaire : '+c.titulaire.nom+(c.titulaire.pays?' ('+c.titulaire.pays+')':'')+' — procédure '+c.procedure.ref+' : '+c.procedure.objet);
+    var tl=add(k,'table'); var hr=add(add(tl,'thead'),'tr');
+    [['Désignation',''],['Quantité','num'],['Unité',''],['Prix unitaire','num'],['Montant','num']].forEach(function(x){ add(hr,'th',x[1],x[0]); });
+    var tb=add(tl,'tbody');
+    c.lignes.forEach(function(lg){ var tr=add(tb,'tr'); add(tr,'td',null,lg.designation); add(tr,'td','num',String(lg.quantite)); add(tr,'td',null,lg.unite); add(tr,'td','num',sep(lg.prixUnitaire)); add(tr,'td','num',sep(lg.quantite*lg.prixUnitaire)); });
+    var tf=add(add(tl,'tfoot'),'tr'); add(tf,'td',null,'Total hors taxes ('+c.devise+')').colSpan=4; add(tf,'td','num',sep(c.total)).style.fontWeight='700';
+    add(k,'p',null,'Livraison prévue le '+c.dateLivraison+' · réceptionnaire : '+c.receptionnaire.nom+'.');
+    add(k,'p',null,'Jalons de paiement : '+c.jalons.map(function(j){ return j.libelle+' '+j.pourcentage+' %'; }).join(' · ')+'.');
+    var cd=c.conditions||{};
+    add(k,'p','muted','Pénalité de retard : '+cd.penaliteParJour+' ‰ du montant par jour calendaire, plafonnée à '+cd.plafondPenalite+' %. Garantie : '+cd.garantieMois+' mois. TVA applicable : '+cd.tva+' %. Conditions générales : cahier des charges de la procédure '+c.procedure.ref+'.');
+    if(c.empreinte) add(k,'div','bc-empreinte','Empreinte SHA-256 du document émis : '+c.empreinte);
+    var pr=add(k,'div','no-print'); pr.style.marginTop='12px';
+    var bp=add(pr,'button','btn btn-ghost btn-sm','Imprimer ou enregistrer en PDF'); fk(bp,'cmd-print');
+    bp.addEventListener('click',function(){ window.print(); });
+  }
+
+  function circuitCommande(c){
+    if(!c.circuit || !c.circuit.length) return;
+    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    add(k,'div','panel-head','Circuit de validation — '+MPCircuits.nbRequises(c.circuit)+' niveau(x) requis');
+    var b=add(k,'div','pad');
+    var fp = c.statut==='validation' ? MPCircuits.prochaine(c.circuit) : -1;
+    c.circuit.forEach(function(e,i){
+      var row=add(b,'div','stepline');
+      add(row,'div','stepnum '+(e.done?'done':(i===fp?'now':'')), e.done?'✓':String(i+1));
+      var d=add(row,'div'); d.style.flex='1 1 auto'; add(d,'strong',null,e.role); add(d,'div','muted',e.who||'');
+      if(Number(e.seuil)>0) add(d,'div','muted','à partir de '+xof(Number(e.seuil)));
+      if(e.done) add(row,'span','chip c-green','Validé le '+e.at);
+      else if(!MPCircuits.requise(e)) add(row,'span','chip c-grey','Non requis pour ce montant');
+      else if(i===fp && can('commande.approve')){
+        var ba=add(row,'button','btn btn-primary btn-sm','Valider'); fk(ba,'cmd-val-'+i);
+        ba.addEventListener('click',function(){ ask('Cette validation engage l’organisation pour '+montantDevise(c.total,c.devise)+'.',function(){ agir('POST',enc(c.id)+'/approbations/'+i,{},'Commande validée au niveau « '+e.role+' ».'); },'Valider au titre « '+e.role+' » ?','Valider'); });
+        var br=add(row,'button','btn btn-ghost btn-sm','Rejeter'); fk(br,'cmd-rej-'+i);
+        br.addEventListener('click',function(){ demander('La commande retourne aux achats pour correction.',function(motif){ agir('POST',enc(c.id)+'/rejet',{motif:motif},'Commande rejetée.'); },'Rejeter la commande ?','Rejeter','Motif du rejet'); });
+      } else add(row,'span','chip c-grey', i===fp?'En attente':'À venir');
+    });
+  }
+
+  function actions(c){
+    if(!can('commande.manage')) return;
+    var foot=null;
+    function barre(){ if(!foot){ foot=add(zone,'div','note'); foot.style.cssText='margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap'; } return foot; }
+    if(c.statut==='validee'){
+      var be=add(barre(),'button','btn btn-primary','Émettre le bon de commande'); fk(be,'cmd-emettre');
+      be.addEventListener('click',function(){ ask('Le serveur attribue le numéro et scelle le document : il ne pourra plus être modifié. Le titulaire le verra dans son portail.',function(){ agir('POST',enc(c.id)+'/emettre',{},'Bon de commande émis.'); },'Émettre le bon de commande ?','Émettre'); });
+    }
+    if(c.statut!=='annulee' && !c.receptions.length){
+      var ba=add(barre(),'button','btn btn-ghost btn-sm','Annuler la commande'); fk(ba,'cmd-annuler');
+      ba.addEventListener('click',function(){ demander(c.numero ? 'Le numéro '+c.numero+' reste attribué : la numérotation ne comporte pas de trou.' : 'Le brouillon est abandonné.',function(motif){ agir('POST',enc(c.id)+'/annuler',{motif:motif},'Commande annulée.'); },'Annuler la commande ?','Annuler la commande','Motif'); });
+    }
+  }
+
+  /* Réceptions, rapprochement commandé / reçu, réserves, retard et pénalités. */
+  function receptions(c){
+    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var ph=add(k,'div','panel-head'); add(ph,'span',null,'Réceptions');
+    if(c.retard>0) add(ph,'span','chip c-red','Retard : '+c.retard+' jour(s) · pénalité '+montantDevise(c.penalite,c.devise));
+    var b=add(k,'div','pad');
+    var tl=add(b,'table','tbl'); tl.style.width='100%';
+    var hr=add(add(tl,'thead'),'tr'); ['Ligne','Commandé','Reçu','Reste à livrer'].forEach(function(t){ add(hr,'th',null,t); });
+    var tb=add(tl,'tbody');
+    c.rapprochement.forEach(function(x){ var tr=add(tb,'tr'); add(tr,'td',null,x.designation); add(tr,'td',null,String(x.commande)); add(tr,'td',null,String(x.recu)); add(tr,'td',null,String(x.ecart)).style.fontWeight = x.ecart>0?'700':''; });
+    var moi = c.receptionnaire.id===state.me;
+    c.receptions.forEach(function(x){
+      var row=add(b,'div','docline'); var lf=add(row,'div'); lf.style.flex='1 1 260px';
+      add(lf,'strong',null,'Réception n° '+x.n+' du '+x.date+' — '+x.par.nom);
+      add(lf,'div','muted','Quantités : '+x.quantites.join(' · ')+(x.reserves?' · réserves : '+x.reserves:''));
+      if(x.levee) add(lf,'div','muted','Réserves levées le '+x.levee.t+' : '+x.levee.motif);
+      if(x.reserves && !x.levee){
+        add(row,'span','chip c-amber','Réserves ouvertes');
+        if(moi){ var bl=add(row,'button','btn btn-ghost btn-sm','Lever les réserves'); fk(bl,'cmd-lever-'+x.n);
+          bl.addEventListener('click',function(){ demander('Indiquez comment les réserves ont été levées.',function(motif){ agir('POST',enc(c.id)+'/receptions/'+x.n+'/levee',{motif:motif},'Réserves levées.'); },'Lever les réserves de la réception n° '+x.n+' ?','Lever','Constat'); }); }
+      }
+    });
+    if(moi && (c.statut==='emise' || c.statut==='en_reception')){
+      add(b,'h3',null,'Constater une livraison').style.marginTop='14px';
+      var champs=[];
+      c.rapprochement.forEach(function(x,i){
+        var w=add(b,'div','docline'); add(w,'div',null,x.designation+' — reste '+x.ecart);
+        var q=add(w,'input'); q.type='number'; q.min='0'; q.max=String(x.ecart); q.value=String(x.ecart); q.style.width='110px'; q.setAttribute('aria-label','Quantité reçue — '+x.designation); fk(q,'cmd-q'+i);
+        champs.push(q);
+      });
+      var lr=add(b,'label',null,'Réserves (facultatif)'); lr.setAttribute('for','cmd-reserves');
+      var rv=add(b,'textarea'); rv.id='cmd-reserves'; rv.rows=2; rv.style.width='100%'; fk(rv,'cmd-reserves');
+      var bc=add(b,'button','btn btn-primary btn-sm','Enregistrer la réception'); bc.style.marginTop='10px'; fk(bc,'cmd-recevoir');
+      bc.addEventListener('click',function(){ agir('POST',enc(c.id)+'/receptions',{quantites:champs.map(function(q){ return Number(q.value); }), reserves:rv.value},'Réception enregistrée.'); });
+    }
+    if(c.receptionProvisoire) add(b,'p',null,'Réception provisoire le '+c.receptionProvisoire.date+'.'+(c.receptionDefinitive?' Réception définitive le '+c.receptionDefinitive.date+'.':'')).style.marginTop='10px';
+    if(moi && c.statut==='receptionnee'){
+      var bd=add(b,'button','btn btn-primary btn-sm','Prononcer la réception définitive'); fk(bd,'cmd-definitive'); bd.disabled=c.reservesOuvertes>0;
+      if(c.reservesOuvertes) bd.title='Levez d’abord les réserves ouvertes.';
+      bd.addEventListener('click',function(){ ask('La réception définitive clôt l’exécution de la commande dans Marché+.',function(){ agir('POST',enc(c.id)+'/definitive',{},'Réception définitive prononcée.'); },'Prononcer la réception définitive ?','Prononcer'); });
+    }
+    if(!moi) add(b,'p','muted','Réceptionnaire désigné : '+c.receptionnaire.nom+'. Seul le réceptionnaire constate les livraisons.').style.marginTop='10px';
+  }
+
+  charger();
+}

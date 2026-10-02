@@ -146,6 +146,12 @@ function vParams(m){
   vParamsCircuitOrg(m,'circuitBesoin','8 · Circuit de validation des besoins','Un besoin suit ce circuit à sa soumission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce budget. Le demandeur ne valide jamais son propre besoin.');
   vParamsCircuitOrg(m,'circuitReferencement','9 · Parcours de référencement des partenaires','Un dossier de référencement suit ces étapes ; les pièces déposées sont validées au dernier niveau.');
   vParamsInscription(m,o);
+  vParamsCircuitOrg(m,'circuitCommande','11 · Circuit de validation des bons de commande','Une commande suit ce circuit avant émission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (en XOF). Celui qui établit la commande ne la valide pas.');
+  var kc=add(m,'div','card'); kc.style.marginTop='18px';
+  add(kc,'div','panel-head','12 · Numérotation des bons de commande');
+  var fc=add(add(kc,'div','pad'),'div','frm');
+  champ(fc,'Préfixe des numéros',o.prefixeCommande||'BC',function(v){ o.prefixeCommande=String(v).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)||'BC'; logit('Préfixe des bons de commande : '+o.prefixeCommande); });
+  add(add(kc,'div','panel-foot'),'span','muted','Numéros continus et sans trou, attribués par le serveur à l\u2019émission : '+(o.prefixeCommande||'BC')+'-'+new Date().getFullYear()+'-0001, puis 0002…');
   add(add(k6,'div','panel-foot'),'span','muted','Aucun message n\u2019est réellement expédié dans cette maquette : la boîte d\u2019envoi restitue ce qui partirait.');
 }
 

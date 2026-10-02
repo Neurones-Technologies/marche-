@@ -32,7 +32,9 @@ var PERMS = [
   {id:'besoin.create',   lab:"Exprimer un besoin",                  grp:'Besoins'},
   {id:'besoin.approve',  lab:"Valider un besoin",                   grp:'Besoins'},
   {id:'besoin.manage',   lab:"Instruire les besoins et en faire des procédures", grp:'Besoins'},
-  {id:'partenaires.manage', lab:"Référencer les partenaires",          grp:'Partenaires'}
+  {id:'partenaires.manage', lab:"Référencer les partenaires",          grp:'Partenaires'},
+  {id:'commande.manage', lab:"Établir et émettre les bons de commande", grp:'Exécution'},
+  {id:'commande.approve',lab:"Valider un bon de commande",          grp:'Exécution'}
 ];
 /* Incompatibilites : separation des fonctions */
 var INCOMPAT = [
@@ -95,7 +97,7 @@ var UI = { q:'', sort:'nom' };
 /* Clés partagées avec le serveur ; view / offerIndex / draft restent propres à chaque session. */
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
-  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement'];
+  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','circuitCommande'];
 var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets','monPartenaire'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
@@ -512,6 +514,7 @@ var VIEWS=[
   {id:'pv',         label:'Procès-verbal', grp:'Décision', perm:'pv.read'},
   {id:'audit',      label:"Journal d'audit", grp:'Décision', perm:'audit.read'},
   {id:'partenaires', label:'Partenaires', grp:'Partenaires', perm:'partenaires.manage'},
+  {id:'commandes',  label:'Commandes et réceptions', grp:'Exécution'},
   {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit'},
   {id:'comptes',    label:'Comptes', grp:'Administration', perm:'roles.edit'},
   {id:'params',     label:'Paramètres', grp:'Administration', perm:'params.edit'},
@@ -529,7 +532,7 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['notifs','procedures','besoins','referencement','partenaires','comptes','roles','regles'];
+var SANS_PROCEDURE = ['notifs','procedures','besoins','referencement','partenaires','commandes','comptes','roles','regles'];
 function avecProcedure(){ return !!(state && state.procedure); }
 /* Un écran est visible si l'une de ses habilitations est accordée (perm, ou perms pour plusieurs), et, sans
    procédure ouverte, s'il ne dépend pas d'une procédure. */

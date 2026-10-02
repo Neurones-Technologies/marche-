@@ -72,6 +72,17 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 /* Procédure courante, en tête du menu : suit les couleurs de la barre latérale (sombre dans « institutionnel »). */
 .side-proc { padding: 0 var(--space-1) var(--space-2); border-bottom: var(--border-w) solid var(--color-side-line); }
 .side-proc .navgrp { display: block; padding: 0 var(--space-2) var(--space-1); }
+@media print {
+  body * { visibility: hidden; }
+  #bc-doc, #bc-doc * { visibility: visible; }
+  #bc-doc { position: absolute; inset: 0 auto auto 0; width: 100%; border: none; box-shadow: none; }
+  #bc-doc .no-print { display: none; }
+}
+.bc-doc { font-size: var(--fs-table); }
+.bc-doc table { width: 100%; border-collapse: collapse; margin: var(--space-3) 0; }
+.bc-doc th, .bc-doc td { border-bottom: var(--border-w) solid var(--color-border); padding: var(--space-2); text-align: left; }
+.bc-doc td.num, .bc-doc th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bc-doc .bc-empreinte { font-family: var(--font-mono, monospace); font-size: var(--fs-tiny); overflow-wrap: anywhere; color: var(--color-text-2); }
 .side-proc select { width: 100%; font-size: var(--fs-small); background: var(--color-side-bg); color: var(--color-side-text); border-color: var(--color-side-muted); }
 .navb {
   display: flex; align-items: center; gap: var(--space-3); background: none; border: none; border-radius: var(--radius-sm);

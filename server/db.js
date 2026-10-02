@@ -55,6 +55,9 @@ CREATE TABLE IF NOT EXISTS partenaires (
 CREATE TABLE IF NOT EXISTS jetons (
   hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL, expires_at INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS commandes (
+  id TEXT PRIMARY KEY, ord INTEGER NOT NULL, procedure_id TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS besoins (
   id TEXT PRIMARY KEY, ord INTEGER NOT NULL, data TEXT NOT NULL, created_by TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -297,21 +300,41 @@ function partenaireDemo() {
   partenaireSave(p);
 }
 
+/* ---- bons de commande (module 4) : rattachés à une procédure, numérotés à l'émission ---- */
+/** Circuit de validation d'une commande par défaut : l'engagement, puis le comité au-delà de 100 millions. */
+const CIRCUIT_COMMANDE = [
+  { role: 'Contrôle de l’engagement', who: 'Direction Financière' },
+  { role: 'Visa du comité d’engagement', who: 'Comité', seuil: 100000000 },
+];
+const commandesAll = () => db.prepare('SELECT data FROM commandes ORDER BY ord').all().map((r) => JSON.parse(r.data));
+const commandeGet = (id) => { const r = db.prepare('SELECT data FROM commandes WHERE id=?').get(id); return r ? JSON.parse(r.data) : null; };
+function commandeInsert(c) {
+  const ord = db.prepare('SELECT COALESCE(MAX(ord),0)+1 AS n FROM commandes').get().n;
+  db.prepare('INSERT INTO commandes(id,ord,procedure_id,data) VALUES(?,?,?,?)').run(c.id, ord, c.procedure.id, JSON.stringify(c));
+  bumpRev();
+}
+function commandeSave(c) { db.prepare('UPDATE commandes SET data=? WHERE id=?').run(JSON.stringify(c), c.id); bumpRev(); }
+/** Numéro continu et sans trou, attribué à l'émission seulement : <préfixe>-<année>-0001. */
+function commandeNumero(prefixe) {
+  const n = commandesAll().filter((c) => c.numero).length + 1;
+  return (prefixe || 'BC') + '-' + new Date().getFullYear() + '-' + String(n).padStart(4, '0');
+}
+
 /* ---- jeu de données initial ---- */
 function defaultOrgKv() {
   return {
     org: { nom: 'Banque Atlantique du Littoral', pays: 'Côte d’Ivoire', ville: 'Abidjan', devisePivot: 'XOF', accent: '#1F6F6B', initiales: 'BAL',
-      rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {}, inscriptionOuverte: true },
+      rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {}, inscriptionOuverte: true, prefixeCommande: 'BC' },
     seuils: { confianceMin: 75, prixBas: 25, structureEcart: 0.8, refsMin: 3, validiteMin: 90, ecartIaMax: 0 },
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
-    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT),
+    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT), circuitCommande: clone(CIRCUIT_COMMANDE),
     mailFrom: 'marches@bal.ci', mailSuffix: '@bal.ci',
   };
 }
 
 function seedAll(withUsers = true) {
   const tx = db.transaction(() => {
-    db.exec('DELETE FROM kv; DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins; DELETE FROM partenaires; DELETE FROM jetons; UPDATE users SET partenaire_id=NULL;');
+    db.exec('DELETE FROM kv; DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins; DELETE FROM commandes; DELETE FROM partenaires; DELETE FROM jetons; UPDATE users SET partenaire_id=NULL;');
     for (const [k, v] of Object.entries(defaultOrgKv())) kvSet(k, v, 'seed');
     // procédure de démonstration : AO-2026-014, publiée telle que dans le prototype, avec ses offres
     const demo = procDefaults(clone(seed.CDC));
@@ -386,6 +409,8 @@ db.transaction(function migrate() {
   // 02/10/2026 : module 1 (référencement). Parcours par défaut ; chaque compte soumissionnaire existant reçoit une fiche
   // « candidat » à compléter (son référencement n'a jamais été instruit).
   if (kvGet('org') && !kvGet('circuitReferencement')) kvSet('circuitReferencement', clone(CIRCUIT_REFERENCEMENT), 'migration');
+  // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.
+  if (kvGet('org') && !kvGet('circuitCommande')) kvSet('circuitCommande', clone(CIRCUIT_COMMANDE), 'migration');
   if (kvGet('org') && db.prepare("SELECT COUNT(*) c FROM partenaires").get().c === 0) {
     const soums = db.prepare("SELECT id, nom, email FROM users WHERE role='soum' AND partenaire_id IS NULL").all();
     for (const u of soums) {
@@ -407,6 +432,7 @@ function resetDemo(uid, who) {
 module.exports = {
   db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
   auditAppend, auditList, auditVerify, offersAll, offerInsert, offersReplace,
+  commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero,
   partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, jetonCreer, jetonUtiliser,
   proceduresAll, procedureGet, procedureCreate, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero,
   resetDemo, slug, frDate, seed,

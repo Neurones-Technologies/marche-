@@ -136,6 +136,16 @@
    "id": "partenaires.manage",
    "lab": "Référencer les partenaires",
    "grp": "Partenaires"
+  },
+  {
+   "id": "commande.manage",
+   "lab": "Établir et émettre les bons de commande",
+   "grp": "Exécution"
+  },
+  {
+   "id": "commande.approve",
+   "lab": "Valider un bon de commande",
+   "grp": "Exécution"
   }
  ],
  "INCOMPAT": [
@@ -182,7 +192,9 @@
     "besoin.create": true,
     "besoin.approve": true,
     "besoin.manage": true,
-    "partenaires.manage": true
+    "partenaires.manage": true,
+    "commande.manage": true,
+    "commande.approve": true
    }
   },
   "achats": {
@@ -211,7 +223,9 @@
     "besoin.create": true,
     "besoin.approve": false,
     "besoin.manage": true,
-    "partenaires.manage": true
+    "partenaires.manage": true,
+    "commande.manage": true,
+    "commande.approve": false
    }
   },
   "evaltech": {
@@ -240,7 +254,9 @@
     "besoin.create": false,
     "besoin.approve": false,
     "besoin.manage": false,
-    "partenaires.manage": false
+    "partenaires.manage": false,
+    "commande.manage": false,
+    "commande.approve": false
    }
   },
   "evalfin": {
@@ -269,7 +285,9 @@
     "besoin.create": false,
     "besoin.approve": false,
     "besoin.manage": false,
-    "partenaires.manage": false
+    "partenaires.manage": false,
+    "commande.manage": false,
+    "commande.approve": false
    }
   },
   "approb": {
@@ -298,7 +316,9 @@
     "besoin.create": false,
     "besoin.approve": true,
     "besoin.manage": false,
-    "partenaires.manage": false
+    "partenaires.manage": false,
+    "commande.manage": false,
+    "commande.approve": true
    }
   },
   "audit": {
@@ -327,7 +347,9 @@
     "besoin.create": false,
     "besoin.approve": false,
     "besoin.manage": false,
-    "partenaires.manage": false
+    "partenaires.manage": false,
+    "commande.manage": false,
+    "commande.approve": false
    }
   },
   "soum": {
@@ -356,7 +378,9 @@
     "besoin.create": false,
     "besoin.approve": false,
     "besoin.manage": false,
-    "partenaires.manage": false
+    "partenaires.manage": false,
+    "commande.manage": false,
+    "commande.approve": false
    }
   },
   "demandeur": {
@@ -385,7 +409,9 @@
     "besoin.create": true,
     "besoin.approve": false,
     "besoin.manage": false,
-    "partenaires.manage": false
+    "partenaires.manage": false,
+    "commande.manage": false,
+    "commande.approve": false
    }
   }
  },

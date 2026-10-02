@@ -348,7 +348,32 @@ avec des statuts ; dépôt réservé aux partenaires référencés en achats pri
 - **Limite** : les courriels sont simulés. Hors production, le lien de vérification est affiché pour la démonstration ;
   en production il ne l'est pas, et l'inscription en ligne reste inutilisable tant que l'envoi réel n'est pas branché.
 
-Prochaine étape : **bon de commande et module 4** (suivi d'exécution jusqu'à la réception).
+### Étape 6 : bon de commande et module 4, suivi d'exécution, réalisé le 02/10/2026
+
+Choix validés le 02/10/2026 : le demandeur du besoin d'origine réceptionne (un autre réceptionnaire peut être désigné
+par commande) ; le PDF est produit par le navigateur à partir d'une page imprimable ; un circuit propre valide les
+commandes, avec des seuils de montant.
+
+- **Établissement** (table `commandes`, `/api/commandes`) : possible une fois l'attribution prononcée et, en marché
+  public, le marché signé. Pré-remplissage depuis l'offre retenue (titulaire, devise, montant restant) et le cahier des
+  charges (jalons 30/40/20/10, pénalité de retard, garantie, avance, TVA). Plusieurs commandes possibles par marché,
+  plafonnées ensemble au montant de l'offre retenue.
+- **Validation** (clé `circuitCommande`, Paramètres → 11) : contrôle de l'engagement, puis visa du comité au-delà de
+  100 millions XOF. Celui qui établit la commande ne la valide pas ; rejet motivé, retour aux achats.
+- **Émission** : numéro continu et sans trou attribué par le serveur à l'émission seulement (`BC-2026-0001`, préfixe
+  réglable, Paramètres → 12), empreinte SHA-256 du document émis, document figé et visible du titulaire dans son portail.
+  Annulation motivée possible avant toute réception ; le numéro reste attribué.
+- **Réceptions** (module 4) : par le réceptionnaire désigné seulement ; quantités reçues par ligne, refus d'une
+  quantité supérieure à la commande, rapprochement commandé / reçu / reste à livrer, réserves et levée motivée.
+  Réception provisoire quand tout est livré, réception définitive une fois les réserves levées. Retard calculé sur la
+  date de livraison prévue ; pénalité selon le taux du cahier des charges, plafonnée à 10 %.
+- **Comptabilité** : export CSV des commandes émises (séparateur « ; », UTF-8), consigné à la piste d'audit.
+- Tests : 79 au total, dont 7 sur les commandes et réceptions ; parcours complet dans Chrome (achats, comité, achats,
+  réceptionnaire).
+- Non couvert : **avenants** (une commande émise ne se modifie pas ; il faut aujourd'hui l'annuler, si rien n'a été
+  reçu, et en émettre une autre), lignes reprises du détail de l'offre (l'offre ne porte qu'un montant global).
+
+Prochaine étape : **module 5** (évaluation des partenaires à partir des réceptions).
 
 Restes du prototype
 repérés en chemin, non traités : le calendrier du tableau de bord (dates écrites en dur) et le texte « Prototype de
