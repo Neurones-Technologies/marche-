@@ -5,6 +5,7 @@ const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, o
 const { whoLabel } = require('../auth');
 const { validateChange, effectsOf } = require('../rules');
 const R = require('../../public/js/regles.js');
+const C = require('../../public/js/circuits.js');
 
 const r = express.Router({ mergeParams: true });
 
@@ -172,6 +173,22 @@ r.post('/approbations/:niveau', (req, res) => {
   if (!Array.isArray(ap) || !Number.isInteger(i) || !ap[i]) changes = introuvable('Niveau d’approbation');
   else if (ap[i].done) changes = { status: 409, code: 'APPROVAL_ALREADY_GIVEN', error: 'Ce niveau est déjà approuvé.' };
   else { ap[i].done = true; changes = { approvals: ap }; }
+  cible(req, res, changes);
+});
+
+/** Rejet motivé de l'attribution par le niveau attendu : l'évaluation est rouverte et le circuit remis à zéro. */
+r.post('/approbations/:niveau/rejet', (req, res) => {
+  const ap = req.store.get('approvals') || [], i = Number(req.params.niveau);
+  let changes;
+  if (!Number.isInteger(i) || !ap[i]) changes = introuvable('Niveau d’approbation');
+  else if (C.prochaine(ap) !== i) changes = { status: 409, code: 'APPROVAL_ORDER', error: 'Seul le niveau attendu peut rejeter l’attribution.' };
+  else {
+    changes = {
+      rejets: (req.store.get('rejets') || []).concat([{ motif: String((req.body || {}).motif || '') }]),
+      evalDone: false,
+      approvals: C.reinitialiser(ap),
+    };
+  }
   cible(req, res, changes);
 });
 

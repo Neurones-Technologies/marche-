@@ -100,6 +100,17 @@ function vParams(m){
     var wi=add(lf,'input'); wi.type='text'; wi.value=a.who; wi.style.cssText='width:100%;margin-top:6px';
     wi.setAttribute('aria-label','Titulaire du niveau'); fk(wi,'appr-who-'+i);
     wi.addEventListener('change',function(){ a.who=wi.value; save(); });
+    var opts=add(lf,'div'); opts.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:6px';
+    var se=add(opts,'input'); se.type='number'; se.min='0'; se.step='1000000'; se.placeholder='Seuil (XOF), facultatif';
+    se.value=Number(a.seuil)>0?a.seuil:''; se.style.flex='1 1 160px';
+    se.setAttribute('aria-label','Montant à partir duquel ce niveau intervient'); fk(se,'appr-seuil-'+i);
+    se.addEventListener('change',function(){ var v=Number(se.value); if(v>0) a.seuil=v; else delete a.seuil; logit('Seuil du niveau « '+a.role+' » : '+(v>0?xof(v):'aucun')); save(); render(); });
+    var sr=add(opts,'select'); sr.style.flex='1 1 160px';
+    sr.setAttribute('aria-label','Rôle réservé pour ce niveau'); fk(sr,'appr-role-'+i);
+    add(sr,'option',null,'Toute personne habilitée').value='';
+    rk.forEach(function(r){ var op=add(sr,'option',null,'Réservé : '+state.roles[r].lab); op.value=r; });
+    sr.value=a.roleId||'';
+    sr.addEventListener('change',function(){ if(sr.value) a.roleId=sr.value; else delete a.roleId; save(); render(); });
     var up=add(row,'button','icon-btn','↑'); up.setAttribute('aria-label','Remonter ce niveau');
     up.disabled = i===0;
     up.addEventListener('click',function(){
@@ -116,9 +127,9 @@ function vParams(m){
     });
   });
   var f5=add(k5,'div','panel-foot');
-  add(f5,'span','muted',state.approvals.length+' niveau(x) configuré(s). L\u2019ordre détermine la séquence d\u2019approbation. Une nouvelle procédure part du circuit par défaut.');
+  add(f5,'span','muted',state.approvals.length+' niveau(x) configuré(s). L\u2019ordre détermine la séquence d\u2019approbation ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (offre classée première, en XOF). Une nouvelle procédure part du circuit par défaut.');
   add(f5,'button','btn btn-ghost btn-sm','Enregistrer comme circuit par défaut').addEventListener('click',function(){
-    state.circuitModele=state.approvals.map(function(a){ return {role:a.role, who:a.who}; });
+    state.circuitModele=state.approvals.map(function(a){ var e={role:a.role, who:a.who}; if(Number(a.seuil)>0) e.seuil=Number(a.seuil); if(a.roleId) e.roleId=a.roleId; return e; });
     logit('Circuit d\u2019approbation par défaut : '+state.circuitModele.map(function(a){ return a.role; }).join(' → ')); save(); render();
   });
   add(f5,'button','btn btn-ghost btn-sm','+ Ajouter un niveau').addEventListener('click',function(){

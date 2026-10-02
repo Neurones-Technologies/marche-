@@ -280,7 +280,24 @@ obligatoire et les délais minimaux de remise des offres.
 - Vérification : les 21 écrans du menu s'affichent sans erreur en administrateur, les 4 du soumissionnaire aussi,
   et les parcours dans le navigateur (profils, procédures, écritures ciblées) passent.
 
-**L'étape 2 (socle) est terminée.** Prochaine étape : le moteur de circuits paramétrables (étape 3).
+**L'étape 2 (socle) est terminée.**
+
+### Étape 3 : moteur de circuits, premier usage (attribution), réalisé le 02/10/2026
+
+- [public/js/circuits.js](../public/js/circuits.js), partagé navigateur et serveur : étapes ordonnées, chacune avec un
+  **seuil de montant** facultatif (elle ne s'applique qu'au-delà) et un **rôle réservé** facultatif ; étapes requises,
+  prochaine étape, contrôle du franchissement (ordre, rôle, séparation des fonctions), remise à zéro.
+- **Circuit d'approbation de l'attribution** : à la validation de l'évaluation, le serveur fixe les étapes requises
+  d'après le montant de l'offre classée première (en XOF, taux figés) et le journalise. Il refuse la validation si le
+  montant laisse moins d'étapes requises que le profil réglementaire n'en exige. Une seule approbation par envoi.
+- **Rejet motivé** de l'attribution par le niveau attendu (`POST /approbations/:niveau/rejet`) : motif obligatoire,
+  évaluation rouverte, circuit remis à zéro, rejet conservé (clé `rejets`, non modifiable) et repris au procès-verbal.
+- Paramètres : seuil et rôle réservé par niveau, repris par le circuit par défaut. Décision : nombre réel de niveaux
+  (l'en-tête affichait « 3 niveaux » en dur), niveaux non requis, conditions, bouton « Rejeter ».
+- Tests : 59 au total, dont 6 sur le moteur et le circuit d'attribution.
+
+Reste pour cette étape : brancher le même moteur sur les circuits des modules à venir (besoin, commande, réception,
+référencement), au fur et à mesure de leur construction. Prochaine étape : **module 2** (besoin → publication).
 
 Restes du prototype
 repérés en chemin, non traités : le calendrier du tableau de bord (dates écrites en dur) et le texte « Prototype de

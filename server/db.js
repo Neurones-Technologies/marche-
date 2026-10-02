@@ -7,6 +7,7 @@ const cfg = require('./config');
 const seed = require('./seed/seed.json');
 const R = require('../public/js/regles.js');
 const P = require('../public/js/profils.js');
+const C = require('../public/js/circuits.js');
 
 if (cfg.dbFile !== ':memory:') fs.mkdirSync(path.dirname(cfg.dbFile), { recursive: true });
 const db = new Database(cfg.dbFile);
@@ -61,7 +62,7 @@ const frDate = () => new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abid
 
 /* Clés propres à une procédure ; toutes les autres appartiennent à l'organisation (une par instance). */
 const PROC_KEYS = ['cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
-  'qa', 'additifs', 'clarifs', 'coi', 'recours', 'standstill', 'contractSigned', 'infructueux', 'fxFrozen', 'cadre', '_sod'];
+  'qa', 'additifs', 'clarifs', 'coi', 'recours', 'standstill', 'contractSigned', 'infructueux', 'fxFrozen', 'cadre', '_sod', 'rejets'];
 const isProcKey = (k) => PROC_KEYS.includes(k);
 
 /* ---- révision globale (détection de changements côté client) ---- */
@@ -186,8 +187,8 @@ function procDefaults(cdc) {
   const circuit = (kvGet('circuitModele') || { value: seed.APPROVALS }).value;
   return {
     cdc, criteria: clone(seed.CRITERIA), quality: {}, justif: {}, confirmed: {}, excluded: {},
-    depClosed: false, evalDone: false, approvals: circuit.map((a) => ({ role: a.role, who: a.who, done: false })),
-    qa: [], additifs: [], clarifs: [], coi: {}, recours: [], standstill: { days: 15, startedAt: null },
+    depClosed: false, evalDone: false, approvals: C.reinitialiser(circuit),
+    qa: [], additifs: [], clarifs: [], coi: {}, recours: [], rejets: [], standstill: { days: 15, startedAt: null },
     contractSigned: false, infructueux: null, cadre: null,
   };
 }

@@ -12,7 +12,8 @@ servie par un vrai backend avec comptes, droits et base de données.
 ```
 public/            front (HTML/CSS/JS sans build) : index.html, css/, js/api.js (connexion, API),
                    js/app/ (noyau, composants, un fichier par écran, démarrage : voir js/app/LISEZMOI.md),
-                   js/regles.js (calculs métier, partagés avec le serveur), js/profils.js (profils réglementaires)
+                   js/regles.js (calculs métier), js/profils.js (profils réglementaires),
+                   js/circuits.js (moteur de circuits de validation), tous trois partagés avec le serveur
 server/
   index.js         Express, helmet (CSP), service du front
   db.js            SQLite (better-sqlite3) : schéma, état de l'organisation (kv) et de chaque procédure (pkv),
@@ -40,6 +41,10 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
   confiance n'est pas confirmé, pas d'approbation avant la validation de l'évaluation, niveaux franchis dans l'ordre.
   Un retour en arrière n'est possible que par un recours déclaré fondé.
 - **Justification obligatoire** de tout écart avec le score proposé par l'IA, vérifiée à la validation de l'évaluation.
+- **Circuit d'approbation paramétrable** : chaque niveau peut ne s'appliquer qu'à partir d'un montant (fixé par le
+  serveur à la validation de l'évaluation, d'après l'offre classée première) et être réservé à un rôle ; les niveaux se
+  franchissent un par un, dans l'ordre ; le niveau attendu peut rejeter l'attribution, avec un motif obligatoire, ce
+  qui rouvre l'évaluation. Le profil réglementaire impose un nombre minimum de niveaux requis.
 - **Séparation des fonctions** : qui a noté ou validé l'évaluation ne peut pas approuver l'attribution, et inversement.
   L'identité et la date de chaque approbation sont posées par le serveur.
 - **Verrous** : taux de change figés à la clôture du dépouillement ; grille, marge de préférence et confirmations
@@ -59,7 +64,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 53 tests (Node 22 requis pour better-sqlite3)
+npm test             # 59 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :

@@ -2,11 +2,11 @@
    Chargé tel quel par <script> (global MPRegles) et par Node (require) : aucune étape de build.
    Fonctions pures : tout ce dont elles ont besoin arrive par le contexte `ctx`
    { offers, org, fxFrozen, cadre, cdc, criteria, quality, justif, excluded, confirmed, docDefs }.
-   Dépend de profils.js, chargé avant lui dans le navigateur. */
+   Dépend de profils.js et circuits.js, chargés avant lui dans le navigateur. */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./profils.js'));
-  else root.MPRegles = factory(root.MPProfils);
-})(this, function (P) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./profils.js'), require('./circuits.js'));
+  else root.MPRegles = factory(root.MPProfils, root.MPCircuits);
+})(this, function (P, C) {
   'use strict';
 
   /* Profil réglementaire de la procédure : celui figé à la publication, sinon celui choisi au cahier des charges,
@@ -115,8 +115,13 @@
     return out;
   }
 
-  function allApproved(approvals) {
-    return !!(approvals && approvals.length) && approvals.every(function (a) { return a.done; });
+  /* Attribution prononcée : toutes les étapes requises du circuit sont approuvées (moteur de circuits). */
+  function allApproved(approvals) { return C.complet(approvals); }
+
+  /* Montant qui détermine les étapes requises du circuit : celui de l'offre classée première, en monnaie pivot. */
+  function montantAttribution(ctx) {
+    var rows = ranking(ctx);
+    return rows.length ? montantXOF(ctx, rows[0].o) : 0;
   }
 
   /* Jours restants avant la fin du délai de recours ; le délai complet tant qu'il n'est pas ouvert. */
@@ -132,6 +137,6 @@
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,
     aiScore: aiScore, curScore: curScore, flagsRemaining: flagsRemaining, weightTotal: weightTotal,
-    ranking: ranking, missingJustifs: missingJustifs, allApproved: allApproved, standstillRemaining: standstillRemaining,
+    ranking: ranking, missingJustifs: missingJustifs, allApproved: allApproved, montantAttribution: montantAttribution, standstillRemaining: standstillRemaining,
   };
 });

@@ -91,7 +91,7 @@ var UI = { q:'', sort:'nom' };
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
   'mailFrom','mailSuffix','approvals','offers','circuitModele'];
-var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre'];
+var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
 var TARGETED = ['quality','justif','confirmed','excluded'];
@@ -189,6 +189,43 @@ function logit(a){
 /* Conserve le focus clavier et la position de defilement au travers d'un rendu */
 function fk(e,key){ e.setAttribute('data-fk',key); return e; }
 /* window.confirm est bloque dans l'iframe d'execution : boite de dialogue interne */
+/* Demande un texte (motif d'un rejet…) ; onOk(texte) n'est appelé qu'avec un texte non vide. */
+function demander(msg, onOk, titre, libelleOui, etiquette){
+  var prev=document.activeElement;
+  var ov=el('div','modal-ov');
+  var bx=el('div','modal');
+  bx.setAttribute('role','dialog'); bx.setAttribute('aria-modal','true'); bx.setAttribute('aria-label', titre||'Saisie');
+  add(bx,'h3',null,titre||'Saisie');
+  add(bx,'p',null,msg);
+  var lb=add(bx,'label',null,etiquette||'Motif'); lb.setAttribute('for','dlg-texte');
+  var ta=add(bx,'textarea'); ta.id='dlg-texte'; ta.rows=3; ta.style.width='100%'; ta.maxLength=1000;
+  var act=add(bx,'div','modal-act');
+  var no=add(act,'button','btn btn-ghost','Annuler');
+  var yes=add(act,'button','btn btn-primary', libelleOui||'Valider');
+  function close(){
+    document.removeEventListener('keydown',key,true);
+    if(ov.parentNode) ov.parentNode.removeChild(ov);
+    if(prev && prev.focus) try{ prev.focus(); }catch(e){}
+  }
+  function key(e){
+    if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); }
+    else if(e.key==='Tab'){
+      var f=[ta,no,yes], i=f.indexOf(document.activeElement);
+      e.preventDefault();
+      f[(i + (e.shiftKey?-1:1) + f.length) % f.length].focus();
+    }
+  }
+  no.addEventListener('click',close);
+  yes.addEventListener('click',function(){
+    var t=ta.value.trim();
+    if(!t){ ta.focus(); toast('Le motif est obligatoire.'); return; }
+    close(); onOk(t);
+  });
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  document.addEventListener('keydown',key,true);
+  ov.appendChild(bx); document.body.appendChild(ov);
+  ta.focus();
+}
 function ask(msg, onYes, titre, libelleOui){
   var prev=document.activeElement;
   var ov=el('div','modal-ov');

@@ -3,6 +3,7 @@
    le même fichier que celui exécuté par le navigateur. */
 const R = require('../public/js/regles.js');
 const P = require('../public/js/profils.js');
+const C = require('../public/js/circuits.js');
 const { seed, frDate } = require('./db');
 
 // clé d'état -> habilitations (au moins une requise). '*' = tout utilisateur connecté.
@@ -29,6 +30,7 @@ const WRITE_PERMS = {
   standstill: ['decision.approve', 'contract.sign', 'recours.handle'],
   contractSigned: ['contract.sign'],
   infructueux: ['decision.approve'],
+  rejets: ['decision.approve'],
   coi: ['*'], notifs: ['*'], emails: ['*'],
 };
 const CAPS = { notifs: 120, emails: 80, qa: 500, additifs: 200, clarifs: 500, recours: 200, delegations: 200 };
@@ -63,6 +65,13 @@ function hasFoundedAppeal(changes) {
   const cur = stored('recours') || [];
   return changes.recours.some((r, i) => r && r.statut === 'fonde' && cur[i] && cur[i].statut === 'ouvert');
 }
+
+/** Le lot contient-il un nouveau rejet d'attribution ? Il renvoie la procédure à l'évaluation (voir « rejets »). */
+function hasNewRejection(changes) {
+  return Array.isArray(changes.rejets) && changes.rejets.length > (stored('rejets') || []).length;
+}
+/** Retour en arrière autorisé : recours déclaré fondé, ou rejet de l'attribution par un niveau du circuit. */
+const retourAutorise = (changes) => hasFoundedAppeal(changes) || hasNewRejection(changes);
 
 /** Valide un changement de clé de la procédure req.store. Retourne null si OK ; sinon un message (403) ou { status, code, error }. */
 function validateChange(key, value, req, changes = { [key]: value }) {
@@ -151,7 +160,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (typeof value !== 'boolean') return 'Booléen attendu.';
       if (value === !!cur) break;
       if (!value) {
-        if (!hasFoundedAppeal(changes)) return refus(409, 'EVALUATION_VALIDATED', 'Une évaluation validée ne se rouvre que par un recours déclaré fondé.');
+        if (!retourAutorise(changes)) return refus(409, 'EVALUATION_VALIDATED', 'Une évaluation validée ne se rouvre que par un recours déclaré fondé ou un rejet de l’attribution.');
         break;
       }
       if (!req.can('eval.validate')) return 'Habilitation insuffisante pour valider l’évaluation.';
@@ -163,40 +172,75 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (miss.length) return refus(422, 'JUSTIFICATION_REQUIRED', `Justification écrite obligatoire pour tout écart avec le score proposé : ${miss.join(', ')}.`);
       if (cadreOf(next).separationFonctions && sod().approvers.includes(uid))
         return refus(403, 'SEPARATION_OF_DUTIES', 'Vous avez approuvé l’attribution de cette procédure : vous ne pouvez pas en valider l’évaluation.');
+      {
+        // le montant de l'attribution fixe les étapes requises : il en faut au moins autant que le profil l'exige
+        const k = cadreOf(next), nReq = C.nbRequises(C.appliquerMontant(next('approvals'), R.montantAttribution({ ...ctx, fxFrozen: stored('fxFrozen') })));
+        if (nReq < k.niveauxApprobationMin)
+          return refus(422, 'APPROVAL_CIRCUIT_TOO_SHORT', `Pour ce montant, le circuit ne compte que ${nReq} niveau(x) requis ; le profil réglementaire en exige au moins ${k.niveauxApprobationMin}.`);
+      }
       break;
     }
     case 'approvals': {
       if (!Array.isArray(value) || value.some((a) => !isObj(a))) return 'Circuit d’approbation invalide.';
       const before = cur || [];
-      const shape = (l) => l.map((a) => ({ role: a.role, who: a.who }));
       const k = cadreOf(next);
-      const tropCourt = () => refus(422, 'APPROVAL_CIRCUIT_TOO_SHORT',
-        `Le profil réglementaire exige au moins ${k.niveauxApprobationMin} niveau(x) d’approbation.`);
-      if (!same(shape(value), shape(before))) {
+      const roles = stored('roles') || {};
+      if (value.some((a) => (a.seuil != null && a.seuil !== '' && !(Number(a.seuil) >= 0)) || (a.roleId && !roles[a.roleId])))
+        return refus(422, 'CIRCUIT_INVALID', 'Étape invalide : seuil négatif ou rôle inconnu.');
+      if (!same(C.forme(value), C.forme(before))) {
         if (!req.can('params.edit')) return 'Modifier le circuit exige l’habilitation « Paramètres ».';
         if (stored('evalDone')) return refus(409, 'APPROVAL_CIRCUIT_LOCKED', 'L’évaluation est validée : le circuit d’approbation ne peut plus être modifié.');
         if (value.some((a) => a.done)) return refus(409, 'APPROVAL_CIRCUIT_LOCKED', 'Un niveau ne peut pas être approuvé en même temps que le circuit est modifié.');
-        if (value.length < k.niveauxApprobationMin) return tropCourt();
+        if (value.length < k.niveauxApprobationMin)
+          return refus(422, 'APPROVAL_CIRCUIT_TOO_SHORT', `Le profil réglementaire exige au moins ${k.niveauxApprobationMin} niveau(x) d’approbation.`);
+        value.forEach((a) => { delete a.requis; delete a.by; delete a.at; });
         break;
       }
-      const founded = hasFoundedAppeal(changes);
+      const retour = retourAutorise(changes);
+      // décisions et étapes requises : posées par le serveur, jamais par le navigateur
       for (let i = 0; i < value.length; i++) {
         const a = value[i], b = before[i];
-        if (!!a.done === !!b.done) { a.by = b.by; a.at = b.at; continue; } // identité et date : jamais fournies par le client
+        if (b.requis === undefined) delete a.requis; else a.requis = b.requis;
+        if (!!a.done === !!b.done) { a.by = b.by; a.at = b.at; continue; }
         if (!a.done) {
-          if (!founded) return refus(409, 'APPROVAL_FINAL', 'Une approbation donnée ne se retire que par un recours déclaré fondé.');
+          if (!retour) return refus(409, 'APPROVAL_FINAL', 'Une approbation donnée ne se retire que par un recours déclaré fondé ou un rejet de l’attribution.');
           delete a.by; delete a.at;
-          continue;
         }
+      }
+      // une seule nouvelle approbation par envoi, contrôlée par le moteur de circuits sur l'état avant l'envoi
+      const nouvelles = value.map((a, i) => (a.done && !before[i].done ? i : -1)).filter((i) => i >= 0);
+      if (nouvelles.length > 1) return refus(409, 'APPROVAL_ORDER', 'Les niveaux d’approbation se franchissent un par un, dans l’ordre.');
+      if (nouvelles.length) {
+        const i = nouvelles[0];
         if (!req.can('decision.approve')) return 'Approuver exige l’habilitation « Approuver l’attribution ».';
         if (!next('evalDone')) return refus(409, 'GATE_EVALUATION_NOT_VALIDATED', 'L’approbation est fermée tant que l’évaluation n’est pas validée.');
-        if (value.slice(0, i).some((x) => !x.done)) return refus(409, 'APPROVAL_ORDER', 'Les niveaux d’approbation se franchissent dans l’ordre.');
-        if (value.length < k.niveauxApprobationMin) return tropCourt();
-        const s = sod();
-        if (k.separationFonctions && (s.scorers.includes(uid) || s.validators.includes(uid)))
-          return refus(403, 'SEPARATION_OF_DUTIES', 'Vous avez noté ou validé l’évaluation de cette procédure : vous ne pouvez pas en approuver l’attribution.');
-        a.by = uid; a.at = frDate();
+        if (C.nbRequises(before) < k.niveauxApprobationMin)
+          return refus(422, 'APPROVAL_CIRCUIT_TOO_SHORT', `Le profil réglementaire exige au moins ${k.niveauxApprobationMin} niveau(x) d’approbation.`);
+        const s = sod(), ecartes = k.separationFonctions ? s.scorers.concat(s.validators) : [];
+        const err = C.controle(before, i, req.user, ecartes);
+        if (err) return refus(err.status, err.code, err.error);
+        value[i].by = uid; value[i].at = frDate();
       }
+      break;
+    }
+    case 'rejets': {
+      // rejet de l'attribution par le niveau attendu du circuit : motif obligatoire, retour à l'évaluation
+      if (!Array.isArray(value) || value.some((x) => !isObj(x))) return 'Liste de rejets invalide.';
+      const before = cur || [];
+      if (value.length < before.length || before.some((x, i) => !same(x, value[i]))) return refus(409, 'REJECTION_LOCKED', 'Un rejet enregistré ne peut être ni modifié ni supprimé.');
+      if (value.length === before.length) break;
+      if (value.length > before.length + 1) return 'Un seul rejet à la fois.';
+      const nv = value[value.length - 1], ap = stored('approvals') || [];
+      const motif = String(nv.motif || '').trim();
+      if (!motif || motif.length > 1000) return refus(422, 'REJECTION_REASON_REQUIRED', 'Le rejet de l’attribution doit être motivé (1 000 caractères au plus).');
+      if (!stored('evalDone')) return refus(409, 'GATE_EVALUATION_NOT_VALIDATED', 'Rien à rejeter : l’évaluation n’est pas validée.');
+      if (C.complet(ap)) return refus(409, 'APPROVAL_FINAL', 'L’attribution est prononcée : elle ne se remet en cause que par un recours.');
+      const i = C.prochaine(ap), k = cadreOf(next), s = sod();
+      const err = C.controle(ap, i, req.user, k.separationFonctions ? s.scorers.concat(s.validators) : []);
+      if (err) return refus(err.status, err.code, err.error);
+      if (changes.evalDone !== false || !Array.isArray(changes.approvals) || changes.approvals.some((a) => a.done))
+        return refus(409, 'REJECTION_INCOMPLETE', 'Un rejet renvoie la procédure à l’évaluation : évaluation rouverte et circuit remis à zéro dans le même envoi.');
+      value[value.length - 1] = { niveau: i, role: ap[i].role, motif, by: uid, at: frDate() };
       break;
     }
     case 'standstill': {
@@ -290,7 +334,14 @@ function validateChange(key, value, req, changes = { [key]: value }) {
     case 'circuitModele':
       if (!Array.isArray(value) || !value.length || value.some((a) => !isObj(a) || typeof a.role !== 'string' || !a.role.trim()))
         return 'Circuit modèle invalide : au moins un niveau, chacun avec un intitulé.';
-      value.forEach((a, i) => { value[i] = { role: String(a.role).slice(0, 120), who: String(a.who || '').slice(0, 120) }; });
+      if (value.some((a) => (a.seuil != null && a.seuil !== '' && !(Number(a.seuil) >= 0)) || (a.roleId && !(stored('roles') || {})[a.roleId])))
+        return refus(422, 'CIRCUIT_INVALID', 'Étape invalide : seuil négatif ou rôle inconnu.');
+      value.forEach((a, i) => {
+        const e = { role: String(a.role).slice(0, 120), who: String(a.who || '').slice(0, 120) };
+        if (Number(a.seuil) > 0) e.seuil = Number(a.seuil);
+        if (a.roleId) e.roleId = a.roleId;
+        value[i] = e;
+      });
       break;
     case 'docDefs': {
       if (!Array.isArray(value) || value.some((d) => !isObj(d) || !d.id)) return 'Liste de pièces invalide.';
@@ -339,6 +390,18 @@ function effectsOf(changes, req) {
     } else if (avant && !apres) {
       kv.cadre = null; // dossier dépublié : le cadre sera de nouveau figé à la prochaine publication
     }
+  }
+  if (changes.evalDone === true && !stored('evalDone')) {
+    // le montant de l'attribution est connu : le serveur fixe les étapes requises du circuit
+    const montant = R.montantAttribution({ ...ctxOf(next), fxFrozen: stored('fxFrozen') });
+    const circuit = C.appliquerMontant(next('approvals'), montant);
+    kv.approvals = circuit;
+    const non = circuit.filter((e) => !e.requis).map((e) => e.role);
+    if (non.length) audit.push(`Circuit d’approbation : pour ${Math.round(montant).toLocaleString('fr-FR')} XOF, niveau(x) non requis — ${non.join(', ')}`);
+  }
+  if (hasNewRejection(changes)) {
+    const r = changes.rejets[changes.rejets.length - 1];
+    audit.push(`Attribution rejetée au niveau « ${r.role} » — motif : ${r.motif} — retour à l’évaluation`);
   }
   if (changes.depClosed === true && !stored('depClosed')) {
     const rates = { ...((next('org') || {}).rates || {}) };

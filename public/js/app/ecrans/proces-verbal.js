@@ -47,7 +47,12 @@ function vPV(m){
   if(!isUemoa(win.o)) add(pv,'p',null,'L\u2019attributaire n\u2019étant pas établi dans l\u2019espace UEMOA, le marché est soumis à la retenue à la source de '+c.retenueNonResident+' % sur les prestations de source locale ; les droits et taxes à l\u2019importation sont à la charge de : '+c.douaneACharge+'.');
 
   add(pv,'h4',null,'7. Approbations recueillies');
-  var u2=add(pv,'ul'); state.approvals.forEach(function(a){ add(u2,'li',null, a.role+' — '+a.who+' — approuvé'); });
+  var u2=add(pv,'ul'); state.approvals.forEach(function(a){
+    add(u2,'li',null, a.role+' — '+a.who+' — '+(a.done ? 'approuvé'+(a.at?' le '+a.at:'') : 'non requis pour ce montant'));
+  });
+  (state.rejets||[]).forEach(function(x){
+    add(pv,'p',null,'Rejet antérieur au niveau « '+x.role+' », le '+x.at+' — motif : '+x.motif+'. La procédure a été reprise à l\u2019évaluation.');
+  });
 
   add(pv,'h4',null,'8. Questions, additifs et clarifications');
   add(pv,'p',null, state.qa.length+' question(s) de candidats traitée(s) · '+state.additifs.length+' additif(s) publié(s) · '+state.clarifs.length+' demande(s) de clarification, sans modification de prix ni de contenu des offres.');

@@ -22,15 +22,22 @@ function vDecision(m){
   }
 
   var wf=add(m,'div','card'); wf.style.marginTop='18px';
-  add(wf,'div','panel-head','Circuit d\u2019approbation — 3 niveaux configurés');
+  var nReq=MPCircuits.nbRequises(state.approvals);
+  add(wf,'div','panel-head','Circuit d\u2019approbation — '+nReq+' niveau(x) requis sur '+state.approvals.length+' configuré(s)');
   var b=add(wf,'div','pad');
-  var fp=-1; for(var i=0;i<state.approvals.length;i++){ if(!state.approvals[i].done){ fp=i; break; } }
+  var fp=MPCircuits.prochaine(state.approvals);
   state.approvals.forEach(function(a,i){
     var row=add(b,'div','stepline');
+    var requis=MPCircuits.requise(a);
     add(row,'div','stepnum '+(a.done?'done':(i===fp?'now':'')), a.done?'✓':String(i+1));
     var d=add(row,'div'); d.style.flex='1 1 auto';
     add(d,'strong',null,a.role); add(d,'div','muted',a.who);
-    if(a.done) add(row,'span','chip c-green','Approuvé');
+    var cond=[];
+    if(Number(a.seuil)>0) cond.push('à partir de '+xof(Number(a.seuil)));
+    if(a.roleId) cond.push('réservé au rôle « '+((state.roles[a.roleId]||{}).lab||a.roleId)+' »');
+    if(cond.length) add(d,'div','muted',cond.join(' · '));
+    if(a.done) add(row,'span','chip c-green','Approuvé'+(a.at?' le '+a.at:''));
+    else if(!requis) add(row,'span','chip c-grey','Non requis pour ce montant');
     else if(i===fp){
       var btn=add(row,'button','btn btn-primary btn-sm','Approuver');
       fk(btn,'appr-'+i); guard('decision.approve',btn);
@@ -52,8 +59,36 @@ function vDecision(m){
           });
         }, 'Approuver au titre « '+a.role+' » ?', 'Approuver');
       });
+      var rj=add(row,'button','btn btn-ghost btn-sm','Rejeter');
+      fk(rj,'rej-'+i); guard('decision.approve',rj);
+      if(a.roleId && me().role!==a.roleId){
+        var res='Niveau réservé au rôle « '+((state.roles[a.roleId]||{}).lab||a.roleId)+' ».';
+        [btn,rj].forEach(function(x){ x.disabled=true; x.title=res; });
+      }
+      rj.addEventListener('click',function(){
+        demander("Le rejet est motivé, nominatif et consigné à la piste d\u2019audit. La procédure revient à l\u2019évaluation et le circuit repart du premier niveau.", function(motif){
+          cibler('POST','/approbations/'+i+'/rejet',{motif:motif}).then(function(r){
+            if(!r) return;
+            logit('Attribution rejetée — '+a.role);
+            notify('appro.attendue','Attribution rejetée — '+a.role,
+              "Le niveau « "+a.role+" » a rejeté l'attribution de la procédure "+REF()+". Motif : "+motif+". L'évaluation est rouverte.");
+            save(); go('evaluation');
+          });
+        }, 'Rejeter l\u2019attribution au titre « '+a.role+' » ?', 'Rejeter', 'Motif du rejet');
+      });
     } else add(row,'span','chip c-grey','En attente');
   });
+
+  if((state.rejets||[]).length){
+    var kr=add(m,'div','card'); kr.style.marginTop='18px';
+    add(kr,'div','panel-head','Rejets antérieurs de l\u2019attribution');
+    var br=add(kr,'div','pad');
+    state.rejets.forEach(function(x){
+      var row=add(br,'div','docline'); var lf=add(row,'div');
+      add(lf,'strong',null,x.role); add(lf,'div','muted',x.motif);
+      add(row,'span','chip c-grey',x.at);
+    });
+  }
 
   var n=add(m,'div','note');
   add(n,'strong',null,'La décision reste humaine. ');
