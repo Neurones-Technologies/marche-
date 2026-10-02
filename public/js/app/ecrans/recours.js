@@ -5,13 +5,8 @@
 /* ============ Notification, délai de recours et signature ============ */
 function vRecours(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Après attribution');
   add(l,'h1',null,'Notification, recours et signature');
   var K=CADRE(), J=delaiJours();
-  add(l,'p','lede', K.recoursActif
-    ? "L'attribution notifiée ouvre un délai pendant lequel le marché ne peut pas être signé. Tout recours déposé dans ce délai suspend la signature jusqu'à décision."
-    : (J>0 ? "L'attribution notifiée ouvre un délai de "+J+" jour(s) avant la signature. Le profil réglementaire de la procédure ne prévoit pas de recours."
-           : "Le profil réglementaire de la procédure ne prévoit ni recours ni délai : le marché peut être signé dès la notification."));
 
   if(!allApproved()) return locked(m,"Cette étape s'ouvre une fois l'attribution prononcée.",'decision',"Aller au circuit d'approbation");
 

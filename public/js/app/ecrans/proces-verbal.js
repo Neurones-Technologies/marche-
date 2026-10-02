@@ -6,8 +6,7 @@ function vPV(m){
   if(!allApproved()) return locked(m,"Le procès-verbal est généré une fois les niveaux d'approbation franchis.",'decision',"Aller au circuit d'approbation");
   var rows=ranking(), win=rows[0], c=state.cdc;
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow',REF()); add(l,'h1',null,"Procès-verbal d'attribution");
-  add(l,'p','lede',"Brouillon généré à partir des données validées à chaque étape. Il reste à relire et à signer — le document produit par le système est un projet, jamais un acte définitif.");
+  add(l,'h1',null,"Procès-verbal d'attribution");
   add(h,'button','btn btn-ghost btn-sm','Imprimer / exporter').addEventListener('click',function(){ imprimer(); });
 
   var card=add(m,'div','card pad'); var pv=add(card,'div','pv');

@@ -7,7 +7,6 @@ function vNotifs(m){
   setTimeout(function(){ if(state.view==='notifs'){ var k=marquerLues(); if(k){ renderNav(); var bn=document.getElementById('bell-n'); if(bn){bn.textContent='';bn.style.cssText='';} } } },1500);
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Notifications');
-  add(l,'p','lede',"Messages adressés au rôle « "+myRole().lab+" ». Les destinataires de chaque événement sont définis dans les règles de notification.");
   var mk=add(h,'button','btn btn-ghost btn-sm','Tout marquer comme lu'); fk(mk,'mk-read');
   mk.addEventListener('click',function(){ var k=marquerLues(); render(); toast(k?k+' notification(s) marquée(s) comme lue(s).':'Aucune notification non lue.'); });
 

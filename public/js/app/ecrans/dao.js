@@ -389,9 +389,7 @@ function daoVolume(P){
 function vDAO(m){
   var c=state.cdc, P=buildDAO(), V=daoVolume(P);
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow',REF());
   add(l,'h1',null,"Dossier d'appel d'offres généré");
-  add(l,'p','lede',"Document complet assemblé à partir des paramètres du cahier des charges : "+P.length+" pièces, "+P.reduce(function(s,x){return s+x.arts.length;},0)+" articles, volume estimé à "+V.pages+" pages. Toute modification du cahier des charges régénère le document.");
   add(h,'button','btn btn-ghost btn-sm','Imprimer / exporter').addEventListener('click',function(){ imprimer(); });
 
   /* Composition */

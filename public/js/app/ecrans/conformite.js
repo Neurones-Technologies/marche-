@@ -5,7 +5,6 @@
 function vConformite(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Conformité & anomalies');
-  add(l,'p','lede',"Contrôle des pièces exigées selon l'origine du soumissionnaire, et signaux de cohérence. Chaque signal est une alerte à instruire, jamais une décision : l'exclusion reste un acte humain, réversible et tracé.");
 
   var c1=add(m,'div','card');
   add(c1,'div','panel-head','Contrôle des pièces par soumissionnaire');

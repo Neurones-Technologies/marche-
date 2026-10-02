@@ -6,9 +6,7 @@ function vEvaluation(m){
   if (!state.depClosed) return locked(m,"L'évaluation s'ouvre une fois le dépouillement clôturé.",'depouille','Aller au dépouillement');
   var c=state.cdc;
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Évaluation comparative');
   add(l,'h1',null,'Notation des offres conformes');
-  add(l,'p','lede',"Montants convertis en francs CFA, puis corrigés de la marge de préférence communautaire lorsqu'elle est active. Toute modification d'un score proposé par l'IA exige une justification écrite, horodatée et attribuée.");
   var rs=add(h,'button','btn btn-ghost btn-sm','Rétablir les scores IA');
   rs.addEventListener('click',function(){
     var quality={};

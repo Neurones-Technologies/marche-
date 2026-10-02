@@ -6,7 +6,7 @@ function vDecision(m){
   if(!state.evalDone) return locked(m,"Le circuit d'approbation s'ouvre une fois l'évaluation validée.",'evaluation',"Aller à l'évaluation");
   var rows=ranking(), win=rows[0], c=state.cdc;
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Décision'); add(l,'h1',null,"Proposition d'attribution");
+  add(l,'h1',null,"Proposition d'attribution");
 
   var card=add(m,'div','card pad');
   add(card,'div','stat-k','Attributaire proposé par le classement');

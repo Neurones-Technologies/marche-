@@ -62,9 +62,7 @@ function evaluationsPartenaire(parent, p){
 /* ============ Mon référencement (prestataire) ============ */
 function vReferencement(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Référencement');
   add(l,'h1',null,'Mon référencement');
-  add(l,'p','lede',"Complétez la fiche de votre entreprise et déposez vos pièces administratives. Une fois votre dossier instruit et validé, vos pièces n’ont plus à être jointes à chaque offre, tant qu’elles sont en cours de validité.");
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
 
   function charger(){
@@ -170,9 +168,7 @@ function vReferencement(m){
 function vPartenaires(m){
   if(!can('partenaires.manage')) return denyBox(m,'partenaires.manage');
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Référencement');
   add(l,'h1',null,'Partenaires');
-  add(l,'p','lede',"Fiches des prestataires, instruction des dossiers de référencement, validation des pièces, suspension et exclusion. Chaque décision est motivée et consignée à la piste d’audit.");
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
 
   function charger(){

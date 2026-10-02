@@ -5,9 +5,7 @@
 /* ============ Clarifications ============ */
 function vClarifs(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Phase d\u2019analyse');
   add(l,'h1',null,'Demandes de clarification');
-  add(l,'p','lede',"Une clarification lève une ambiguïté sur une offre déjà déposée. Elle ne peut en aucun cas modifier le prix ni le contenu substantiel de l'offre : ce serait une négociation déguisée, et un motif de recours.");
 
   var k=add(m,'div','card');
   var ph=add(k,'div','panel-head');

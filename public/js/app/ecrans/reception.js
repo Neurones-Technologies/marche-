@@ -5,7 +5,6 @@
 function vReception(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Réception des offres');
-  add(l,'p','lede',"Dépôt des plis puis traitement automatique : OCR, détection de structure, extraction guidée par la grille, conversion des montants en francs CFA au taux arrêté à l'ouverture. Chaque champ extrait porte son indice de confiance.");
 
   var card=add(m,'div','card');
   var ph=add(card,'div','panel-head'); add(ph,'span',null,'Plis reçus et traitement');

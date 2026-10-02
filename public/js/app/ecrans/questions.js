@@ -5,9 +5,7 @@
 /* ============ Questions des candidats & additifs ============ */
 function vQA(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Phase de publication');
   add(l,'h1',null,'Questions des candidats et additifs');
-  add(l,'p','lede',"Les réponses sont rendues anonymes et communiquées à tous les candidats ayant retiré le dossier. Un additif modifiant substantiellement la préparation des offres reporte la date limite de dépôt.");
 
   var k1=add(m,'div','card');
   var ph=add(k1,'div','panel-head');

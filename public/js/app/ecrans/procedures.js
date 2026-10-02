@@ -17,11 +17,7 @@ UI.filtreAO = { phase:'', annee:'', q:'' };
    et le montant attribués, le besoin d'origine et les commandes ; filtres par phase, année et recherche. */
 function vProcedures(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Registre');
   add(l,'h1',null,'Appels d\u2019offres');
-  add(l,'p','lede', can('offres.read')
-    ? "Toutes les procédures de l\u2019organisation, en cours et passées. Ouvrez une procédure pour travailler dessus : ses écrans apparaissent dans le menu, sous « Procédure »."
-    : "Les appels d\u2019offres publiés auxquels vous pouvez répondre.");
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
   var COUL={ preparation:'c-grey', publiee:'c-amber', evaluation:'c-blue', approbation:'c-teal', attribuee:'c-teal', signee:'c-green', infructueuse:'c-red', archivee:'c-grey' };
 

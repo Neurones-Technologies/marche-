@@ -6,7 +6,6 @@ function vCDC(m){
   var c=state.cdc;
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Cahier des charges');
-  add(l,'p','lede',"Construction du dossier d'appel d'offres : objet, allotissement, spécifications, pièces exigées selon l'origine du soumissionnaire, régime fiscal et douanier, préférence communautaire. Ces paramètres alimentent ensuite tout le reste de la procédure.");
   var pb=add(h,'button','btn '+(c.cdcPublie?'btn-ghost':'btn-primary'), c.cdcPublie?'Cahier des charges publié ✓':'Publier le cahier des charges');
   pb.disabled=c.cdcPublie; guard('cdc.publish',pb);
   pb.addEventListener('click',function(){

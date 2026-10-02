@@ -5,7 +5,6 @@
 function vCriteres(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Grille de critères');
-  add(l,'p','lede',"Grille paramétrable par organisation et par type de procédure. Les critères « calculés » sont notés par formule sur les montants convertis et corrigés de la préférence ; les critères qualitatifs reçoivent une proposition de l'IA validée par un évaluateur.");
 
   var card=add(m,'div','card');
   var ph=add(card,'div','panel-head'); add(ph,'span',null,'Critères et pondérations');

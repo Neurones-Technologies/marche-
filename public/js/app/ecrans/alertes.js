@@ -7,7 +7,6 @@ function vRegles(m){
   if(!can('notif.manage')) return denyBox(m,'notif.manage');
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Règles de notification');
-  add(l,'p','lede',"Pour chaque événement de la procédure : canal de diffusion et rôles destinataires. Un événement sans destinataire ne notifie personne, même si le canal est actif.");
 
   var rk=Object.keys(state.roles);
   var card=add(m,'div','card');

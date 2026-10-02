@@ -14,9 +14,7 @@ function ouvrirLien(lien){
 
 function vAccueil(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow',(state.org||{}).nom||'');
   add(l,'h1',null,'Tableau de bord');
-  add(l,'p','lede','Bonjour '+me().nom+'. Voici ce qui vous attend, puis l’état de chaque registre.');
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
 
   MP.api('GET','/api/accueil').then(function(r){ zone.textContent=''; dessiner(r); })

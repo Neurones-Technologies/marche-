@@ -8,7 +8,6 @@ function vParams(m){
   var o=state.org, sx=state.seuils;
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Paramètres');
-  add(l,'p','lede',"Tout ce qui varie d'une organisation à l'autre se règle ici : identité, devises, seuils de détection, pièces exigibles et circuit d'approbation. Aucune de ces valeurs n'est codée en dur dans les écrans.");
 
   function champ(parent,lab,val,cb,type,opts){
     var w=add(parent,'div'); var id='s'+Math.random().toString(36).slice(2,8);

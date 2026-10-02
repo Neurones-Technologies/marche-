@@ -33,9 +33,7 @@ function vPortail(m){
   if (!c.cdcPublie) return locked(m,"Le portail n'accepte les dépôts qu'une fois le cahier des charges publié.",'cdc','Aller au cahier des charges');
 
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow',REF()+' · '+c.procedure);
   add(l,'h1',null,c.objet);
-  add(l,'p','lede','Autorité contractante : '+c.autorite+' · Langue : '+c.langue+' · Devise : '+c.deviseSoumission);
   add(h,'span','chip c-amber','Date limite de dépôt : '+c.ouverture);
 
   /* Dossier à retirer */

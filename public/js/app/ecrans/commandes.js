@@ -15,9 +15,7 @@ function montantDevise(n, devise){ return sep(Math.round(Number(n)||0))+' '+(dev
 
 function vCommandes(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','Exécution');
   add(l,'h1',null,'Commandes et réceptions');
-  add(l,'p','lede',"Le bon de commande est établi à partir de l’offre retenue, validé, puis émis sous un numéro continu. Le réceptionnaire constate les livraisons : Marché+ rapproche ce qui a été commandé de ce qui a été reçu. La facture et le paiement restent dans la comptabilité.");
   if(can('commande.manage')){
     var ex=add(h,'a','btn btn-ghost btn-sm','Exporter pour la comptabilité (CSV)'); ex.href='/api/commandes/export.csv'; ex.setAttribute('download','commandes.csv');
   }

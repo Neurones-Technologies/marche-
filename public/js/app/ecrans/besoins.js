@@ -11,9 +11,7 @@ UI.besoin = null;
 
 function vBesoins(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'div','eyebrow','De l’intention à la publication');
   add(l,'h1',null,'Besoins');
-  add(l,'p','lede',"Un service exprime son besoin et le soumet au circuit de validation de l’organisation. Une fois validé, les achats en font une procédure, pré-remplie avec l’objet, le budget et le type de procédure pressenti.");
 
   var grille=add(m,'div'); grille.style.cssText='display:grid;grid-template-columns:minmax(0,1fr);gap:18px';
   var liste=add(grille,'div','card'); add(liste,'div','panel-head','Besoins');

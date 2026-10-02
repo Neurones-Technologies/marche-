@@ -7,7 +7,6 @@ function vComptes(m){
   if(!can('roles.edit')) return denyBox(m,'roles.edit');
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Comptes utilisateurs');
-  add(l,'p','lede',"Création, rôle, activation et réinitialisation de mot de passe. Toute action est consignée dans la piste d'audit. Un compte désactivé perd son accès immédiatement.");
 
   var card=add(m,'div','card');
   add(card,'div','panel-head','Comptes');
@@ -78,7 +77,6 @@ function vRoles(m){
   if(!can('roles.edit')) return denyBox(m,'roles.edit');
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Rôles et habilitations');
-  add(l,'p','lede',"Matrice des permissions par rôle. Les cumuls incompatibles au regard de la séparation des fonctions sont signalés : ils restent techniquement possibles, mais doivent être justifiés.");
 
   var rk=Object.keys(state.roles);
   var confl=[];

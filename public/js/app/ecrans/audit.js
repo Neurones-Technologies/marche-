@@ -5,7 +5,6 @@
 function vAudit(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,"Piste d'audit");
-  add(l,'p','lede',"Journal horodaté de toutes les actions de la procédure. C'est cette trace qui permet de démontrer, en cas de recours devant l'organe de régulation, que chaque score retenu a été validé ou corrigé par une personne identifiée.");
   var vb=add(m,'div'); vb.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px';
   var vbtn=add(vb,'button','btn btn-ghost btn-sm',"Vérifier l'intégrité du journal");
   var vres=add(vb,'span','chip c-grey','Non vérifié'); vres.setAttribute('role','status');
