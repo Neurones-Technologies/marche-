@@ -396,8 +396,10 @@ seuil, jamais de suspension automatique ; note montrée aux évaluateurs, hors d
 Les cinq modules du cadrage existent, sur le socle (plusieurs procédures, écritures ciblées, interface découpée) et
 le moteur de circuits, avec les profils réglementaires public et privé. Restent, par ordre d'importance :
 
-1. **Envoi réel des courriels** : sans lui, l'inscription en ligne ne fonctionne pas en production, et les
-   notifications restent simulées.
+1. ~~**Envoi réel des courriels**~~ : **fait le 02/10/2026** par Microsoft 365 (API Graph, voir README,
+   « Courriels »). Reste à faire chez le client : enregistrer l'application, limiter sa permission à la boîte d'envoi,
+   renseigner le `.env` de production. Au passage, les notifications et la boîte d'envoi ne sont plus transmises qu'à
+   leurs destinataires (elles l'étaient à tous les comptes, soumissionnaires compris).
 2. **Validation juridique** des valeurs du profil public (délai de recours, marge de préférence, pièces imposées) et
    des seuils de type de procédure, provisoires.
 3. **IA réelle** : extraction des offres et des pièces, aujourd'hui simulée (`docs/EXTRACTION.md` de la branche

@@ -98,7 +98,7 @@ var UI = { q:'', sort:'nom' };
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
   'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','circuitCommande','evaluationPartenaires'];
-var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres'];
+var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres','courriels'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
 var TARGETED = ['quality','justif','confirmed','excluded'];
@@ -402,7 +402,8 @@ function notify(evId, titre, corps){
   }
   if(r.email){
     var dest=destinataires(r.roles);
-    state.emails.unshift({ id:'m'+Date.now()+Math.random().toString(36).slice(2,6), ev:evId,
+    // ids : le serveur envoie aux adresses réelles de ces comptes (il ignore toute adresse fournie ici)
+    state.emails.unshift({ id:'m'+Date.now()+Math.random().toString(36).slice(2,6), ev:evId, ids:dest.map(function(u){ return u.id; }),
       de:state.mailFrom, a:dest.map(mailAdr), noms:dest.map(function(u){return u.nom+' ('+roleLab(u.role)+')';}),
       objet:'['+REF()+'] '+titre, corps:corps+"\n\n—\n"+state.org.nom+" — plateforme Marché+\nCe message est généré automatiquement ; ne pas y répondre.",
       t:t, statut:'simulé' });

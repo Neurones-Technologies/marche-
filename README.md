@@ -85,7 +85,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 80 tests (Node 22 requis pour better-sqlite3)
+npm test             # 85 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :
@@ -114,6 +114,42 @@ En production : `SEED_DEMO=0` (pas de comptes de démo), `ALLOW_RESET=0`, HTTPS 
 
 > GitHub Pages ne convient plus : le projet nécessite le serveur Node.
 
+## Courriels (Microsoft 365)
+
+Les courriels partent d'une boîte Microsoft 365 par l'API Microsoft Graph (`sendMail`), avec une application
+enregistrée dans Entra ID (identifiants client, aucune dépendance ajoutée). Les notifications partent vers l'adresse
+réelle des comptes destinataires, désignés par leur identifiant : une adresse fournie par le navigateur est ignorée.
+Chaque message garde son statut (envoyé, ou échec avec sa cause) dans la boîte d'envoi de l'écran Notifications ;
+chacun n'y voit que les courriels qui lui sont adressés (l'administration des notifications et l'audit voient tout).
+
+Mise en place (administrateur Microsoft 365) :
+
+1. **Boîte d'envoi** : créer une boîte partagée, par exemple `marches@votre-domaine` (sans licence).
+2. **Application** : Entra ID → Inscriptions d'applications → Nouvelle inscription (« Marché+ — courriels »,
+   locataire unique). Noter l'identifiant d'application (client) et l'identifiant de l'annuaire (locataire).
+3. **Secret** : Certificats et secrets → Nouveau secret client ; noter sa **valeur** et sa date d'expiration
+   (le renouveler avant cette date).
+4. **Permission limitée à la boîte d'envoi** : accorder `Mail.Send` par le contrôle d'accès d'Exchange Online
+   (« RBAC for Applications »), limité à la seule boîte d'envoi. Ne pas accorder `Mail.Send` dans Entra ID : une
+   permission d'application accordée là vaut pour **toutes** les boîtes de l'organisation. Dans Exchange Online
+   PowerShell (vérifier la syntaxe sur la documentation Microsoft « Role Based Access Control for Applications ») :
+   ```powershell
+   New-ServicePrincipal -AppId <client> -ObjectId <objet de l'application d'entreprise> -DisplayName "Marché+"
+   New-ManagementScope -Name "Marche+ boite d'envoi" -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'marches@votre-domaine'"
+   New-ManagementRoleAssignment -App <client> -Role "Application Mail.Send" -CustomResourceScope "Marche+ boite d'envoi"
+   Test-ServicePrincipalAuthorization -Identity <client> -Resource marches@votre-domaine
+   ```
+5. **Serveur** : dans le `.env` de production (jamais dans le dépôt), puis redémarrer le conteneur :
+   ```
+   APP_URL=https://tenders.neuronestech.com
+   MAIL_MODE=graph
+   M365_TENANT_ID=<locataire>
+   M365_CLIENT_ID=<client>
+   M365_CLIENT_SECRET=<valeur du secret>
+   M365_SENDER=marches@votre-domaine
+   ```
+   L'écran Notifications indique alors « Envoi par Microsoft 365 » et le statut de chaque message.
+
 ## Pièces jointes
 
 Le soumissionnaire téléverse chaque pièce exigée dans le portail (PDF, PNG, JPG, DOCX, XLSX, 10 Mo max par défaut,
@@ -130,8 +166,8 @@ avec la base.
 ## Limites connues
 
 - L'extraction IA des offres (scores, champs à confiance faible) reste celle des données de démonstration.
-- Les courriels sont simulés (journalisés, non envoyés). Conséquence pour l'inscription en ligne : en production,
-  le lien de vérification n'est ni envoyé ni affiché ; tant que l'envoi réel n'est pas branché, fermer l'inscription
-  (Paramètres → 10) ou activer les comptes à la main (Comptes → Réactiver).
+- Sans configuration Microsoft 365 (`MAIL_MODE=graph`), les courriels restent simulés. En production, l'inscription
+  en ligne a besoin de l'envoi réel : sinon le lien de vérification n'est ni envoyé ni affiché (fermer l'inscription,
+  Paramètres → 10, ou activer les comptes à la main).
 - Les signaux d'anomalie (prix anormalement bas, structures de prix similaires…) sont calculés dans le navigateur ;
   le classement, la conformité et les justifications le sont aussi par le serveur (`public/js/regles.js`).

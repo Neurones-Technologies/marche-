@@ -11,6 +11,7 @@ const rateLimit = require('express-rate-limit');
 const { db, kvGet, kvSet, partenaireCreer, jetonCreer, jetonUtiliser, auditAppend, bumpRev, frDate } = require('../db');
 const { bcrypt } = require('../auth');
 const cfg = require('../config');
+const mail = require('../mail');
 
 const r = express.Router();
 const limite = rateLimit({ windowMs: 3600000, limit: cfg.inscriptionParHeure, standardHeaders: true, legacyHeaders: false,
@@ -35,7 +36,7 @@ r.post('/', limite, (req, res) => {
   if (!motDePasseValide(mdp)) return res.status(422).json({ error: 'Mot de passe : 10 caractères minimum, avec majuscule, minuscule et chiffre.' });
   if (db.prepare('SELECT 1 FROM users WHERE lower(email)=?').get(email)) return res.status(202).json({ message: REPONSE });
 
-  let lien;
+  let lien, courriel;
   db.transaction(() => {
     const uid = 'u' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex');
     db.prepare('INSERT INTO users(id,nom,email,role,pass_hash,active,a_verifier) VALUES(?,?,?,?,?,0,1)').run(uid, nom, email, 'soum', bcrypt.hashSync(mdp, 10));
@@ -45,14 +46,21 @@ r.post('/', limite, (req, res) => {
     const jeton = jetonCreer(uid, 'verification', 48);
     lien = '/?verifier=' + jeton;
     const emails = (kvGet('emails') || { value: [] }).value;
-    emails.unshift({ id: 'm' + Date.now() + crypto.randomBytes(2).toString('hex'), ev: 'inscription', de: kvGet('mailFrom') ? kvGet('mailFrom').value : '',
-      a: [email], noms: [nom + ' (' + raisonSociale + ')'], objet: 'Vérifiez votre adresse pour finaliser votre inscription',
+    courriel = { id: 'm' + Date.now() + crypto.randomBytes(2).toString('hex'), ev: 'inscription', de: mail.actif() ? mail.expediteur() : (kvGet('mailFrom') ? kvGet('mailFrom').value : ''),
+      ids: [uid], a: [email], noms: [nom + ' (' + raisonSociale + ')'], objet: 'Vérifiez votre adresse pour finaliser votre inscription',
       corps: 'Bonjour ' + nom + ',\n\nPour activer le compte de ' + raisonSociale + ' sur la plateforme d’achats de ' + (org.nom || 'l’organisation') +
-        ', ouvrez ce lien dans les 48 heures :\n' + lien + '\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message.',
-      t: frDate(), statut: 'simulé' });
+        ', ouvrez ce lien dans les 48 heures :\n' + cfg.appUrl + lien + '\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message.',
+      t: frDate(), statut: mail.actif() ? 'en cours' : 'simulé' };
+    emails.unshift(courriel);
     kvSet('emails', emails.slice(0, 80), 'inscription');
     auditAppend(null, 'Inscription en ligne', `Inscription d’un prestataire — ${raisonSociale} (${pays}), fiche ${p.id}, en attente de vérification du courriel`);
   })();
+  if (courriel && mail.actif()) {
+    mail.envoyer({ a: courriel.a, objet: courriel.objet, corps: courriel.corps }).then((r) => {
+      const cur = (kvGet('emails') || { value: [] }).value, x = cur.find((m) => m.id === courriel.id);
+      if (x) { x.statut = r.statut; if (r.erreur) x.erreur = r.erreur; x.expedie = frDate(); kvSet('emails', cur, 'courriel'); }
+    }).catch((e) => console.error('Courriel d’inscription', e));
+  }
   res.status(202).json({ message: REPONSE, ...(cfg.prod ? {} : { lienVerification: lien }) });
 });
 

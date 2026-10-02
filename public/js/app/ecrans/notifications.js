@@ -12,10 +12,11 @@ function vNotifs(m){
   mk.addEventListener('click',function(){ var k=marquerLues(); render(); toast(k?k+' notification(s) marquée(s) comme lue(s).':'Aucune notification non lue.'); });
 
   var mine=notifsPourMoi(), unread=nonLues().length;
+  var envoiReel=!!(state.courriels && state.courriels.mode==='microsoft365');
   var st=add(m,'div','stats');
   [['Non lues',String(unread),unread?'var(--amber)':null],
    ['Reçues',String(mine.length),null],
-   ['Courriels simulés',String(state.emails.length),null],
+   [envoiReel ? 'Courriels' : 'Courriels simulés',String(state.emails.length),null],
    ['Événements actifs',String(EVENTS.filter(function(e){var r=state.notifRules[e.id];return r&&(r.inapp||r.email);}).length)+' / '+EVENTS.length,null]
   ].forEach(function(x){ var c=add(st,'div','card pad'); add(c,'div','stat-k',x[0]); var v=add(c,'div','stat-v',x[1]); if(x[2]) v.style.color=x[2]; });
 
@@ -41,7 +42,7 @@ function vNotifs(m){
   var c2=add(m,'div','card'); c2.style.marginTop='18px';
   var ph=add(c2,'div','panel-head');
   add(ph,'span',null,"Boîte d'envoi — courriels");
-  add(ph,'span','chip c-amber','Simulation : aucun message n\u2019est réellement expédié');
+  add(ph,'span','chip '+(envoiReel?'c-green':'c-amber'), envoiReel ? 'Envoi par Microsoft 365 — '+state.courriels.expediteur : 'Simulation : aucun message n\u2019est réellement expédié');
   var b2=add(c2,'div','pad');
   if(!state.emails.length) add(b2,'p','muted',"Aucun courriel généré pour l'instant.");
   state.emails.slice(0,12).forEach(function(mm){
@@ -49,6 +50,8 @@ function vNotifs(m){
     var t=add(row,'div'); t.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
     add(t,'strong',null,mm.objet);
     add(t,'span','chip c-grey',mm.t);
+    var ST={ 'envoyé':'c-green', 'en cours':'c-amber', 'échec':'c-red', 'simulé':'c-grey', 'sans destinataire':'c-grey' };
+    if(mm.statut) add(t,'span','chip '+(ST[mm.statut]||'c-grey'), mm.statut==='échec' && mm.erreur ? 'Échec : '+mm.erreur : mm.statut);
     add(row,'div','muted','De : '+mm.de+' — À : '+(mm.a.join(', ')||'(aucun destinataire pour les rôles visés)'));
     if(mm.noms.length) add(row,'div','muted','Soit : '+mm.noms.join(' · '));
     var pre=add(row,'div',null,mm.corps);
@@ -56,6 +59,8 @@ function vNotifs(m){
   });
 
   var nb=add(m,'div','note');
-  add(nb,'strong',null,'Ce que ce module simule. ');
-  nb.appendChild(document.createTextNode("Les notifications internes sont réelles dans la maquette : elles sont ciblées par rôle, marquées lues par utilisateur et persistées. L'envoi de courriel, lui, est simulé : les messages sont rendus tels qu'ils partiraient, mais aucun serveur de messagerie n'est branché. En production, ce module nécessite un service d'envoi, une gestion des rebonds et un traitement du désabonnement."));
+  add(nb,'strong',null, envoiReel ? 'Envoi des courriels. ' : 'Ce que ce module simule. ');
+  nb.appendChild(document.createTextNode(envoiReel
+    ? "Les courriels partent de la boîte "+state.courriels.expediteur+" par Microsoft 365, vers l'adresse réelle des comptes destinataires. Chaque message garde son statut (envoyé, ou échec avec sa cause). Vous ne voyez ici que les courriels qui vous sont adressés, sauf si vous administrez les notifications."
+    : "Les notifications internes sont réelles : ciblées par rôle, marquées lues par utilisateur et persistées. L'envoi de courriel est simulé tant que Microsoft 365 n'est pas configuré sur le serveur (MAIL_MODE=graph, voir le README) : les messages sont rendus tels qu'ils partiraient."));
 }

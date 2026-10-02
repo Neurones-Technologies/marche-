@@ -59,6 +59,10 @@ if [ ! -f .env ]; then
     echo "SHOW_DEMO_ACCOUNTS=0"
     echo "ALLOW_RESET=${ALLOW_RESET:-1}"
     echo "MAX_FILE_MB=10"
+    # Liens envoyés par courriel ; envoi réel par Microsoft 365 : renseigner MAIL_MODE=graph et
+    # M365_* (voir README, « Courriels »). Tant qu'ils manquent, les courriels restent simulés.
+    echo "APP_URL=${APP_URL:-https://tenders.neuronestech.com}"
+    echo "MAIL_MODE=simule"
   } > .env
   chmod 600 .env
 else

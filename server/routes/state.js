@@ -5,6 +5,7 @@ const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, o
 const { whoLabel } = require('../auth');
 const { validateChange, effectsOf } = require('../rules');
 const R = require('../../public/js/regles.js');
+const mail = require('../mail');
 const { pieceValable } = require('./partenaires');
 const C = require('../../public/js/circuits.js');
 
@@ -24,6 +25,13 @@ function buildState(req) {
     audit: req.pid && (req.can('audit.read') || req.can('pv.read')) ? auditList(200, req.pid) : [],
   };
   delete st._sod; // historique de séparation des fonctions : interne au serveur
+  // notifications et courriels : chacun ne reçoit que ce qui le concerne (l'administration et l'audit voient tout)
+  const toutVoir = req.can('notif.manage') || req.can('audit.read');
+  if (!toutVoir) {
+    st.notifs = (st.notifs || []).filter((n) => (n.roles || []).includes(req.user.role));
+    st.emails = (st.emails || []).filter((e) => (e.ids || []).includes(req.user.id));
+  }
+  st.courriels = { mode: mail.actif() ? 'microsoft365' : 'simulation', expediteur: mail.actif() ? mail.expediteur() : null };
   // évaluation des partenaires (module 5) : montrée aux lecteurs des offres, jamais intégrée au classement
   if (canSeeOffers && req.pid) {
     const fiches = partenairesAll(), par = {};
@@ -71,7 +79,7 @@ function ecrire(req, changes) {
     if (typeof err === 'string') return { status: 403, body: { error: err, key: k } };
     if (err) return { status: err.status, body: { error: err.error, code: err.code, key: k } };
   }
-  const newRevs = {}, who = whoLabel(req.user), uid = req.user.id;
+  const newRevs = {}, who = whoLabel(req.user), uid = req.user.id, aExpedier = [];
   // journal : une clé de procédure se rattache à la procédure, une clé d'organisation à l'organisation
   const tx = db.transaction(() => {
     const fx = effectsOf(changes, req);
@@ -101,6 +109,20 @@ function ecrire(req, changes) {
           if (!x || !x.id) continue;
           const old = byId.get(x.id); byId.delete(x.id);
           if (old && Array.isArray(x.lu)) x.lu = [...new Set([...(old.lu || []), ...x.lu])];
+          if (k === 'emails') {
+            if (old) { out.push(old); continue; } // un courriel enregistré ne se réécrit pas depuis le navigateur
+            // nouveau courriel : destinataires = comptes actifs désignés par identifiant, avec leur adresse réelle
+            // (jamais une adresse fournie par le navigateur : la plateforme ne sert pas à écrire à n'importe qui)
+            const ids = [...new Set((Array.isArray(x.ids) ? x.ids : []).map(String))].slice(0, 50);
+            const comptes = ids.length ? db.prepare(`SELECT id, nom, email FROM users WHERE active=1 AND id IN (${ids.map(() => '?').join(',')})`).all(...ids) : [];
+            const e = { id: String(x.id).slice(0, 40), ev: String(x.ev || '').slice(0, 40), de: mail.actif() ? mail.expediteur() : String(x.de || '').slice(0, 120),
+              ids: comptes.map((u) => u.id), a: comptes.map((u) => u.email), noms: comptes.map((u) => u.nom),
+              objet: String(x.objet || '').slice(0, 250), corps: String(x.corps || '').slice(0, 20000), t: frDate(),
+              statut: !comptes.length ? 'sans destinataire' : (mail.actif() ? 'en cours' : 'simulé') };
+            if (comptes.length && mail.actif()) aExpedier.push(e);
+            out.push(e);
+            continue;
+          }
           out.push(x);
         }
         const cap = k === 'notifs' ? 120 : 80;
@@ -111,7 +133,18 @@ function ecrire(req, changes) {
     }
   });
   try { tx(); } catch (e) { return { status: e.status || 500, body: { error: e.message } }; }
+  aExpedier.forEach(expedier); // après l'écriture : l'envoi ne retient ni ne fait échouer l'action
   return { status: 200, body: { ok: true, rev: getRev(), revs: newRevs } };
+}
+
+/** Expédie un courriel de la boîte d'envoi et y consigne le résultat (envoyé, ou échec avec sa cause). */
+function expedier(e) {
+  mail.envoyer({ a: e.a, objet: e.objet, corps: e.corps }).then((r) => {
+    const cur = (kvGet('emails') || { value: [] }).value, x = cur.find((m) => m.id === e.id);
+    if (!x) return;
+    x.statut = r.statut; if (r.erreur) x.erreur = r.erreur; x.expedie = frDate();
+    require('../db').kvSet('emails', cur, 'courriel');
+  }).catch((err) => console.error('Courriel', e.id, err));
 }
 
 /** Modification d'une ou plusieurs clés entières, avec détection de conflit sur les révisions envoyées. */

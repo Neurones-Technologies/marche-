@@ -126,6 +126,13 @@ Le script récupère `origin/main` (`git reset --hard` : toute modification fait
 `/opt/marcheplus` est écrasée, sauf le `.env` qui n'est pas suivi par git). La base est conservée
 dans le volume.
 
+**Courriels (Microsoft 365)** : le `.env` existant n'est jamais réécrit. Pour activer l'envoi réel, y ajouter à la
+main `APP_URL`, `MAIL_MODE=graph` et les variables `M365_*` (procédure dans le README, « Courriels »), puis relancer
+le script. Garder `chmod 600` sur le `.env` : il contient alors le secret de l'application Entra ID.
+
+**Mise à jour de la version d'avant les procédures multiples** : les migrations reprennent les données au démarrage
+(procédure p1, rôles et habilitations, fiches partenaires). Sauvegarder d'abord le volume (voir « Exploitation »).
+
 Si le vhost change dans le dépôt, le recopier à la main (étape 3) : le script ne touche jamais au nginx
 de l'hôte. Attention, le fichier installé contient alors les blocs ajoutés par certbot : sauvegarder
 l'existant avant de l'écraser, puis relancer `certbot install --nginx --cert-name tenders.neuronestech.com`.

@@ -19,4 +19,6 @@ module.exports = {
   allowReset: process.env.ALLOW_RESET !== '0',
   // Inscription publique des prestataires : tentatives par adresse IP et par heure
   inscriptionParHeure: Number(process.env.INSCRIPTION_RATE_LIMIT) || 5,
+  // Adresse publique de l'application, pour les liens envoyés par courriel (ex. https://tenders.neuronestech.com)
+  appUrl: (process.env.APP_URL || 'http://localhost:' + (Number(process.env.PORT) || 3000)).replace(/\/+$/, ''),
 };
