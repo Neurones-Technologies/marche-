@@ -1,12 +1,24 @@
 /* Règles de calcul de Marché+, partagées par le navigateur et le serveur.
    Chargé tel quel par <script> (global MPRegles) et par Node (require) : aucune étape de build.
    Fonctions pures : tout ce dont elles ont besoin arrive par le contexte `ctx`
-   { offers, org, fxFrozen, cdc, criteria, quality, justif, excluded, confirmed, docDefs }. */
+   { offers, org, fxFrozen, cadre, cdc, criteria, quality, justif, excluded, confirmed, docDefs }.
+   Dépend de profils.js, chargé avant lui dans le navigateur. */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.MPRegles = factory();
-})(this, function () {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./profils.js'));
+  else root.MPRegles = factory(root.MPProfils);
+})(this, function (P) {
   'use strict';
+
+  /* Profil réglementaire de la procédure : celui figé à la publication, sinon celui choisi au cahier des charges,
+     sinon le profil par défaut du client. */
+  function profilId(ctx) {
+    return (ctx.cadre && ctx.cadre.profil) || (ctx.cdc && ctx.cdc.profil) || (ctx.org && ctx.org.profilDefaut) || P.DEFAUT;
+  }
+  /* Règles effectives de la procédure : figées à la publication du dossier, calculées en direct avant. */
+  function cadre(ctx) {
+    if (ctx.cadre && ctx.cadre.regles) return ctx.cadre.regles;
+    return P.effectif(profilId(ctx), ctx.org && ctx.org.reglages);
+  }
 
   /* Taux de change : ceux figés à la clôture du dépouillement s'ils existent, sinon ceux des paramètres.
      Une fois figés, une modification des paramètres ne fait plus bouger le classement. */
@@ -16,22 +28,30 @@
   }
   function rate(ctx, devise) { return rates(ctx)[devise] || 1; }
 
-  function isUemoa(ctx, o) { return ((ctx.org && ctx.org.uemoa) || []).indexOf(o.iso) >= 0; }
-  function isLocal(o) { return o.iso === 'CI'; }
+  /* « UEMOA » désigne la zone de préférence du profil ; « local », le pays de l'acheteur. */
+  function isUemoa(ctx, o) { return cadre(ctx).zonePreference.indexOf(o.iso) >= 0; }
+  function isLocal(ctx, o) { return o.iso === cadre(ctx).paysLocal; }
+
+  /* Marge de préférence appliquée : 0 si elle est désactivée ou interdite par le profil, plafonnée sinon. */
+  function prefTaux(ctx) {
+    var c = ctx.cdc || {}, k = cadre(ctx);
+    if (!c.prefActive || !k.preferenceAutorisee) return 0;
+    return Math.max(0, Math.min(Number(c.prefTaux || 0), k.preferenceTauxMax));
+  }
 
   function montantXOF(ctx, o) { return o.montant * rate(ctx, o.devise); }
   /* Montant de comparaison : la marge de préférence ne s'applique qu'au classement,
      jamais au montant du marché (qui reste le montant d'offre). */
   function montantCorrige(ctx, o) {
-    var m = montantXOF(ctx, o), c = ctx.cdc || {};
-    if (c.prefActive && !isUemoa(ctx, o)) m = m * (1 + Number(c.prefTaux || 0) / 100);
+    var m = montantXOF(ctx, o), t = prefTaux(ctx);
+    if (t && !isUemoa(ctx, o)) m = m * (1 + t / 100);
     return m;
   }
 
   function requiredDocs(ctx, o) {
     return (ctx.docDefs || []).filter(function (d) {
       if (d.scope === 'tous') return true;
-      if (d.scope === 'local') return isLocal(o);
+      if (d.scope === 'local') return isLocal(ctx, o);
       return !isUemoa(ctx, o);
     });
   }
@@ -108,6 +128,7 @@
   }
 
   return {
+    profilId: profilId, cadre: cadre, prefTaux: prefTaux,
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,
     aiScore: aiScore, curScore: curScore, flagsRemaining: flagsRemaining, weightTotal: weightTotal,

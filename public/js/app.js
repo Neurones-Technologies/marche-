@@ -2,9 +2,7 @@
 "use strict";
 
 /* ============ Référentiels ============ */
-var UEMOA_DEF = ['CI','BF','SN','ML','NE','TG','BJ','GW'];
 var RATES_DEF = { XOF:1, EUR:655.957, USD:601.4, GHS:41.2, NGN:0.39 };
-function UEMOA_L(){ return (state && state.org && state.org.uemoa) ? state.org.uemoa : UEMOA_DEF; }
 function RATE(d){ var r=(state && state.fxFrozen && state.fxFrozen.rates) || (state && state.org && state.org.rates) || RATES_DEF; return r[d]||1; }
 function DOCS(){ return (state && state.docDefs) ? state.docDefs : DOC_DEFS; }
 
@@ -92,7 +90,7 @@ var UI = { q:'', sort:'nom' };
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
   'mailFrom','mailSuffix','approvals','offers'];
-var SERVER_ONLY = ['audit','receipts','fxFrozen'];
+var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre'];
 var synced = {}, revs = {}, serverRev = 0, flushing = false, dirty = false, flushTimer = null;
 var EMPTY_DRAFT = function(){ return { name:'', iso:'CI', devise:'XOF', montant:'', delai:'', garantie:'', refsCount:'', lots:[], docs:{} }; };
 function uiKey(){ return 'marcheplus.ui.'+(state?state.me:''); }
@@ -222,13 +220,15 @@ function xof(n){ return sep(n)+' XOF'; }
 /* Les calculs métier vivent dans regles.js, partagé avec le serveur : mêmes résultats des deux côtés. */
 var R = window.MPRegles;
 function RCTX(){
-  return { offers:SEED_OFFERS, org:state.org, fxFrozen:state.fxFrozen, cdc:state.cdc, criteria:state.criteria,
+  return { offers:SEED_OFFERS, org:state.org, fxFrozen:state.fxFrozen, cadre:state.cadre, cdc:state.cdc, criteria:state.criteria,
     quality:state.quality, justif:state.justif, excluded:state.excluded, confirmed:state.confirmed, docDefs:DOCS() };
 }
 /* Référence de la procédure : une donnée du cahier des charges, jamais une valeur écrite dans le code. */
 function REF(){ return (state && state.cdc && state.cdc.ref) || '—'; }
-function isUemoa(o){ return UEMOA_L().indexOf(o.iso)>=0; }
-function isLocal(o){ return R.isLocal(o); }
+/* Règles du profil réglementaire de la procédure (figées à la publication du dossier). */
+function CADRE(){ return R.cadre(RCTX()); }
+function isUemoa(o){ return R.isUemoa(RCTX(),o); }
+function isLocal(o){ return R.isLocal(RCTX(),o); }
 function montantXOF(o){ return R.montantXOF(RCTX(),o); }
 function montantCorrige(o){ return R.montantCorrige(RCTX(),o); }
 function requiredDocs(o){ return R.requiredDocs(RCTX(),o); }
@@ -845,12 +845,14 @@ function lifeStatus(){
   st.eval   = state.evalDone ? 'done' : (state.depClosed?'now':'todo');
   st.appro  = allApproved() ? 'done' : (state.evalDone?'now':'todo');
   var rOuv  = state.recours.filter(function(x){return x.statut==='ouvert';}).length;
-  st.recours= !allApproved() ? 'todo' : (rOuv?'blocked':(standstillReste()>0?'now':'done'));
+  st.recours= !allApproved() ? 'todo' : (rOuv?'blocked':((!state.standstill.startedAt||standstillReste()>0)?'now':'done'));
   st.signe  = state.contractSigned ? 'done' : 'todo';
   if(state.infructueux) { st.eval='blocked'; }
   return st;
 }
-function standstillReste(){ return R.standstillRemaining(state.standstill); }
+/* Durée du délai de recours : celle fixée à la notification, sinon celle du profil réglementaire. */
+function delaiJours(){ return state.standstill.startedAt ? state.standstill.days : CADRE().delaiRecoursJours; }
+function standstillReste(){ return R.standstillRemaining({ days:delaiJours(), startedAt:state.standstill.startedAt }); }
 function recoursOuverts(){ return state.recours.filter(function(x){return x.statut==='ouvert';}); }
 function clarifsOuvertes(){ return state.clarifs.filter(function(x){return x.statut==='envoyee';}); }
 function coiDe(uid){ return state.coi[uid]||null; }
@@ -1140,6 +1142,15 @@ function vCDC(m){
   txt(f1,"Objet du marché",c.objet,function(v){ c.objet=v; logit('Objet du marché modifié'); },'textarea').style.gridColumn='1/-1';
   txt(f1,"Autorité contractante",c.autorite,function(v){ c.autorite=v; });
   txt(f1,"Type de procédure",c.procedure,function(v){ c.procedure=v; });
+  (function(){
+    var w=add(f1,'div'); add(w,'label',null,'Profil réglementaire').setAttribute('for','cdc-profil');
+    var s=add(w,'select'); s.id='cdc-profil'; fk(s,'cdc-profil');
+    Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(s,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
+    s.value=R.profilId(RCTX());
+    s.disabled=!!c.cdcPublie;
+    s.addEventListener('change',function(){ c.profil=s.value; logit('Profil réglementaire de la procédure : '+MPProfils.profil(s.value).lab); save(); render(); });
+    if(c.cdcPublie) add(w,'div','muted','Figé à la publication du dossier.');
+  })();
   txt(f1,"Langue de soumission",c.langue,function(v){ c.langue=v; });
   txt(f1,"Devise de soumission",c.deviseSoumission,function(v){ c.deviseSoumission=v; });
   txt(f1,"Date d'ouverture des plis",c.ouverture,function(v){ c.ouverture=v; });
@@ -1218,7 +1229,9 @@ function vCDC(m){
   add(k6,'div','panel-head','6 · Préférence communautaire UEMOA');
   var b6=add(k6,'div','pad');
   var row6=add(b6,'div'); row6.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap';
+  var K=CADRE();
   var pill=add(row6,'button','pill'+(c.prefActive?' on':''), c.prefActive?'Marge de préférence activée':'Marge de préférence désactivée');
+  pill.disabled=!K.preferenceAutorisee && !c.prefActive;
   pill.addEventListener('click',function(){
     c.prefActive=!c.prefActive;
     logit('Marge de préférence communautaire '+(c.prefActive?'activée':'désactivée'));
@@ -1227,16 +1240,19 @@ function vCDC(m){
   var wr=add(row6,'div');
   var lb=add(wr,'label',null,'Taux (%)'); lb.setAttribute('for','preftaux');
   lb.style.cssText='font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;display:block';
-  var pi=add(wr,'input'); pi.id='preftaux'; pi.type='number'; pi.min='0'; pi.max='25'; pi.value=c.prefTaux; pi.style.width='110px';
+  var pi=add(wr,'input'); pi.id='preftaux'; pi.type='number'; pi.min='0'; pi.max=String(K.preferenceTauxMax); pi.value=c.prefTaux; pi.style.width='110px';
   pi.disabled=!c.prefActive;
   pi.addEventListener('change',function(){
-    c.prefTaux=Math.max(0,Math.min(25,Number(pi.value)||0));
+    c.prefTaux=Math.max(0,Math.min(K.preferenceTauxMax,Number(pi.value)||0));
     logit('Taux de préférence communautaire porté à '+c.prefTaux+' %'); save(); render();
   });
   if(state.depClosed){
     pill.disabled=true; pi.disabled=true;
     add(b6,'p','muted',"Dépouillement clôturé : la marge est figée, elle conditionne le classement.").style.marginTop='12px';
   }
+  add(b6,'p','muted', K.preferenceAutorisee
+    ? 'Profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » : taux de '+K.preferenceTauxMax+' % au plus.'
+    : 'Le profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » n’autorise pas de marge de préférence.').style.marginTop='12px';
   add(b6,'p','muted',"Mécanisme : les offres de soumissionnaires établis hors de l'espace communautaire sont majorées du taux retenu pour les seuls besoins de la comparaison. Le prix contractuel du titulaire reste son prix d'offre.").style.marginTop='12px';
 
   /* Pièces */
@@ -2000,7 +2016,7 @@ function vPortail(m){
     ['AE','Émirats arabes unis'],['US','États-Unis']];
   var DEV=[['XOF','Franc CFA (XOF)'],['EUR','Euro (EUR)'],['USD','Dollar US (USD)'],['GHS','Cedi (GHS)'],['NGN','Naira (NGN)']];
   function paysNom(iso){ for(var i=0;i<PAYS.length;i++) if(PAYS[i][0]===iso) return PAYS[i][1]; return iso; }
-  var uem = UEMOA_L().indexOf(d.iso)>=0, loc = d.iso==='CI';
+  var uem = isUemoa(d), loc = isLocal(d);
 
   var band=add(m,'div','card'); band.style.cssText='border-color:var(--violet);border-width:2px;margin-bottom:18px';
   var bp=add(band,'div','pad');
@@ -2477,6 +2493,7 @@ function vParams(m){
     se.value=d.scope;
     se.addEventListener('change',function(){ d.scope=se.value; logit('Pièce « '+d.label+' » : profil concerné modifié'); save(); render(); });
     var del=add(row,'button','icon-btn','×'); del.setAttribute('aria-label','Supprimer la pièce '+d.label);
+    if(CADRE().piecesImposees.indexOf(d.id)>=0){ del.disabled=true; del.title='Pièce exigée par le profil réglementaire'; }
     del.addEventListener('click',function(){
       ask('Cette pièce ne sera plus exigée ni contrôlée sur aucune offre.', function(){
         state.docDefs.splice(i,1); logit('Pièce retirée du référentiel : '+d.label); save(); render();
@@ -2512,7 +2529,8 @@ function vParams(m){
     });
     var del=add(row,'button','icon-btn','×'); del.setAttribute('aria-label','Supprimer ce niveau');
     del.addEventListener('click',function(){
-      if(state.approvals.length<=1){ toast('Le circuit doit conserver au moins un niveau.'); return; }
+      var nmin=Math.max(1,CADRE().niveauxApprobationMin);
+      if(state.approvals.length<=nmin){ toast('Le profil réglementaire exige au moins '+nmin+' niveau(x) d’approbation.'); return; }
       ask('Ce niveau de validation disparaîtra du circuit et du procès-verbal.', function(){
         state.approvals.splice(i,1); logit('Niveau d\u2019approbation supprimé : '+a.role); save(); render();
       },'Supprimer « '+a.role+' » ?','Supprimer');
@@ -2530,7 +2548,61 @@ function vParams(m){
   var f6=add(add(k6,'div','pad'),'div','frm');
   champ(f6,'Adresse expéditrice',state.mailFrom,function(v){ state.mailFrom=v; });
   champ(f6,'Domaine des destinataires',state.mailSuffix,function(v){ state.mailSuffix=v; });
+  vParamsCadre(m,o);
   add(add(k6,'div','panel-foot'),'span','muted','Aucun message n\u2019est réellement expédié dans cette maquette : la boîte d\u2019envoi restitue ce qui partirait.');
+}
+
+/* Cadre réglementaire : profil par défaut et réglages du client, dans les bornes du profil (profils.js). */
+function vParamsCadre(m,o){
+  var P=MPProfils, pid=R.profilId({ cdc:state.cdc, org:o }), prof=P.profil(pid);
+  var eff=P.effectif(pid,o.reglages);
+  var k7=add(m,'div','card'); k7.style.marginTop='18px';
+  var ph=add(k7,'div','panel-head'); add(ph,'span',null,'7 · Cadre réglementaire');
+  add(ph,'span','chip '+(prof.public?'c-violet':'c-teal'), prof.lab);
+  var b=add(k7,'div','pad');
+  var w=add(add(b,'div','frm'),'div');
+  add(w,'label',null,'Profil par défaut des nouvelles procédures').setAttribute('for','par-profil');
+  var s=add(w,'select'); s.id='par-profil'; fk(s,'par-profil');
+  Object.keys(P.PROFILS).forEach(function(id){ var op=add(s,'option',null,P.PROFILS[id].lab); op.value=id; });
+  s.value=o.profilDefaut||P.DEFAUT;
+  s.addEventListener('change',function(){ o.profilDefaut=s.value; logit('Profil réglementaire par défaut : '+P.profil(s.value).lab); save(); render(); });
+  add(b,'p','muted','Règles du profil « '+prof.lab+' », celui de la procédure en cours. '+prof.note).style.marginTop='12px';
+  if(state.cadre) add(b,'div','note','Le cadre de la procédure '+REF()+' a été figé à sa publication, le '+state.cadre.at+' : un réglage modifié ici ne s’appliquera qu’aux procédures publiées ensuite.');
+  var lab=function(id){ var d=DOCS().filter(function(x){ return x.id===id; })[0]; return d?d.label:id; };
+  P.REGLES.forEach(function(def){
+    var r=prof.regles[def.id], v=eff[def.id];
+    var row=add(b,'div','docline');
+    var lf=add(row,'div'); lf.style.flex='1 1 260px';
+    add(lf,'div',null,def.lab).style.fontWeight='600';
+    if(def.type==='pieces' && !v.length){ add(lf,'div','muted','Aucune : toutes les pièces du référentiel peuvent être retirées.'); return; }
+    if(r.impose){
+      add(lf,'div','muted', def.type==='bool' ? (v?'Oui':'Non') : def.type==='liste-pays' ? v.join(', ')
+        : def.type==='pieces' ? (v.length ? v.map(lab).join(' ; ') : 'Aucune') : String(v));
+      add(row,'span','chip c-grey','Imposé par le profil');
+      return;
+    }
+    var set=function(val,aff){ o.reglages=o.reglages||{}; o.reglages[def.id]=val; logit('Réglage « '+def.lab+' » : '+aff); save(); render(); };
+    if(def.type==='bool'){
+      var p=add(row,'button','pill'+(v?' on':''), v?'Oui':'Non'); fk(p,'rg-'+def.id);
+      p.setAttribute('aria-pressed',v?'true':'false'); p.setAttribute('aria-label',def.lab);
+      p.addEventListener('click',function(){ set(!v, v?'non':'oui'); });
+      return;
+    }
+    var i=add(row,'input'); i.setAttribute('aria-label',def.lab); fk(i,'rg-'+def.id);
+    if(def.type==='nombre'){
+      i.type='number'; i.min=r.min; i.max=r.max; i.value=v; i.style.width='110px';
+      add(lf,'div','muted','Entre '+r.min+' et '+r.max+'.');
+    } else {
+      i.type='text'; i.value = def.type==='liste-pays' ? v.join(', ') : v; i.style.flex='1 1 200px';
+      add(lf,'div','muted', def.type==='liste-pays' ? 'Codes pays à deux lettres, séparés par des virgules.' : 'Code pays à deux lettres.');
+    }
+    i.addEventListener('change',function(){
+      var val = def.type==='nombre' ? Number(i.value)
+        : def.type==='liste-pays' ? i.value.toUpperCase().split(/[\s,;]+/).filter(Boolean) : i.value.trim().toUpperCase();
+      set(val, Array.isArray(val) ? val.join(', ') : String(val));
+    });
+  });
+  add(add(k7,'div','panel-foot'),'span','muted','Les valeurs du profil public sont à faire valider par un juriste marchés publics avant tout usage réel.');
 }
 
 /* ============ Règles de notification ============ */
@@ -2732,7 +2804,11 @@ function vRecours(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'div','eyebrow','Après attribution');
   add(l,'h1',null,'Notification, recours et signature');
-  add(l,'p','lede',"L'attribution notifiée ouvre un délai pendant lequel le marché ne peut pas être signé. Tout recours déposé dans ce délai suspend la signature jusqu'à décision.");
+  var K=CADRE(), J=delaiJours();
+  add(l,'p','lede', K.recoursActif
+    ? "L'attribution notifiée ouvre un délai pendant lequel le marché ne peut pas être signé. Tout recours déposé dans ce délai suspend la signature jusqu'à décision."
+    : (J>0 ? "L'attribution notifiée ouvre un délai de "+J+" jour(s) avant la signature. Le profil réglementaire de la procédure ne prévoit pas de recours."
+           : "Le profil réglementaire de la procédure ne prévoit ni recours ni délai : le marché peut être signé dès la notification."));
 
   if(!allApproved()) return locked(m,"Cette étape s'ouvre une fois l'attribution prononcée.",'decision',"Aller au circuit d'approbation");
 
@@ -2747,16 +2823,16 @@ function vRecours(m){
   add(k1,'div','panel-head','1 · Notification aux soumissionnaires');
   var b1=add(k1,'div','pad');
   if(!state.standstill.startedAt){
-    add(b1,'p','muted',"La notification informe l'attributaire et communique aux non-retenus les motifs du rejet de leur offre. Elle déclenche le délai de recours.");
-    var bn=add(b1,'button','btn btn-primary','Notifier et ouvrir le délai de recours');
+    add(b1,'p','muted',"La notification informe l'attributaire et communique aux non-retenus les motifs du rejet de leur offre."+(J>0 ? " Elle déclenche le délai de recours." : ""));
+    var bn=add(b1,'button','btn btn-primary', J>0 ? 'Notifier et ouvrir le délai de recours' : 'Notifier l’attribution');
     guard('decision.approve',bn); fk(bn,'notif-att');
     bn.addEventListener('click',function(){
-      ask("Chaque soumissionnaire non retenu recevra le motif du rejet de son offre et son rang. Le marché ne pourra pas être signé avant l'expiration du délai de "+state.standstill.days+" jours.",
+      ask("Chaque soumissionnaire non retenu recevra le motif du rejet de son offre et son rang."+(J>0 ? " Le marché ne pourra pas être signé avant l'expiration du délai de "+J+" jours." : ""),
         function(){
-          state.standstill.startedAt=Date.now();
+          state.standstill.startedAt=Date.now(); state.standstill.days=J;
           logit('Notification d\u2019attribution — délai de recours ouvert');
           notify('standstill','Attribution notifiée — délai de recours ouvert',
-            "Le marché "+REF()+" est attribué à "+win.o.name+". Les soumissionnaires non retenus disposent de "+state.standstill.days+" jours pour contester. La signature est suspendue jusqu'à l'expiration de ce délai.");
+            "Le marché "+REF()+" est attribué à "+win.o.name+"."+(J>0 ? " Les soumissionnaires non retenus disposent de "+J+" jours pour contester. La signature est suspendue jusqu'à l'expiration de ce délai." : ""));
           save(); render();
         },"Notifier l'attribution ?","Notifier");
     });
@@ -2787,6 +2863,10 @@ function vRecours(m){
   }
 
   var k2=add(m,'div','card'); k2.style.marginTop='18px';
+  if(!K.recoursActif && !state.recours.length){
+    add(k2,'div','panel-head','2 · Recours');
+    add(add(k2,'div','pad'),'p','muted','Le profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » ne prévoit pas de recours des soumissionnaires.');
+  } else {
   var ph2=add(k2,'div','panel-head');
   add(ph2,'span',null,'2 · Recours déposés');
   var ro=recoursOuverts().length;
@@ -2823,7 +2903,7 @@ function vRecours(m){
       });
     }
   });
-  if(state.standstill.startedAt && !state.contractSigned){
+  if(K.recoursActif && state.standstill.startedAt && !state.contractSigned){
     var f2=add(k2,'div','panel-foot');
     add(f2,'span','muted','Recours recevable jusqu\u2019à l\u2019expiration du délai.');
     var br=add(f2,'button','btn btn-ghost btn-sm','Simuler un recours');
@@ -2836,6 +2916,7 @@ function vRecours(m){
         perdant+" conteste l'attribution de la procédure "+REF()+". La signature du marché est suspendue jusqu'à instruction du recours.");
       save(); render();
     });
+  }
   }
 
   var k3=add(m,'div','card'); k3.style.marginTop='18px';
@@ -2854,7 +2935,7 @@ function vRecours(m){
       add(w,'strong',null,'Signature bloquée. ');
       raisons.forEach(function(x){ add(w,'div',null,x); });
     } else {
-      add(b3,'p','muted','Délai expiré, aucun recours en instance : le marché peut être signé.');
+      add(b3,'p','muted', J>0 || K.recoursActif ? 'Délai expiré, aucun recours en instance : le marché peut être signé.' : 'Attribution notifiée : le marché peut être signé.');
     }
     var bs=add(b3,'button','btn btn-dark','Signer le marché'); bs.style.marginTop='12px';
     bs.disabled=bloque; guard('contract.sign',bs); fk(bs,'sign');
@@ -2866,6 +2947,7 @@ function vRecours(m){
     });
   }
 
+  if(!K.recoursActif && J===0) return;
   var nb=add(m,'div','note');
   add(nb,'strong',null,'Pourquoi ce verrou existe. ');
   nb.appendChild(document.createTextNode("Signer avant l'expiration du délai prive le soumissionnaire évincé de tout recours utile : à ce stade, l'annulation coûte bien plus cher que l'attente. Le blocage est technique et non contournable depuis l'interface — c'est précisément ce qui protège le client."));

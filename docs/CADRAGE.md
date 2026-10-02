@@ -86,7 +86,7 @@ Les règles écrites au lot A ([server/rules.js](../server/rules.js)) se répart
 | Séparation des fonctions (noter ou valider ≠ approuver) | Socle, activée par défaut | Désactivable en privé pour une très petite équipe, avec trace à l'audit |
 | Délai de recours avant signature | Imposée (public) / Paramétrable (privé, désactivé par défaut) | |
 | Procédure de recours, retour en arrière sur recours fondé | Imposée (public) / Paramétrable (privé) | |
-| Marge de préférence communautaire | Imposée (public, selon le pays) / Désactivée (privé) | |
+| Marge de préférence communautaire | Plafonnée par le profil (public : 15 %) / Paramétrable (privé) | Activée ou non au cahier des charges, dans la limite du profil |
 | Circuit d'approbation de l'attribution | Paramétrable | Niveaux et seuils fixés par le client ; minimum imposé en public |
 | Pièces administratives exigées (RCCM, attestation fiscale, CNPS…) | Paramétrable | Liste minimale imposée en public |
 
@@ -199,7 +199,7 @@ module 3. Ordre proposé :
 
 | Étape | Contenu | Charge indicative |
 |---|---|---|
-| 1 | Commiter le lot A ; sortir les valeurs réglementaires de `rules.js` vers un **profil** (public / privé) | 1 sem. |
+| 1 | Commiter le lot A ; sortir les valeurs réglementaires de `rules.js` vers un **profil** (public / privé) | 1 sem. — **réalisé le 02/10/2026** (voir ci-dessous) |
 | 2 | **Socle** : plusieurs procédures (lot C), écritures ciblées (lot B), découpage de `app.js` par écran | 4 à 5 sem. |
 | 3 | **Moteur de circuits** paramétrables, en remplacement du circuit d'approbation en dur | 2 sem. |
 | 4 | **Module 2** (besoin → publication) : premier usage du moteur, petit, il le valide | 2 sem. |
@@ -210,6 +210,29 @@ module 3. Ordre proposé :
 
 Total hors IA : de **18 à 21 semaines** pour un développeur. Ce sont des ordres de grandeur, comme dans
 EVOLUTION.md, à revoir après les étapes 1 et 2. Le front reste en JavaScript natif, sans framework ni build.
+
+### Étape 1 : réalisée le 02/10/2026
+
+- [public/js/profils.js](../public/js/profils.js), partagé par le navigateur et le serveur, définit deux profils :
+  **« Marchés publics — Côte d'Ivoire (UEMOA) »** (profil par défaut) et **« Achats privés »**. Chacun porte neuf
+  règles : recours, délai de recours, marge de préférence (autorisée, taux maximal, pays bénéficiaires), pays de
+  l'acheteur, niveaux d'approbation minimum, séparation des fonctions, pièces qui ne peuvent pas être retirées.
+- Le client choisit son **profil par défaut** et règle les points paramétrables dans **Paramètres → Cadre
+  réglementaire** (`org.reglages`). Le profil d'une procédure se choisit au cahier des charges.
+- **Le cadre est figé à la publication du dossier** (clé `cadre`, écrite par le serveur seul et journalisée).
+  Un réglage modifié ensuite ne s'applique qu'aux procédures publiées après.
+- Le serveur refuse ce que le profil interdit : `PROFILE_LOCKED`, `PREFERENCE_NOT_ALLOWED`,
+  `PREFERENCE_OUT_OF_BOUNDS`, `PIECE_IMPOSED`, `APPROVAL_CIRCUIT_TOO_SHORT`, `APPEAL_NOT_PROVIDED`,
+  `SETTING_OUT_OF_BOUNDS`. Il fixe lui-même la durée du délai de recours à la notification.
+- La liste UEMOA et le pays « local » (auparavant `CI` en dur) viennent du profil. Une migration range la liste
+  UEMOA d'une instance existante dans ses réglages et fige le cadre d'une procédure déjà publiée.
+- Tests : 36 au total, dont 6 sur les profils (y compris un parcours privé où une même personne note, approuve et
+  signe sans délai).
+
+Valeurs du profil public **reprises de la démonstration, à valider par un juriste** : délai de recours de 15 jours,
+marge de préférence plafonnée à 15 %, au moins 2 niveaux d'approbation, pièces imposées (RCCM, attestation fiscale,
+CNPS, caution de soumission). Hors de cette étape : le choix du type de procédure selon les seuils, la publicité
+obligatoire et les délais minimaux de remise des offres.
 
 Pourquoi cet ordre : les modules 1, 4 et 5 reposent sur des notions (partenaire, commande, circuit) que le
 socle actuel n'a pas. Les construire sur l'état clé/valeur d'une procédure unique obligerait à tout refaire

@@ -3,6 +3,7 @@ const { db, getRev, kvGet, kvSet, kvAll, auditAppend, auditList, auditVerify, of
 const { requireAuth, needPerm, whoLabel } = require('../auth');
 const { validateChange, effectsOf } = require('../rules');
 const cfg = require('../config');
+const R = require('../../public/js/regles.js');
 
 const r = express.Router();
 r.use(requireAuth);
@@ -120,10 +121,11 @@ r.post('/offers', needPerm('portail.use'), (req, res) => {
   const docDefs = kvGet('docDefs').value;
   const pending = db.prepare('SELECT * FROM files WHERE owner=? AND offer_id IS NULL').all(req.user.id);
   const byDoc = new Map(pending.map((f) => [f.doc_id, f]));
-  const isLocal = d.iso === 'CI', isUemoa = org.uemoa.includes(d.iso);
+  // pièces exigées selon le pays du soumissionnaire et le profil réglementaire (zone de préférence, pays local)
+  const exigees = new Set(R.requiredDocs({ org, cdc, cadre: (kvGet('cadre') || {}).value, docDefs }, { iso: d.iso }).map((x) => x.id));
   const docs = {}, missing = [];
   docDefs.forEach((x) => {
-    const need = x.scope === 'tous' ? true : x.scope === 'local' ? isLocal : !isUemoa;
+    const need = exigees.has(x.id);
     docs[x.id] = need ? byDoc.has(x.id) : true; // pièce non exigée pour ce profil : considérée fournie
     if (need && !byDoc.has(x.id)) missing.push(x.label);
   });

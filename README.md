@@ -11,7 +11,7 @@ servie par un vrai backend avec comptes, droits et base de données.
 
 ```
 public/            front (HTML/CSS/JS sans build) : index.html, css/, js/api.js (connexion, API), js/app.js (vues),
-                   js/regles.js (calculs métier, partagés avec le serveur)
+                   js/regles.js (calculs métier, partagés avec le serveur), js/profils.js (profils réglementaires)
 server/
   index.js         Express, helmet (CSP), service du front
   db.js            SQLite (better-sqlite3) : schéma, jeu de données initial, audit chaîné
@@ -48,7 +48,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 30 tests (Node 22 requis pour better-sqlite3)
+npm test             # 36 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :

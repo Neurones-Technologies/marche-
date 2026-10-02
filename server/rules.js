@@ -2,6 +2,7 @@
    Les calculs (conversion, conformité, classement, justifications) viennent de public/js/regles.js,
    le même fichier que celui exécuté par le navigateur. */
 const R = require('../public/js/regles.js');
+const P = require('../public/js/profils.js');
 const { seed, kvGet, offersAll, frDate } = require('./db');
 
 // clé d'état -> habilitations (au moins une requise). '*' = tout utilisateur connecté.
@@ -42,10 +43,13 @@ function nextOf(changes) { return (k) => (k in changes ? changes[k] : stored(k))
 
 function ctxOf(get) {
   return {
-    offers: offersAll(), org: get('org'), fxFrozen: stored('fxFrozen'), cdc: get('cdc'), criteria: get('criteria'),
+    offers: offersAll(), org: get('org'), fxFrozen: stored('fxFrozen'), cadre: stored('cadre'), cdc: get('cdc'), criteria: get('criteria'),
     quality: get('quality'), justif: get('justif'), excluded: get('excluded'), confirmed: get('confirmed'), docDefs: get('docDefs'),
   };
 }
+
+/** Règles du profil réglementaire en vigueur après le lot (figées à la publication du dossier). */
+function cadreOf(get) { return R.cadre(ctxOf(get)); }
 
 /** Qui a noté, validé ou approuvé cette procédure : historique cumulé, tenu par le serveur seul. */
 function sod() { return stored('_sod') || { scorers: [], validators: [], approvers: [] }; }
@@ -80,6 +84,16 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       }
       if (stored('depClosed') && cur && (!!value.prefActive !== !!cur.prefActive || Number(value.prefTaux || 0) !== Number(cur.prefTaux || 0)))
         return refus(409, 'PREFERENCE_LOCKED', 'Le dépouillement est clôturé : la marge de préférence ne peut plus être modifiée, elle conditionne le classement.');
+      if (value.profil != null && !P.existe(value.profil))
+        return refus(422, 'PROFILE_UNKNOWN', 'Profil réglementaire inconnu.');
+      if (cur && cur.cdcPublie && R.profilId({ cdc: value, org: next('org') }) !== R.profilId({ cdc: cur, org: next('org') }))
+        return refus(409, 'PROFILE_LOCKED', 'Le dossier est publié : son profil réglementaire ne peut plus être modifié.');
+      if (value.prefActive) {
+        const k = cadreOf(next);
+        if (!k.preferenceAutorisee) return refus(409, 'PREFERENCE_NOT_ALLOWED', 'Le profil réglementaire de la procédure n’autorise pas de marge de préférence.');
+        if (Number(value.prefTaux || 0) > k.preferenceTauxMax)
+          return refus(422, 'PREFERENCE_OUT_OF_BOUNDS', `La marge de préférence ne peut pas dépasser ${k.preferenceTauxMax} % dans ce profil réglementaire.`);
+      }
       break;
     case 'criteria': {
       if (!Array.isArray(value)) return 'Grille invalide.';
@@ -108,7 +122,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         return refus(409, 'GATE_DEPOUILLEMENT_NOT_CLOSED', 'L’évaluation est fermée tant que le dépouillement n’est pas clôturé.');
       if (stored('evalDone'))
         return refus(409, 'EVALUATION_VALIDATED', 'L’évaluation est validée : les notes ne peuvent plus être modifiées.');
-      if (sod().approvers.includes(uid))
+      if (cadreOf(next).separationFonctions && sod().approvers.includes(uid))
         return refus(403, 'SEPARATION_OF_DUTIES', 'Vous avez approuvé l’attribution de cette procédure : vous ne pouvez pas en noter les offres.');
       break;
     }
@@ -143,7 +157,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (wt !== 100) return refus(422, 'GRID_INVALID', `Le total des pondérations est de ${wt} % : la grille doit totaliser 100 %.`);
       const miss = R.missingJustifs(ctx);
       if (miss.length) return refus(422, 'JUSTIFICATION_REQUIRED', `Justification écrite obligatoire pour tout écart avec le score proposé : ${miss.join(', ')}.`);
-      if (sod().approvers.includes(uid))
+      if (cadreOf(next).separationFonctions && sod().approvers.includes(uid))
         return refus(403, 'SEPARATION_OF_DUTIES', 'Vous avez approuvé l’attribution de cette procédure : vous ne pouvez pas en valider l’évaluation.');
       break;
     }
@@ -151,10 +165,14 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (!Array.isArray(value) || value.some((a) => !isObj(a))) return 'Circuit d’approbation invalide.';
       const before = cur || [];
       const shape = (l) => l.map((a) => ({ role: a.role, who: a.who }));
+      const k = cadreOf(next);
+      const tropCourt = () => refus(422, 'APPROVAL_CIRCUIT_TOO_SHORT',
+        `Le profil réglementaire exige au moins ${k.niveauxApprobationMin} niveau(x) d’approbation.`);
       if (!same(shape(value), shape(before))) {
         if (!req.can('params.edit')) return 'Modifier le circuit exige l’habilitation « Paramètres ».';
         if (stored('evalDone')) return refus(409, 'APPROVAL_CIRCUIT_LOCKED', 'L’évaluation est validée : le circuit d’approbation ne peut plus être modifié.');
         if (value.some((a) => a.done)) return refus(409, 'APPROVAL_CIRCUIT_LOCKED', 'Un niveau ne peut pas être approuvé en même temps que le circuit est modifié.');
+        if (value.length < k.niveauxApprobationMin) return tropCourt();
         break;
       }
       const founded = hasFoundedAppeal(changes);
@@ -169,8 +187,9 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         if (!req.can('decision.approve')) return 'Approuver exige l’habilitation « Approuver l’attribution ».';
         if (!next('evalDone')) return refus(409, 'GATE_EVALUATION_NOT_VALIDATED', 'L’approbation est fermée tant que l’évaluation n’est pas validée.');
         if (value.slice(0, i).some((x) => !x.done)) return refus(409, 'APPROVAL_ORDER', 'Les niveaux d’approbation se franchissent dans l’ordre.');
+        if (value.length < k.niveauxApprobationMin) return tropCourt();
         const s = sod();
-        if (s.scorers.includes(uid) || s.validators.includes(uid))
+        if (k.separationFonctions && (s.scorers.includes(uid) || s.validators.includes(uid)))
           return refus(403, 'SEPARATION_OF_DUTIES', 'Vous avez noté ou validé l’évaluation de cette procédure : vous ne pouvez pas en approuver l’attribution.');
         a.by = uid; a.at = frDate();
       }
@@ -179,10 +198,9 @@ function validateChange(key, value, req, changes = { [key]: value }) {
     case 'standstill': {
       if (!isObj(value)) return 'Délai de recours invalide.';
       const b = cur || {};
-      if (Number(value.days) !== Number(b.days)) {
-        if (b.startedAt) return refus(409, 'STANDSTILL_LOCKED', 'Le délai de recours est ouvert : sa durée ne peut plus être modifiée.');
-        if (!req.can('params.edit')) return 'Modifier la durée du délai de recours exige l’habilitation « Paramètres ».';
-      }
+      if (b.startedAt && Number(value.days) !== Number(b.days))
+        return refus(409, 'STANDSTILL_LOCKED', 'Le délai de recours est ouvert : sa durée ne peut plus être modifiée.');
+      if (!b.startedAt) value.days = cadreOf(next).delaiRecoursJours; // durée fixée par le profil réglementaire
       if (!b.startedAt && value.startedAt) {
         if (!req.can('decision.approve')) return 'Notifier l’attribution exige l’habilitation « Approuver l’attribution ».';
         if (!R.allApproved(next('approvals'))) return refus(409, 'GATE_APPROVAL_INCOMPLETE', 'L’attribution ne peut être notifiée qu’une fois tous les niveaux d’approbation franchis.');
@@ -207,6 +225,8 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         if (!['rejete', 'fonde'].includes(a.statut)) return 'Décision de recours invalide.';
       }
       if (value.slice(before.length).some((r) => r.statut !== 'ouvert')) return 'Un nouveau recours est enregistré « ouvert ».';
+      if (value.length > before.length && !cadreOf(next).recoursActif)
+        return refus(409, 'APPEAL_NOT_PROVIDED', 'Le profil réglementaire de la procédure ne prévoit pas de recours.');
       break;
     }
     case 'contractSigned': {
@@ -254,10 +274,25 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       }
       break;
     }
-    case 'org':
+    case 'org': {
       if (!isObj(value) || !isObj(value.rates)) return 'Paramètres de l’organisation invalides.';
       for (const v of Object.values(value.rates)) if (!(Number(v) > 0)) return 'Taux de change invalide.';
+      if (value.profilDefaut != null && !P.existe(value.profilDefaut)) return refus(422, 'PROFILE_UNKNOWN', 'Profil réglementaire inconnu.');
+      if (value.reglages != null && !isObj(value.reglages)) return 'Réglages invalides.';
+      const errs = P.erreursReglages(R.profilId({ cdc: next('cdc'), org: value }), value.reglages);
+      if (errs.length) return refus(422, 'SETTING_OUT_OF_BOUNDS', 'Réglage refusé par le profil réglementaire : ' + errs.map((e) => `${e.regle} (${e.motif})`).join(' ; ') + '.');
       break;
+    }
+    case 'docDefs': {
+      if (!Array.isArray(value) || value.some((d) => !isObj(d) || !d.id)) return 'Liste de pièces invalide.';
+      const ids = new Set(value.map((d) => d.id));
+      const manquantes = cadreOf(next).piecesImposees.filter((id) => !ids.has(id));
+      if (manquantes.length) {
+        const lab = (id) => ((cur || []).find((d) => d.id === id) || { label: id }).label;
+        return refus(409, 'PIECE_IMPOSED', 'Pièce exigée par le profil réglementaire, elle ne peut pas être retirée : ' + manquantes.map(lab).join(' ; ') + '.');
+      }
+      break;
+    }
     default:
       break;
   }
@@ -267,7 +302,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
 
 /**
  * Effets serveur d'un lot validé, à exécuter dans la même transaction, AVANT l'écriture des clés :
- * historique de séparation des fonctions, gel des taux, classement arrêté. Retourne { kv, audit }.
+ * historique de séparation des fonctions, gel du cadre réglementaire et des taux, classement arrêté. Retourne { kv, audit }.
  */
 function effectsOf(changes, req) {
   const uid = req.user.id, next = nextOf(changes);
@@ -284,6 +319,16 @@ function effectsOf(changes, req) {
   if (Array.isArray(changes.approvals)) {
     const before = stored('approvals') || [];
     if (changes.approvals.some((a, i) => a.done && !(before[i] || {}).done)) add(s.approvers);
+  }
+  if ('cdc' in changes) {
+    const avant = !!(stored('cdc') || {}).cdcPublie, apres = !!(changes.cdc || {}).cdcPublie;
+    if (apres && !avant) {
+      const ctx = { ...ctxOf(next), cadre: null }, id = R.profilId(ctx);
+      kv.cadre = { profil: id, regles: R.cadre(ctx), at: frDate(), by: uid };
+      audit.push(`Cadre réglementaire figé à la publication du dossier : ${P.profil(id).lab}`);
+    } else if (avant && !apres) {
+      kv.cadre = null; // dossier dépublié : le cadre sera de nouveau figé à la prochaine publication
+    }
   }
   if (changes.depClosed === true && !stored('depClosed')) {
     const rates = { ...((next('org') || {}).rates || {}) };

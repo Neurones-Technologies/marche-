@@ -5,6 +5,8 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const cfg = require('./config');
 const seed = require('./seed/seed.json');
+const R = require('../public/js/regles.js');
+const P = require('../public/js/profils.js');
 
 if (cfg.dbFile !== ':memory:') fs.mkdirSync(path.dirname(cfg.dbFile), { recursive: true });
 const db = new Database(cfg.dbFile);
@@ -123,7 +125,8 @@ function defaultKv() {
     cdc: clone(seed.CDC), criteria: clone(seed.CRITERIA), quality: q, justif: {}, confirmed: {}, excluded: {},
     depClosed: false, evalDone: false,
     org: { nom: 'Banque Atlantique du Littoral', pays: 'Côte d’Ivoire', ville: 'Abidjan', devisePivot: 'XOF', accent: '#1F6F6B', initiales: 'BAL',
-      uemoa: clone(seed.UEMOA_DEF), rates: clone(seed.RATES_DEF) },
+      rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {} },
+    cadre: null,
     seuils: { confianceMin: 75, prixBas: 25, structureEcart: 0.8, refsMin: 3, validiteMin: 90, ecartIaMax: 0 },
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
     notifs: [], emails: [], qa: [], additifs: [], clarifs: [], coi: {}, delegations: [], recours: [],
@@ -159,6 +162,20 @@ if (db.prepare('SELECT COUNT(*) c FROM kv').get().c === 0) seedAll(true);
   if (cdc && !cdc.value.ref) {
     cdc.value.ref = seed.CDC.ref;
     kvSet('cdc', cdc.value, 'migration');
+  }
+  // 02/10/2026 : profils réglementaires. La liste UEMOA de l'organisation devient un réglage du profil,
+  // et le cadre d'une procédure déjà publiée est figé avec les règles qui s'appliquaient jusque-là.
+  const org = kvGet('org');
+  if (org && !org.value.profilDefaut) {
+    const { uemoa, ...reste } = org.value;
+    const reglages = {};
+    if (Array.isArray(uemoa) && JSON.stringify(uemoa) !== JSON.stringify(P.UEMOA)) reglages.zonePreference = uemoa;
+    kvSet('org', { ...reste, profilDefaut: P.DEFAUT, reglages }, 'migration');
+  }
+  const pub = kvGet('cdc');
+  if (pub && pub.value.cdcPublie && !kvGet('cadre')) {
+    const ctx = { cdc: pub.value, org: kvGet('org').value };
+    kvSet('cadre', { profil: R.profilId(ctx), regles: R.cadre(ctx), at: frDate(), by: 'migration' }, 'migration');
   }
 })();
 
