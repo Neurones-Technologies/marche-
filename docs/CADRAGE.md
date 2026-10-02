@@ -297,7 +297,34 @@ obligatoire et les délais minimaux de remise des offres.
 - Tests : 59 au total, dont 6 sur le moteur et le circuit d'attribution.
 
 Reste pour cette étape : brancher le même moteur sur les circuits des modules à venir (besoin, commande, réception,
-référencement), au fur et à mesure de leur construction. Prochaine étape : **module 2** (besoin → publication).
+référencement), au fur et à mesure de leur construction.
+
+### Étape 4 : module 2, du besoin à la publication, réalisé le 02/10/2026
+
+Choix validés le 02/10/2026 : un rôle « Demandeur » ; un besoin validé crée une procédure pré-remplie que les achats
+rédigent et publient ; le type de procédure se déduit du montant par des seuils du profil, provisoires.
+
+- **Rôle et habilitations** : rôle « Demandeur (service interne) » ; habilitations « Exprimer un besoin », « Valider un
+  besoin » (comité d'engagement), « Instruire les besoins et en faire des procédures » (achats). Les instances
+  existantes les reçoivent par migration ; compte de démonstration `k.yao@bal.ci`.
+- **Besoins** (table `besoins`, routes `/api/besoins`) : brouillon → soumis → validé → procédure créée, avec retour au
+  demandeur sur rejet motivé. Numéro continu attribué par le serveur (`B-2026-0001`), historique de chaque action, et
+  entrée au journal d'audit.
+- **Circuit de validation** (clé `circuitBesoin`, Paramètres → 8) : le moteur de l'étape 3, appliqué au budget estimé.
+  Par défaut : responsable hiérarchique, puis contrôle budgétaire au-delà de 50 millions. Le demandeur ne valide jamais
+  son propre besoin.
+- **Type de procédure** : consultation simple sous 10 millions, appel d'offres restreint jusqu'à 100 millions, ouvert
+  au-delà. Ces deux seuils sont des **réglages du profil, provisoires, à valider par un juriste** (Paramètres → 7).
+- **Transformation** : la procédure reprend l'objet, le budget estimé, le service et le type de procédure ; le lien
+  est conservé dans les deux sens, et le demandeur suit la procédure en lecture (sans offres ni notes).
+- **Interface sans procédure** : un utilisateur qui ne voit encore aucune procédure (demandeur, instance vide) travaille
+  sur l'état de l'organisation seule (`/api/organisation/state`). Il a accès aux écrans Besoins, Procédures,
+  Notifications et, selon son rôle, aux comptes, rôles et alertes. Cela remplace le message « Aucun appel d'offres
+  ouvert », qui bloquait aussi un acheteur sur une instance vide.
+- Tests : 66 au total, dont 7 sur les besoins ; parcours complet dans Chrome (demandeur, approbateur, achats, retour du
+  demandeur).
+
+Prochaine étape : **module 1** (référencement des partenaires).
 
 Restes du prototype
 repérés en chemin, non traités : le calendrier du tableau de bord (dates écrites en dur) et le texte « Prototype de

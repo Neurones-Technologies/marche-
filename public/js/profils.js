@@ -26,7 +26,24 @@
     { id: 'niveauxApprobationMin', lab: 'Niveaux d’approbation minimum', type: 'nombre' },
     { id: 'separationFonctions', lab: 'Séparation des fonctions (noter ≠ approuver)', type: 'bool' },
     { id: 'piecesImposees', lab: 'Pièces qui ne peuvent pas être retirées', type: 'pieces' },
+    { id: 'seuilConsultation', lab: 'Montant à partir duquel un appel d’offres est requis (XOF)', type: 'nombre' },
+    { id: 'seuilAppelOffresOuvert', lab: 'Montant à partir duquel l’appel d’offres est ouvert (XOF)', type: 'nombre' },
   ];
+
+  /* Type de procédure selon le montant estimé du besoin. Seuils PROVISOIRES, à valider par un juriste : ils sont
+     paramétrables dans les deux profils tant qu'aucune valeur réglementaire n'a été confirmée. */
+  var TYPES = {
+    consultation: 'Consultation simple (demande de cotations)',
+    restreint: 'Appel d’offres restreint',
+    ouvert: 'Appel d’offres ouvert',
+  };
+  function typeProcedure(regles, montant) {
+    var m = Number(montant) || 0, id;
+    if (m < regles.seuilConsultation) id = 'consultation';
+    else if (m < regles.seuilAppelOffresOuvert) id = 'restreint';
+    else id = 'ouvert';
+    return { id: id, lab: TYPES[id] };
+  }
 
   /* Pour chaque règle : { v: valeur par défaut, impose: true|false, min, max }. */
   var PROFILS = {
@@ -43,6 +60,8 @@
         niveauxApprobationMin: { v: 2, impose: false, min: 2, max: 10 },
         separationFonctions: { v: true, impose: true },
         piecesImposees: { v: ['registre', 'fiscal', 'cnps', 'caution'], impose: true },
+        seuilConsultation: { v: 10000000, impose: false, min: 0, max: 1000000000000 },
+        seuilAppelOffresOuvert: { v: 100000000, impose: false, min: 0, max: 1000000000000 },
       },
     },
     prive: {
@@ -58,6 +77,8 @@
         niveauxApprobationMin: { v: 1, impose: false, min: 1, max: 10 },
         separationFonctions: { v: true, impose: false },
         piecesImposees: { v: [], impose: true },
+        seuilConsultation: { v: 10000000, impose: false, min: 0, max: 1000000000000 },
+        seuilAppelOffresOuvert: { v: 100000000, impose: false, min: 0, max: 1000000000000 },
       },
     },
   };
@@ -106,5 +127,5 @@
     return out;
   }
 
-  return { UEMOA: UEMOA, REGLES: REGLES, PROFILS: PROFILS, DEFAUT: DEFAUT, profil: profil, existe: existe, effectif: effectif, erreursReglages: erreursReglages };
+  return { UEMOA: UEMOA, REGLES: REGLES, PROFILS: PROFILS, DEFAUT: DEFAUT, TYPES: TYPES, typeProcedure: typeProcedure, profil: profil, existe: existe, effectif: effectif, erreursReglages: erreursReglages };
 });

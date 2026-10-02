@@ -49,6 +49,10 @@ CREATE TABLE IF NOT EXISTS files (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS besoins (
+  id TEXT PRIMARY KEY, ord INTEGER NOT NULL, data TEXT NOT NULL, created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 // 02/10/2026 : plusieurs procédures. Les offres, accusés, pièces et entrées d'audit portent leur procédure
 // (NULL pour une entrée d'audit qui concerne l'organisation : connexion, comptes, paramètres).
@@ -177,6 +181,7 @@ function proceduresAll() {
     const g = (k) => (pkvGet(p.id, k) || {}).value;
     const cdc = g('cdc') || {};
     return { id: p.id, ref: cdc.ref, objet: cdc.objet, publie: !!cdc.cdcPublie, archive: !!p.archived, creee: p.created_at,
+      besoin: cdc.besoin || null, demandeur: cdc.demandeur || null,
       depouillement: !!g('depClosed'), evaluation: !!g('evalDone'), signe: !!g('contractSigned'), infructueux: !!g('infructueux') };
   });
 }
@@ -198,14 +203,34 @@ function procedureInsert(pid, values, uid) {
   for (const [k, v] of Object.entries(values)) pkvSet(pid, k, v, uid);
 }
 /** Nouvelle procédure (non publiée) : identifiant attribué par le serveur. */
-function procedureCreate({ ref, objet, profil }, uid) {
+function procedureCreate({ ref, objet, profil, extra }, uid) {
   const n = db.prepare('SELECT COUNT(*) c FROM procedures').get().c + 1;
   let pid = 'p' + n;
   while (procedureGet(pid)) pid = 'p' + (Number(pid.slice(1)) + 1);
   const org = (kvGet('org') || { value: {} }).value;
-  const cdc = { ...clone(seed.CDC), ref, objet, autorite: org.nom || seed.CDC.autorite, cdcPublie: false, profil: profil || org.profilDefaut || P.DEFAUT };
+  const cdc = { ...clone(seed.CDC), ref, objet, autorite: org.nom || seed.CDC.autorite, cdcPublie: false, profil: profil || org.profilDefaut || P.DEFAUT, ...(extra || {}) };
   procedureInsert(pid, procDefaults(cdc), uid);
   return pid;
+}
+
+/* ---- besoins (module 2) : propres à l'organisation, hors procédure ---- */
+/** Circuit de validation d'un besoin par défaut ; le contrôle budgétaire n'intervient qu'au-delà de 50 millions. */
+const CIRCUIT_BESOIN = [
+  { role: 'Responsable hiérarchique du demandeur', who: 'À désigner' },
+  { role: 'Contrôle budgétaire', who: 'Direction Financière', seuil: 50000000 },
+];
+const besoinsAll = () => db.prepare('SELECT data FROM besoins ORDER BY ord').all().map((r) => JSON.parse(r.data));
+const besoinGet = (id) => { const r = db.prepare('SELECT data FROM besoins WHERE id=?').get(id); return r ? JSON.parse(r.data) : null; };
+function besoinInsert(b, uid) {
+  const ord = db.prepare('SELECT COALESCE(MAX(ord),0)+1 AS n FROM besoins').get().n;
+  db.prepare('INSERT INTO besoins(id,ord,data,created_by) VALUES(?,?,?,?)').run(b.id, ord, JSON.stringify(b), uid);
+  bumpRev();
+}
+function besoinSave(b) { db.prepare('UPDATE besoins SET data=? WHERE id=?').run(JSON.stringify(b), b.id); bumpRev(); }
+/** Numéro continu sur l'instance : B-<année>-0001, attribué par le serveur. */
+function besoinNumero() {
+  const n = db.prepare('SELECT COUNT(*) c FROM besoins').get().c + 1;
+  return 'B-' + new Date().getFullYear() + '-' + String(n).padStart(4, '0');
 }
 
 /* ---- jeu de données initial ---- */
@@ -215,14 +240,14 @@ function defaultOrgKv() {
       rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {} },
     seuils: { confianceMin: 75, prixBas: 25, structureEcart: 0.8, refsMin: 3, validiteMin: 90, ecartIaMax: 0 },
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
-    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS),
+    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN),
     mailFrom: 'marches@bal.ci', mailSuffix: '@bal.ci',
   };
 }
 
 function seedAll(withUsers = true) {
   const tx = db.transaction(() => {
-    db.exec('DELETE FROM kv; DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit;');
+    db.exec('DELETE FROM kv; DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins;');
     for (const [k, v] of Object.entries(defaultOrgKv())) kvSet(k, v, 'seed');
     // procédure de démonstration : AO-2026-014, publiée telle que dans le prototype, avec ses offres
     const demo = procDefaults(clone(seed.CDC));
@@ -279,6 +304,20 @@ db.transaction(function migrate() {
     ['offers', 'receipts', 'files'].forEach((t) => db.prepare(`UPDATE ${t} SET procedure_id='p1' WHERE procedure_id IS NULL`).run());
     bumpRev();
   }
+  // 02/10/2026 : module 2 (besoins). Nouvelles habilitations dans les rôles existants (accordées comme dans le jeu de
+  // référence aux rôles qui y figurent, refusées aux autres), rôle « Demandeur », circuit de validation par défaut.
+  const roles = kvGet('roles');
+  if (roles) {
+    const r = clone(roles.value); let change = false;
+    const nouvelles = seed.PERMS.map((x) => x.id);
+    for (const [id, def] of Object.entries(r)) {
+      def.perms = def.perms || {};
+      for (const pId of nouvelles) if (!(pId in def.perms)) { def.perms[pId] = !!(seed.ROLES[id] && seed.ROLES[id].perms[pId]); change = true; }
+    }
+    if (!r.demandeur) { r.demandeur = clone(seed.ROLES.demandeur); change = true; }
+    if (change) kvSet('roles', r, 'migration');
+  }
+  if (kvGet('org') && !kvGet('circuitBesoin')) kvSet('circuitBesoin', clone(CIRCUIT_BESOIN), 'migration');
 })();
 
 function resetDemo(uid, who) {
@@ -292,5 +331,6 @@ function resetDemo(uid, who) {
 module.exports = {
   db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
   auditAppend, auditList, auditVerify, offersAll, offerInsert, offersReplace,
-  proceduresAll, procedureGet, procedureCreate, resetDemo, slug, frDate, seed,
+  proceduresAll, procedureGet, procedureCreate, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero,
+  resetDemo, slug, frDate, seed,
 };

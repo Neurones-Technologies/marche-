@@ -116,6 +116,21 @@
    "id": "contract.sign",
    "lab": "Signer le marché",
    "grp": "Décision"
+  },
+  {
+   "id": "besoin.create",
+   "lab": "Exprimer un besoin",
+   "grp": "Besoins"
+  },
+  {
+   "id": "besoin.approve",
+   "lab": "Valider un besoin",
+   "grp": "Besoins"
+  },
+  {
+   "id": "besoin.manage",
+   "lab": "Instruire les besoins et en faire des procédures",
+   "grp": "Besoins"
   }
  ],
  "INCOMPAT": [
@@ -158,7 +173,10 @@
     "qa.answer": true,
     "clarif.send": true,
     "recours.handle": true,
-    "contract.sign": true
+    "contract.sign": true,
+    "besoin.create": true,
+    "besoin.approve": true,
+    "besoin.manage": true
    }
   },
   "achats": {
@@ -183,7 +201,10 @@
     "qa.answer": true,
     "clarif.send": true,
     "recours.handle": true,
-    "contract.sign": false
+    "contract.sign": false,
+    "besoin.create": true,
+    "besoin.approve": false,
+    "besoin.manage": true
    }
   },
   "evaltech": {
@@ -208,7 +229,10 @@
     "qa.answer": false,
     "clarif.send": false,
     "recours.handle": false,
-    "contract.sign": false
+    "contract.sign": false,
+    "besoin.create": false,
+    "besoin.approve": false,
+    "besoin.manage": false
    }
   },
   "evalfin": {
@@ -233,7 +257,10 @@
     "qa.answer": false,
     "clarif.send": false,
     "recours.handle": false,
-    "contract.sign": false
+    "contract.sign": false,
+    "besoin.create": false,
+    "besoin.approve": false,
+    "besoin.manage": false
    }
   },
   "approb": {
@@ -258,7 +285,10 @@
     "qa.answer": false,
     "clarif.send": false,
     "recours.handle": true,
-    "contract.sign": true
+    "contract.sign": true,
+    "besoin.create": false,
+    "besoin.approve": true,
+    "besoin.manage": false
    }
   },
   "audit": {
@@ -283,7 +313,10 @@
     "qa.answer": false,
     "clarif.send": false,
     "recours.handle": false,
-    "contract.sign": false
+    "contract.sign": false,
+    "besoin.create": false,
+    "besoin.approve": false,
+    "besoin.manage": false
    }
   },
   "soum": {
@@ -308,7 +341,38 @@
     "qa.answer": false,
     "clarif.send": false,
     "recours.handle": false,
-    "contract.sign": false
+    "contract.sign": false,
+    "besoin.create": false,
+    "besoin.approve": false,
+    "besoin.manage": false
+   }
+  },
+  "demandeur": {
+   "lab": "Demandeur (service interne)",
+   "perms": {
+    "cdc.edit": false,
+    "cdc.publish": false,
+    "criteres.edit": false,
+    "portail.use": false,
+    "offres.read": false,
+    "depouille.confirm": false,
+    "depouille.close": false,
+    "conformite.decide": false,
+    "eval.score": false,
+    "eval.validate": false,
+    "decision.approve": false,
+    "pv.read": false,
+    "audit.read": false,
+    "params.edit": false,
+    "roles.edit": false,
+    "notif.manage": false,
+    "qa.answer": false,
+    "clarif.send": false,
+    "recours.handle": false,
+    "contract.sign": false,
+    "besoin.create": true,
+    "besoin.approve": false,
+    "besoin.manage": false
    }
   }
  },
@@ -347,6 +411,11 @@
    "id": "u0",
    "nom": "Administrateur",
    "role": "admin"
+  },
+  {
+   "id": "u7",
+   "nom": "K. Yao",
+   "role": "demandeur"
   }
  ],
  "EVENTS": [

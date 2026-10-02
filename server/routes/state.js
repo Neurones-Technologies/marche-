@@ -20,7 +20,7 @@ function buildState(req) {
     ...values, users, me: req.user.id, procedure: req.pid,
     offers: canSeeOffers ? req.store.offers() : [],
     receipts: req.can('portail.use') || canSeeOffers ? receipts : [],
-    audit: req.can('audit.read') || req.can('pv.read') ? auditList(200, req.pid) : [],
+    audit: req.pid && (req.can('audit.read') || req.can('pv.read')) ? auditList(200, req.pid) : [],
   };
   delete st._sod; // historique de séparation des fonctions : interne au serveur
   // Un soumissionnaire ne doit voir ni les notes, ni les décisions internes.
@@ -43,6 +43,9 @@ const MERGED = ['notifs', 'emails'];
 function ecrire(req, changes) {
   const keys = Object.keys(changes);
   if (!keys.length) return { status: 200, body: { ok: true, rev: getRev(), revs: {} } };
+  // sans procédure ouverte : seules les clés de l'organisation s'écrivent
+  if (!req.pid && keys.some((k) => isProcKey(k) || k === 'offers'))
+    return { status: 409, body: { error: 'Aucune procédure ouverte : seules les données de l’organisation sont modifiables.', code: 'NO_PROCEDURE' } };
   // procédure archivée : seules les clés de l'organisation (notifications lues, paramètres) restent modifiables
   if (req.archived && keys.some(isProcKey))
     return { status: 409, body: { error: 'Procédure archivée : elle ne peut plus être modifiée.', code: 'PROCEDURE_ARCHIVED' } };

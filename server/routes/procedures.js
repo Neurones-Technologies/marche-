@@ -8,9 +8,10 @@ const P = require('../../public/js/profils.js');
 const r = express.Router();
 r.use(requireAuth);
 
-/** Un compte sans accès aux offres (soumissionnaire) ne voit que les procédures publiées et non archivées. */
+/** Un compte sans accès aux offres (soumissionnaire, demandeur) ne voit que les procédures publiées et non archivées. */
 const voitTout = (req) => req.can('offres.read') || req.can('cdc.edit');
-const visible = (req, p) => voitTout(req) || (p.publie && !p.archive);
+// … et le demandeur suit en lecture la procédure née de son besoin
+const visible = (req, p) => voitTout(req) || (p.publie && !p.archive) || (p.demandeur && p.demandeur === req.user.id);
 
 r.get('/', (req, res) => res.json({ procedures: proceduresAll().filter((p) => visible(req, p)) }));
 

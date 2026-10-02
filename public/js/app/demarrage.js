@@ -2,7 +2,7 @@
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
-var ROUTER={dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
+var ROUTER={dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, besoins:vBesoins, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
@@ -11,6 +11,7 @@ function isAdminView(id){ return VIEWS.some(function(v){ return v.id===id && v.g
 function renderProcSel(){
   var box=document.getElementById('side-proc'); box.textContent='';
   var list=MP.procs().filter(function(p){ return !p.archive || p.id===MP.pid(); });
+  if(!list.length){ add(box,'div','navgrp','Aucune procédure ouverte'); return; }
   add(box,'label','navgrp','Procédure').setAttribute('for','proc-sel');
   var s=add(box,'select'); s.id='proc-sel';
   list.forEach(function(p){ var o=add(s,'option',null,p.ref+(p.archive?' (archivée)':'')+' — '+(p.objet||'')); o.value=p.id; });
@@ -40,9 +41,10 @@ function render(){
   renderNav();
   renderProcSel();
   renderHeader();
-  var ph=phase(), chip=document.getElementById('phase-chip');
-  chip.textContent=ph.k; chip.className='chip '+ph.c;
-  chip.style.display = isAdminView(state.view) ? 'none' : '';
+  var chip=document.getElementById('phase-chip');
+  if(avecProcedure()){ var ph=phase(); chip.textContent=ph.k; chip.className='chip '+ph.c; }
+  chip.style.display = !avecProcedure() || isAdminView(state.view) ? 'none' : '';
+  if(!viewAllowed(state.view)) state.view=homeView();
   var lbl=null;
   for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===state.view) lbl=VIEWS[i].label;
   document.title = (lbl? lbl+' — ' : '')+'Marché+';

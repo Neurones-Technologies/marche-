@@ -143,6 +143,7 @@ function vParams(m){
   champ(f6,'Adresse expéditrice',state.mailFrom,function(v){ state.mailFrom=v; });
   champ(f6,'Domaine des destinataires',state.mailSuffix,function(v){ state.mailSuffix=v; });
   vParamsCadre(m,o);
+  vParamsCircuitBesoin(m);
   add(add(k6,'div','panel-foot'),'span','muted','Aucun message n\u2019est réellement expédié dans cette maquette : la boîte d\u2019envoi restitue ce qui partirait.');
 }
 
@@ -197,4 +198,42 @@ function vParamsCadre(m,o){
     });
   });
   add(add(k7,'div','panel-foot'),'span','muted','Les valeurs du profil public sont à faire valider par un juriste marchés publics avant tout usage réel.');
+}
+
+/* Circuit de validation des besoins (module 2) : même moteur que le circuit d'approbation de l'attribution. */
+function vParamsCircuitBesoin(m){
+  var c=state.circuitBesoin=state.circuitBesoin||[];
+  var k=add(m,'div','card'); k.style.marginTop='18px';
+  add(k,'div','panel-head','8 · Circuit de validation des besoins');
+  var b=add(k,'div','pad');
+  var rk=Object.keys(state.roles);
+  c.forEach(function(a,i){
+    var row=add(b,'div','docline');
+    var lf=add(row,'div'); lf.style.flex='1 1 240px';
+    var ti=add(lf,'input'); ti.type='text'; ti.value=a.role; ti.style.width='100%';
+    ti.setAttribute('aria-label','Intitulé du niveau'); fk(ti,'cb-lab-'+i);
+    ti.addEventListener('change',function(){ a.role=ti.value; save(); });
+    var wi=add(lf,'input'); wi.type='text'; wi.value=a.who||''; wi.style.cssText='width:100%;margin-top:6px';
+    wi.setAttribute('aria-label','Titulaire du niveau'); fk(wi,'cb-who-'+i);
+    wi.addEventListener('change',function(){ a.who=wi.value; save(); });
+    var opts=add(lf,'div'); opts.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:6px';
+    var se=add(opts,'input'); se.type='number'; se.min='0'; se.step='1000000'; se.placeholder='Seuil (XOF), facultatif';
+    se.value=Number(a.seuil)>0?a.seuil:''; se.style.flex='1 1 160px';
+    se.setAttribute('aria-label','Budget à partir duquel ce niveau intervient'); fk(se,'cb-seuil-'+i);
+    se.addEventListener('change',function(){ var v=Number(se.value); if(v>0) a.seuil=v; else delete a.seuil; save(); render(); });
+    var sr=add(opts,'select'); sr.style.flex='1 1 160px';
+    sr.setAttribute('aria-label','Rôle réservé pour ce niveau'); fk(sr,'cb-role-'+i);
+    add(sr,'option',null,'Toute personne habilitée').value='';
+    rk.forEach(function(r){ var op=add(sr,'option',null,'Réservé : '+state.roles[r].lab); op.value=r; });
+    sr.value=a.roleId||'';
+    sr.addEventListener('change',function(){ if(sr.value) a.roleId=sr.value; else delete a.roleId; save(); render(); });
+    var del=add(row,'button','icon-btn','×'); del.setAttribute('aria-label','Supprimer ce niveau');
+    del.disabled=c.length<=1;
+    del.addEventListener('click',function(){ c.splice(i,1); logit('Niveau de validation des besoins supprimé : '+a.role); save(); render(); });
+  });
+  var f=add(k,'div','panel-foot');
+  add(f,'span','muted','Un besoin suit ce circuit à sa soumission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce budget. Le demandeur ne valide jamais son propre besoin.');
+  add(f,'button','btn btn-ghost btn-sm','+ Ajouter un niveau').addEventListener('click',function(){
+    c.push({role:'Nouveau niveau de validation', who:'À désigner'}); logit('Niveau de validation des besoins ajouté'); save(); render();
+  });
 }

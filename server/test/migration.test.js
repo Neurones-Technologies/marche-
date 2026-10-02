@@ -52,6 +52,8 @@ test('la procédure unique devient p1, avec ses données, offres et accusés', (
   assert.deepEqual(D.kvGet('circuitModele').value, [{ role: 'Direction', who: 'D. Kone' }]);
   assert.deepEqual(D.kvGet('org').value.reglages, { zonePreference: ['CI', 'SN'] });
   assert.equal(D.store('p1').get('cadre').profil, 'uemoa-ci', 'cadre figé pour une procédure déjà publiée');
+  assert.ok(D.kvGet('roles').value.demandeur, 'rôle « Demandeur » ajouté');
+  assert.ok(D.kvGet('circuitBesoin').value.length, 'circuit de validation des besoins par défaut');
 });
 
 test('la chaîne d’audit d’origine reste vérifiable, et se poursuit', () => {

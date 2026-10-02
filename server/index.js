@@ -2,7 +2,8 @@ const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const cfg = require('./config');
-require('./db');
+const { store } = require('./db');
+const { requireAuth } = require('./auth');
 
 const app = express();
 app.disable('x-powered-by');
@@ -33,6 +34,14 @@ app.use('/api', (req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/files', require('./routes/files').global);
 app.use('/api/procedures', require('./routes/procedures'));
+app.use('/api/besoins', require('./routes/besoins'));
+// État de l'organisation seule, quand aucune procédure n'est ouverte (demandeur, instance encore vide) :
+// lecture de l'état et écriture des seules clés d'organisation, par les mêmes routes que pour une procédure.
+app.use('/api/organisation', requireAuth, (req, res, next) => {
+  if (!['/state', '/audit'].includes(req.path)) return res.status(404).json({ error: 'Route inconnue.' });
+  req.pid = null; req.store = store(null);
+  next();
+}, require('./routes/state'));
 app.use('/api', require('./routes/admin'));
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Route inconnue.' }));

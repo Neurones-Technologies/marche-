@@ -19,7 +19,7 @@ const WRITE_PERMS = {
   evalDone: ['eval.validate', 'recours.handle'],
   approvals: ['decision.approve', 'params.edit', 'recours.handle'],
   org: ['params.edit'], seuils: ['params.edit'], docDefs: ['params.edit'],
-  mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'],
+  mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'],
   offers: ['params.edit'],
   roles: ['roles.edit'], users: ['roles.edit'], delegations: ['roles.edit'],
   notifRules: ['notif.manage'],
@@ -332,6 +332,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       break;
     }
     case 'circuitModele':
+    case 'circuitBesoin':
       if (!Array.isArray(value) || !value.length || value.some((a) => !isObj(a) || typeof a.role !== 'string' || !a.role.trim()))
         return 'Circuit modèle invalide : au moins un niveau, chacun avec un intitulé.';
       if (value.some((a) => (a.seuil != null && a.seuil !== '' && !(Number(a.seuil) >= 0)) || (a.roleId && !(stored('roles') || {})[a.roleId])))

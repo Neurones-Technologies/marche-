@@ -28,7 +28,10 @@ var PERMS = [
   {id:'qa.answer',       lab:"Répondre aux candidats et publier des additifs", grp:'Préparation'},
   {id:'clarif.send',     lab:"Demander une clarification à un soumissionnaire", grp:'Traitement'},
   {id:'recours.handle',  lab:"Instruire un recours",                grp:'Décision'},
-  {id:'contract.sign',   lab:"Signer le marché",                    grp:'Décision'}
+  {id:'contract.sign',   lab:"Signer le marché",                    grp:'Décision'},
+  {id:'besoin.create',   lab:"Exprimer un besoin",                  grp:'Besoins'},
+  {id:'besoin.approve',  lab:"Valider un besoin",                   grp:'Besoins'},
+  {id:'besoin.manage',   lab:"Instruire les besoins et en faire des procédures", grp:'Besoins'}
 ];
 /* Incompatibilites : separation des fonctions */
 var INCOMPAT = [
@@ -45,7 +48,8 @@ function ROLES_DEF(){
     evalfin:  { lab:'Évaluateur financier',       perms:permsDef(['offres.read','depouille.confirm','eval.score','eval.validate','pv.read']) },
     approb:   { lab:"Membre du comité d'engagement", perms:permsDef(['offres.read','decision.approve','pv.read','audit.read','recours.handle','contract.sign']) },
     audit:    { lab:'Auditeur interne (lecture)', perms:permsDef(['offres.read','pv.read','audit.read']) },
-    soum:     { lab:'Soumissionnaire',            perms:permsDef(['portail.use']) }
+    soum:     { lab:'Soumissionnaire',            perms:permsDef(['portail.use']) },
+    demandeur:{ lab:'Demandeur (service interne)', perms:permsDef(['besoin.create']) }
   };
 }
 var EVENTS = [
@@ -90,7 +94,7 @@ var UI = { q:'', sort:'nom' };
 /* Clés partagées avec le serveur ; view / offerIndex / draft restent propres à chaque session. */
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
-  'mailFrom','mailSuffix','approvals','offers','circuitModele'];
+  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin'];
 var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
@@ -104,7 +108,7 @@ function snapAll(){ SYNC_KEYS.forEach(function(k){ synced[k]=JSON.stringify(stat
 function applyServer(payload, keepPending){
   var st=payload.state, first=!state;
   if(first){ state={ view:'dashboard', offerIndex:0, draft:EMPTY_DRAFT() }; }
-  SYNC_KEYS.concat(SERVER_ONLY).concat(['me']).forEach(function(k){
+  SYNC_KEYS.concat(SERVER_ONLY).concat(['me','procedure']).forEach(function(k){
     if(!(k in st)) return;
     var pending = !first && keepPending && SYNC_KEYS.indexOf(k)>=0 && TARGETED.indexOf(k)<0 && JSON.stringify(state[k])!==synced[k];
     if(pending) return;
@@ -490,6 +494,7 @@ var VIEWS=[
   {id:'dashboard',  label:'Tableau de bord', grp:'Pilotage'},
   {id:'notifs',     label:'Notifications', grp:'Pilotage'},
   {id:'procedures', label:'Procédures', grp:'Pilotage'},
+  {id:'besoins',    label:'Besoins', grp:'Préparation', perms:['besoin.create','besoin.approve','besoin.manage']},
   {id:'cdc',        label:'Cahier des charges', grp:'Préparation', perm:'cdc.edit'},
   {id:'dao',        label:'DAO', grp:'Préparation', perm:'cdc.edit'},
   {id:'criteres',   label:'Grille de critères', grp:'Préparation', perm:'criteres.edit'},
@@ -520,13 +525,28 @@ function lockReason(id){
   if(id==='clarifs' && !state.cdc.cdcPublie) return "Les clarifications interviennent après réception des offres.";
   return null;
 }
-function viewAllowed(id){ return VIEWS.some(function(v){ return v.id===id && (!v.perm || can(v.perm)); }); }
+/* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
+var SANS_PROCEDURE = ['notifs','procedures','besoins','comptes','roles','regles'];
+function avecProcedure(){ return !!(state && state.procedure); }
+/* Un écran est visible si l'une de ses habilitations est accordée (perm, ou perms pour plusieurs), et, sans
+   procédure ouverte, s'il ne dépend pas d'une procédure. */
+function vueVisible(v){
+  if(!avecProcedure() && SANS_PROCEDURE.indexOf(v.id)<0) return false;
+  if(v.perms) return v.perms.some(can);
+  return !v.perm || can(v.perm);
+}
+function viewAllowed(id){ return VIEWS.some(function(v){ return v.id===id && vueVisible(v); }); }
 /* Le soumissionnaire n'a rien à faire sur le tableau de bord acheteur : il arrive sur son portail. */
-function homeView(){ return (!can('offres.read') && can('portail.use')) ? 'portail' : 'dashboard'; }
+function homeView(){
+  if(!avecProcedure()) return can('besoin.create')||can('besoin.approve')||can('besoin.manage') ? 'besoins' : 'procedures';
+  if(!can('offres.read') && can('portail.use')) return 'portail';
+  if(!can('offres.read') && can('besoin.create')) return 'besoins';
+  return 'dashboard';
+}
 function renderNav(){
   var box=document.getElementById('navs'); box.textContent='';
   var grp=null;
-  var vis=VIEWS.filter(function(v){ return !v.perm || can(v.perm); });
+  var vis=VIEWS.filter(vueVisible);
   vis.forEach(function(v){
     if(v.grp!==grp){ grp=v.grp; add(box,'div','navgrp',grp); }
     var b=el('button','navb'+(v.role?' role':''));
@@ -562,7 +582,7 @@ function openMenu(){
 }
 function go(v){
   var def=null; for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===v) def=VIEWS[i];
-  if(def && def.perm && !can(def.perm)){ toast('Écran non accessible avec le rôle « '+myRole().lab+' ».'); return; }
+  if(def && !vueVisible(def)){ toast('Écran non accessible avec le rôle « '+myRole().lab+' ».'); return; }
   state.view=v; save(); render(); window.scrollTo(0,0);
 }
 function locked(m,msg,t,l){

@@ -20,7 +20,8 @@ server/
                    jeu de données initial, migrations, audit chaîné
   auth.js          JWT en cookie HttpOnly/SameSite=Strict, middleware d'habilitations
   rules.js         règles métier côté serveur : qui peut écrire quoi, et dans quel ordre
-  routes/          /api/auth/*, /api/procedures (liste, création, archivage),
+  routes/          /api/auth/*, /api/besoins (expression, validation, transformation en procédure),
+                   /api/organisation/state (état sans procédure ouverte), /api/procedures (liste, création, archivage),
                    /api/procedures/:id/{state,offers,audit,files},
                    écritures ciblées /api/procedures/:id/{scores,confirmations,conformite,approbations},
                    /api/files/:id, /api/audit/verify, /api/admin/reset
@@ -30,6 +31,9 @@ server/
 
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 
+- **Besoins** : un service exprime un besoin, qui suit le circuit de validation de l'organisation (niveaux selon le
+  budget, le demandeur ne valide jamais son propre besoin, rejet motivé) ; validé, il devient une procédure pré-remplie
+  (objet, budget, type de procédure pressenti selon des seuils provisoires du profil), que le demandeur suit en lecture.
 - **Plusieurs procédures** : chacune a son dossier, ses offres, son évaluation, ses accusés et son journal ; les
   paramètres, rôles et comptes sont communs à l'organisation. Un soumissionnaire ne voit que les procédures publiées.
   Une procédure archivée se consulte mais ne se modifie plus.
@@ -64,7 +68,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 59 tests (Node 22 requis pour better-sqlite3)
+npm test             # 66 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :
@@ -78,6 +82,7 @@ Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PAS
 | s.bamba@bal.ci | Auditeur interne |
 | contact.sotrap@bal.ci | Soumissionnaire |
 | administrateur@bal.ci | Administrateur fonctionnel |
+| k.yao@bal.ci | Demandeur (service interne) |
 
 ## Déploiement (Docker)
 
