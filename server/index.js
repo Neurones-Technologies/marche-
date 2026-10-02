@@ -34,7 +34,9 @@ app.use('/api', require('./routes/state'));
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Route inconnue.' }));
 
-app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'], maxAge: cfg.prod ? '1h' : 0 }));
+// no-cache : le navigateur revalide chaque fichier (304 s'il n'a pas changé). Avec un max-age, une mise à jour
+// pouvait mêler un index.html neuf et un app.js ancien resté en cache, et l'interface ne s'affichait plus.
+app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'], setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 app.use((err, req, res, next) => { // eslint-disable-line
   console.error(err);
   res.status(err.status || 500).json({ error: cfg.prod ? 'Erreur interne.' : String(err.message) });

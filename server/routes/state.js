@@ -1,7 +1,7 @@
 const express = require('express');
 const { db, getRev, kvGet, kvSet, kvAll, auditAppend, auditList, auditVerify, offersAll, offerInsert, offersReplace, resetDemo, frDate, seed } = require('../db');
 const { requireAuth, needPerm, whoLabel } = require('../auth');
-const { validateChange } = require('../rules');
+const { validateChange, effectsOf } = require('../rules');
 const cfg = require('../config');
 
 const r = express.Router();
@@ -21,6 +21,7 @@ function buildState(req) {
     receipts: req.can('portail.use') || canSeeOffers ? receipts : [],
     audit: req.can('audit.read') || req.can('pv.read') ? auditList(200) : [],
   };
+  delete st._sod; // historique de séparation des fonctions : interne au serveur
   // Un soumissionnaire ne doit voir ni les notes, ni les décisions internes.
   if (!canSeeOffers) { st.quality = {}; st.justif = {}; st.confirmed = {}; st.excluded = {}; }
   return { state: st, revs, rev: getRev() };
@@ -43,11 +44,15 @@ r.patch('/state', (req, res) => {
   const conflicts = keys.filter((k) => { if (MERGED.includes(k)) return false; const cur = kvGet(k); return cur && base && base[k] != null && cur.rev !== base[k]; });
   if (conflicts.length) return res.status(409).json({ error: 'Données modifiées entre-temps par un autre utilisateur.', conflicts });
   for (const k of keys) {
-    const err = validateChange(k, changes[k], req);
-    if (err) return res.status(403).json({ error: err, key: k });
+    const err = validateChange(k, changes[k], req, changes);
+    if (typeof err === 'string') return res.status(403).json({ error: err, key: k });
+    if (err) return res.status(err.status).json({ error: err.error, code: err.code, key: k });
   }
   const newRevs = {};
   const tx = db.transaction(() => {
+    const fx = effectsOf(changes, req);
+    for (const [k, v] of Object.entries(fx.kv)) newRevs[k] = kvSet(k, v, req.user.id);
+    for (const a of fx.audit) auditAppend(req.user.id, whoLabel(req.user), a);
     for (const k of keys) {
       if (k === 'users') {
         const upd = db.prepare('UPDATE users SET role=? WHERE id=?');
@@ -104,6 +109,7 @@ r.post('/offers', needPerm('portail.use'), (req, res) => {
   const lots = Array.isArray(d.lots) ? [...new Set(d.lots.filter((x) => lotIds.has(x)))] : [];
   const errs = [];
   if (!cdc.cdcPublie) errs.push('Le dossier n’est pas publié.');
+  if ((kvGet('depClosed') || {}).value) errs.push('Le dépouillement est clôturé : aucune offre ne peut plus être déposée.');
   if (name.length < 2 || name.length > 200) errs.push('Raison sociale invalide.');
   if (!/^[A-Z]{2}$/.test(String(d.iso || ''))) errs.push('Pays invalide.');
   if (!org.rates[d.devise]) errs.push('Devise non admise.');

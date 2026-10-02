@@ -152,6 +152,16 @@ function seedAll(withUsers = true) {
 
 if (db.prepare('SELECT COUNT(*) c FROM kv').get().c === 0) seedAll(true);
 
+/* Migrations de données des instances existantes (idempotentes). */
+(function migrate() {
+  // 02/10/2026 : la référence de la procédure devient un champ du cahier des charges.
+  const cdc = kvGet('cdc');
+  if (cdc && !cdc.value.ref) {
+    cdc.value.ref = seed.CDC.ref;
+    kvSet('cdc', cdc.value, 'migration');
+  }
+})();
+
 function resetDemo(uid, who) {
   const tx = db.transaction(() => {
     seedAll(false);

@@ -80,9 +80,12 @@ test('notation : déclaration de conflit d’intérêts obligatoire, une seule f
   assert.equal(r.status, 403);
   r = await call('PATCH', '/api/state', { changes: { coi: { u2: { declare: true, conflit: false, t: 'now' } } } }, ev);
   assert.equal(r.status, 200);
+  // Déclaration faite : le refus vient maintenant du séquencement (dépouillement non clôturé).
+  // Le parcours complet jusqu'à la notation acceptée est dans sequencement.test.js.
   const st2 = (await call('GET', '/api/state', null, ev)).json;
   r = await call('PATCH', '/api/state', { changes: { quality: q }, base: { quality: st2.revs.quality } }, ev);
-  assert.equal(r.status, 200);
+  assert.equal(r.status, 409);
+  assert.equal(r.json.code, 'GATE_DEPOUILLEMENT_NOT_CLOSED');
 });
 
 test('séparation des rôles : l’évaluateur ne peut pas approuver ni signer', async () => {
