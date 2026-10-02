@@ -73,6 +73,7 @@ function vCommandes(m){
     if(modifiable) brouillon(c); else documentCommande(c);
     circuitCommande(c);
     actions(c);
+    avenants(c);
     if(c.numero && c.statut!=='annulee') receptions(c);
     var kh=add(zone,'div','card'); kh.style.marginTop='18px';
     add(kh,'div','panel-head','Historique');
@@ -157,7 +158,10 @@ function vCommandes(m){
     add(k,'p',null,'Jalons de paiement : '+c.jalons.map(function(j){ return j.libelle+' '+j.pourcentage+' %'; }).join(' · ')+'.');
     var cd=c.conditions||{};
     add(k,'p','muted','Pénalité de retard : '+cd.penaliteParJour+' ‰ du montant par jour calendaire, plafonnée à '+cd.plafondPenalite+' %. Garantie : '+cd.garantieMois+' mois. TVA applicable : '+cd.tva+' %. Conditions générales : cahier des charges de la procédure '+c.procedure.ref+'.');
+    var emis=(c.avenants||[]).filter(function(a){ return a.statut==='emis'; });
+    if(emis.length) add(k,'p',null,'Version en vigueur : modifiée par '+emis.map(function(a){ return 'l’avenant '+a.numero+' du '+a.emisLe; }).join(', ')+'.');
     if(c.empreinte) add(k,'div','bc-empreinte','Empreinte SHA-256 du document émis : '+c.empreinte);
+    emis.forEach(function(a){ add(k,'div','bc-empreinte','Empreinte SHA-256 de l’avenant '+a.numero+' : '+a.empreinte); });
     var pr=add(k,'div','no-print'); pr.style.marginTop='12px';
     var bp=add(pr,'button','btn btn-ghost btn-sm','Imprimer ou enregistrer en PDF'); fk(bp,'cmd-print');
     bp.addEventListener('click',function(){ window.print(); });
@@ -197,6 +201,65 @@ function vCommandes(m){
       var ba=add(barre(),'button','btn btn-ghost btn-sm','Annuler la commande'); fk(ba,'cmd-annuler');
       ba.addEventListener('click',function(){ demander(c.numero ? 'Le numéro '+c.numero+' reste attribué : la numérotation ne comporte pas de trou.' : 'Le brouillon est abandonné.',function(motif){ agir('POST',enc(c.id)+'/annuler',{motif:motif},'Commande annulée.'); },'Annuler la commande ?','Annuler la commande','Motif'); });
     }
+  }
+
+  /* Avenants : proposés par les achats, validés par le même circuit, émis sous le numéro de la commande suivi de -An. */
+  function avenants(c){
+    var liste=c.avenants||[], ouvert=liste.some(function(a){ return a.statut==='validation' || a.statut==='validee'; });
+    var possible = can('commande.manage') && ['emise','en_reception','receptionnee'].indexOf(c.statut)>=0 && !ouvert;
+    if(!liste.length && !possible) return;
+    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    add(k,'div','panel-head','Avenants');
+    var b=add(k,'div','pad');
+    var ST={ validation:['En validation','c-amber'], validee:['Validé, à émettre','c-teal'], emis:['Émis','c-green'], rejete:['Rejeté','c-red'] };
+    liste.slice().reverse().forEach(function(a){
+      var row=add(b,'div','docline'); var lf=add(row,'div'); lf.style.flex='1 1 280px';
+      add(lf,'strong',null,(a.numero||'Avenant n° '+a.n)+' — '+montantDevise(a.ancienTotal,c.devise)+' → '+montantDevise(a.nouveauTotal,c.devise));
+      add(lf,'div','muted','Motif : '+a.motif+(a.rejet?' · rejeté ('+a.rejet.role+') : '+a.rejet.motif:'')+' · livraison prévue le '+a.dateLivraison);
+      var st=ST[a.statut]||[a.statut,'c-grey']; add(row,'span','chip '+st[1],st[0]);
+      if(a.statut==='validation' && can('commande.approve')){
+        var i=MPCircuits.prochaine(a.circuit), e=a.circuit[i];
+        var bv=add(row,'button','btn btn-primary btn-sm','Valider ('+e.role+')'); fk(bv,'av-val-'+a.n);
+        bv.addEventListener('click',function(){ ask('L’avenant porte la commande à '+montantDevise(a.nouveauTotal,c.devise)+'.',function(){ agir('POST',enc(c.id)+'/avenants/'+a.n+'/approbations/'+i,{},'Avenant validé.'); },'Valider l’avenant n° '+a.n+' ?','Valider'); });
+        var br=add(row,'button','btn btn-ghost btn-sm','Rejeter'); fk(br,'av-rej-'+a.n);
+        br.addEventListener('click',function(){ demander('L’avenant est abandonné ; un autre pourra être proposé.',function(motif){ agir('POST',enc(c.id)+'/avenants/'+a.n+'/rejet',{motif:motif},'Avenant rejeté.'); },'Rejeter l’avenant n° '+a.n+' ?','Rejeter','Motif du rejet'); });
+      }
+      if(a.statut==='validee' && can('commande.manage')){
+        var be=add(row,'button','btn btn-primary btn-sm','Émettre l’avenant'); fk(be,'av-emettre-'+a.n);
+        be.addEventListener('click',function(){ ask('Le serveur attribue le numéro '+c.numero+'-A'+a.n+' et scelle l’avenant ; la commande passe à sa nouvelle version.',function(){ agir('POST',enc(c.id)+'/avenants/'+a.n+'/emettre',{},'Avenant émis.'); },'Émettre l’avenant ?','Émettre'); });
+      }
+    });
+    if(!possible) return;
+    var lignes=JSON.parse(JSON.stringify(c.lignes)), recu=c.rapprochement.map(function(x){ return x.recu; });
+    var ed=add(k,'div','pad'); ed.style.borderTop='1px solid var(--color-border)';
+    add(ed,'h3',null,'Proposer un avenant');
+    var tl=add(ed,'table','tbl'); tl.style.width='100%';
+    var hr=add(add(tl,'thead'),'tr'); ['Désignation','Quantité','Unité','Prix unitaire ('+c.devise+')','Déjà reçu'].forEach(function(t){ add(hr,'th',null,t); });
+    var tb=add(tl,'tbody');
+    function dessiner(){
+      tb.textContent='';
+      lignes.forEach(function(lg,i){
+        var tr=add(tb,'tr');
+        [['designation','text','100%'],['quantite','number','90px'],['unite','text','90px'],['prixUnitaire','number','150px']].forEach(function(x){
+          var td=add(tr,'td'); var inp=add(td,'input'); inp.type=x[1]; inp.value=lg[x[0]]; inp.style.width=x[2];
+          inp.setAttribute('aria-label',x[0]+' ligne '+(i+1)); fk(inp,'av-l'+i+'-'+x[0]);
+          if(x[0]==='quantite' && i<recu.length) inp.min=String(recu[i]);
+          inp.addEventListener('input',function(){ lg[x[0]] = x[1]==='number' ? Number(inp.value) : inp.value; });
+        });
+        add(tr,'td','muted', i<recu.length ? String(recu[i]) : 'nouvelle ligne');
+      });
+    }
+    dessiner();
+    var al=add(ed,'button','btn btn-ghost btn-sm','+ Ajouter une ligne'); fk(al,'av-add');
+    al.addEventListener('click',function(){ lignes.push({designation:'',quantite:1,unite:'unité',prixUnitaire:0}); dessiner(); });
+    var f=add(ed,'div','frm'); f.style.marginTop='12px';
+    var w1=add(f,'div'); add(w1,'label',null,'Nouvelle date de livraison').setAttribute('for','av-date');
+    var dl=add(w1,'input'); dl.type='date'; dl.id='av-date'; dl.value=c.dateLivraison; fk(dl,'av-date');
+    var w2=add(f,'div'); w2.style.gridColumn='1/-1'; add(w2,'label',null,'Motif de l’avenant').setAttribute('for','av-motif');
+    var mo=add(w2,'textarea'); mo.id='av-motif'; mo.rows=2; mo.style.width='100%'; fk(mo,'av-motif');
+    add(ed,'p','muted','Une ligne existante ne se supprime pas et sa quantité ne descend pas sous ce qui a déjà été reçu. Le nouveau total reste plafonné au montant de l’offre retenue.').style.marginTop='8px';
+    var bp=add(ed,'button','btn btn-primary btn-sm','Proposer l’avenant'); fk(bp,'av-proposer');
+    bp.addEventListener('click',function(){ agir('POST',enc(c.id)+'/avenants',{lignes:lignes, dateLivraison:dl.value, motif:mo.value},'Avenant proposé.'); });
   }
 
   /* Réceptions, rapprochement commandé / reçu, réserves, retard et pénalités. */

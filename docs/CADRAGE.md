@@ -404,9 +404,11 @@ le moteur de circuits, avec les profils réglementaires public et privé. Resten
    des seuils de type de procédure, provisoires.
 3. **IA réelle** : extraction des offres et des pièces, aujourd'hui simulée (`docs/EXTRACTION.md` de la branche
    `conception`), à chiffrer avec le coût par document.
-4. **Avenants** aux bons de commande ; lignes de commande reprises du détail des offres.
-5. Restes du prototype : calendrier du tableau de bord en dur, procédure de démonstration créée même avec
-   `SEED_DEMO=0`.
+4. ~~**Avenants** aux bons de commande~~ : **faits le 02/10/2026** (motif, même circuit de validation sur le nouveau
+   montant, numéro dérivé -A1, empreinte chaînée à la version précédente, versions conservées, réception qui reprend
+   selon les nouvelles quantités). Reste : lignes de commande reprises du détail des offres.
+5. ~~Restes du prototype~~ : **faits le 02/10/2026** (calendrier sur les dates réelles ; avec `SEED_DEMO=0`, instance
+   vide nommée par `ORG_NOM` et compte administrateur initial `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
 6. **Déploiement** sur le VPS : les migrations reprennent les données existantes (procédure p1, rôles, fiches
    partenaires), à faire précéder d'une sauvegarde du volume.
 

@@ -42,6 +42,8 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
   émise sous un numéro continu et sans trou, avec l'empreinte SHA-256 du document ; imprimable et enregistrable en PDF
   depuis le navigateur ; transmise au titulaire par le portail. Le réceptionnaire désigné constate les livraisons
   (rapprochement commandé / reçu, réserves et levée, retard et pénalités plafonnées), puis la réception définitive.
+  Une commande émise ne se modifie que par avenant motivé, validé et émis sous un numéro dérivé (BC-2026-0001-A1),
+  sans supprimer de ligne ni descendre sous les quantités reçues ; les versions antérieures sont conservées.
   Export CSV des commandes émises pour la comptabilité. La facture et le paiement restent dans l'ERP.
 - **Référencement des partenaires** : un prestataire crée le compte de son entreprise depuis l'écran de connexion
   (limitation par adresse IP, champ piège, pas d'énumération des comptes, compte inactif jusqu'à la vérification du
@@ -85,7 +87,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 85 tests (Node 22 requis pour better-sqlite3)
+npm test             # 87 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :

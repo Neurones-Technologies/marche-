@@ -131,6 +131,36 @@ test('annulation motivée : le numéro reste attribué, pas de trou dans la num�
   assert.equal(a.json.commande.numero, c2.numero);
   const c3 = await emettre();
   assert.match(c3.numero, /-0003$/);
+  c3id = c3.id;
+});
+
+let c3id;
+test('avenant : motivé, validé, émis sous un numéro dérivé, jamais sous les quantités reçues', async () => {
+  const U = `/api/commandes/${c3id}`;
+  // une livraison partielle d'abord (le réceptionnaire est l'acheteur qui a établi la commande)
+  ok(await call('POST', U + '/receptions', { quantites: [1] }, achats), 201);
+  const base = { lignes: [{ designation: 'Complément', quantite: 2, unite: 'forfait', prixUnitaire: 1000000 }, { designation: 'Formation', quantite: 1, unite: 'jour', prixUnitaire: 500000 }], dateLivraison: '2027-03-31' };
+  refusé(await call('POST', U + '/avenants', { ...base, motif: '' }, achats), 422, 'REASON_REQUIRED');
+  refusé(await call('POST', U + '/avenants', { ...base, lignes: [], motif: 'x' }, achats), 422, 'AMENDMENT_INVALID');
+  refusé(await call('POST', U + '/avenants', { ...base, lignes: [{ ...base.lignes[0], quantite: 0 }], motif: 'x' }, achats), 422, 'AMENDMENT_BELOW_RECEIVED');
+  refusé(await call('POST', U + '/avenants', { ...base, lignes: [{ ...base.lignes[0], prixUnitaire: 90000000 }], motif: 'x' }, achats), 422, 'AMOUNT_EXCEEDED');
+  let r = await call('POST', U + '/avenants', { ...base, motif: 'Extension du périmètre : un second forfait et une journée de formation.' }, achats);
+  ok(r, 201);
+  assert.equal(r.json.commande.avenants[0].statut, 'validation');
+  refusé(await call('POST', U + '/avenants', { ...base, motif: 'Doublon' }, achats), 409, 'AMENDMENT_PENDING');
+  refusé(await call('POST', U + '/annuler', { motif: 'x' }, achats), 409);
+  refusé(await call('POST', U + '/avenants/1/emettre', {}, achats), 409, 'AMENDMENT_NOT_VALIDATED');
+  ok(await call('POST', U + '/avenants/1/approbations/0', {}, approb));
+  r = await call('POST', U + '/avenants/1/emettre', {}, achats);
+  ok(r);
+  const c = r.json.commande;
+  assert.match(c.avenants[0].numero, /^BC-\d{4}-0003-A1$/);
+  assert.match(c.avenants[0].empreinte, /^[0-9a-f]{64}$/);
+  assert.equal(c.total, 2500000);
+  assert.equal(c.version, 1);
+  assert.equal(c.versions[0].lignes[0].quantite, 1, 'version précédente conservée');
+  assert.equal(c.statut, 'en_reception', 'reste à livrer après l’avenant');
+  assert.deepEqual(c.rapprochement.map((x) => x.ecart), [1, 1]);
 });
 
 test('évaluation : visible des acheteurs et des évaluateurs, hors classement ; réglages contrôlés', async () => {

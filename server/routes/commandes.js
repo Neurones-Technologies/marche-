@@ -223,8 +223,118 @@ r.post('/:id/annuler', (req, res) => {
   const c = req.commande, motif = String((req.body || {}).motif || '').trim();
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Établir les bons de commande » requise.');
   if (c.statut === 'annulee' || c.receptions.length) return err(res, 409, 'ORDER_NOT_CANCELLABLE', 'Une commande déjà réceptionnée, même en partie, ne s’annule pas.');
+  if (avenantOuvert(c)) return err(res, 409, 'AMENDMENT_PENDING', 'Un avenant est en cours : rejetez-le ou émettez-le avant d’annuler.');
   if (!motif || motif.length > 1000) return err(res, 422, 'REASON_REQUIRED', 'L’annulation doit être motivée (1 000 caractères au plus).');
   db.transaction(() => { c.statut = 'annulee'; c.annulation = { motif, by: req.user.id, at: frDate() }; journal(req, c, 'annulée — motif : ' + motif); commandeSave(c); })();
+  res.json({ commande: vue(c) });
+});
+
+/* ---- Avenants ----
+   Une commande émise ne se modifie jamais : un avenant, motivé, la fait évoluer (quantités, prix, nouvelles lignes,
+   date de livraison). Il suit le même circuit de validation, sur le nouveau montant, puis il est émis sous le numéro
+   de la commande suivi de -A1, -A2… avec sa propre empreinte. Les versions antérieures restent dans l'historique.
+   Une ligne existante ne se supprime pas, et une quantité ne descend jamais sous ce qui a déjà été reçu. */
+const AVENANT_OUVERT = ['validation', 'validee'];
+const avenantOuvert = (c) => (c.avenants || []).find((a) => AVENANT_OUVERT.includes(a.statut));
+function avenantDe(req, res) {
+  const a = (req.commande.avenants || [])[Number(req.params.n) - 1];
+  if (!a) { err(res, 404, 'AMENDMENT_UNKNOWN', 'Avenant introuvable.'); return null; }
+  return a;
+}
+
+r.post('/:id/avenants', (req, res) => {
+  const c = req.commande, d = req.body || {};
+  if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Établir les bons de commande » requise.');
+  if (!['emise', 'en_reception', 'receptionnee'].includes(c.statut)) return err(res, 409, 'ORDER_NOT_AMENDABLE', 'Seule une commande émise, dont la réception définitive n’est pas prononcée, peut faire l’objet d’un avenant.');
+  if (avenantOuvert(c)) return err(res, 409, 'AMENDMENT_PENDING', 'Un avenant est déjà en cours sur cette commande.');
+  const motif = String(d.motif || '').trim();
+  if (!motif || motif.length > 1000) return err(res, 422, 'REASON_REQUIRED', 'L’avenant doit être motivé (1 000 caractères au plus).');
+  const lignes = Array.isArray(d.lignes) ? d.lignes : [];
+  if (lignes.length < c.lignes.length) return err(res, 422, 'AMENDMENT_INVALID', 'Une ligne de la commande ne se supprime pas : ramenez sa quantité au nécessaire.');
+  if (lignes.length > 100) return err(res, 422, 'AMENDMENT_INVALID', 'Une commande compte 100 lignes au plus.');
+  for (const l of lignes) {
+    if (!String(l.designation || '').trim() || String(l.designation).length > 300) return err(res, 422, 'AMENDMENT_INVALID', 'Désignation obligatoire (300 caractères au plus).');
+    if (!(Number(l.quantite) >= 0) || !(Number(l.prixUnitaire) >= 0)) return err(res, 422, 'AMENDMENT_INVALID', 'Quantités et prix unitaires positifs ou nuls attendus.');
+  }
+  const recu = vue(c).rapprochement;
+  const sous = c.lignes.map((l, i) => (Number(lignes[i].quantite) + 1e-9 < recu[i].recu ? l.designation : null)).filter(Boolean);
+  if (sous.length) return err(res, 422, 'AMENDMENT_BELOW_RECEIVED', 'Quantité inférieure à ce qui a déjà été reçu : ' + sous.join(' ; ') + '.');
+  const dateLivraison = String(d.dateLivraison || c.dateLivraison);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateLivraison)) return err(res, 422, 'AMENDMENT_INVALID', 'Date de livraison invalide (AAAA-MM-JJ).');
+  const nouvelles = lignes.map((l) => ({ designation: String(l.designation).trim(), quantite: Number(l.quantite), unite: String(l.unite || 'unité').trim().slice(0, 30), prixUnitaire: Number(l.prixUnitaire) }));
+  const nouveauTotal = total({ lignes: nouvelles });
+  const plafond = c.montantOffre - engage(c.procedure.id, c.id);
+  if (nouveauTotal > plafond + 0.005) return err(res, 422, 'AMOUNT_EXCEEDED', `Le nouveau total dépasse le montant restant de l’offre retenue (${Math.round(plafond).toLocaleString('fr-FR')} ${c.devise}).`);
+  if (!(nouveauTotal > 0)) return err(res, 422, 'AMENDMENT_INVALID', 'Le montant de la commande modifiée doit rester positif.');
+  const circuit = C.appliquerMontant(C.reinitialiser((kvGet('circuitCommande') || { value: [] }).value), nouveauTotal * (c.taux || 1));
+  const a = { n: (c.avenants || []).length + 1, motif, lignes: nouvelles, dateLivraison, ancienTotal: total(c), nouveauTotal, circuit,
+    statut: C.nbRequises(circuit) ? 'validation' : 'validee', creePar: req.user.id, cree: frDate() };
+  db.transaction(() => {
+    c.avenants = (c.avenants || []).concat([a]);
+    journal(req, c, `avenant n° ${a.n} proposé (${Math.round(a.ancienTotal).toLocaleString('fr-FR')} → ${Math.round(nouveauTotal).toLocaleString('fr-FR')} ${c.devise}) — motif : ${motif}`);
+    commandeSave(c);
+  })();
+  res.status(201).json({ commande: vue(c) });
+});
+
+r.post('/:id/avenants/:n/approbations/:niveau', (req, res) => {
+  const c = req.commande, a = avenantDe(req, res), i = Number(req.params.niveau);
+  if (!a) return;
+  if (!valide(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Valider un bon de commande » requise.');
+  if (a.statut !== 'validation') return err(res, 409, 'AMENDMENT_NOT_SUBMITTED', 'Cet avenant n’est pas en attente de validation.');
+  const e = C.controle(a.circuit, i, req.user, [a.creePar]);
+  if (e) return err(res, e.status, e.code === 'SEPARATION_OF_DUTIES' ? 'ORDER_OWN' : e.code, e.code === 'SEPARATION_OF_DUTIES' ? 'Vous ne pouvez pas valider un avenant que vous avez établi.' : e.error);
+  db.transaction(() => {
+    Object.assign(a.circuit[i], { done: true, by: req.user.id, at: frDate() });
+    if (C.complet(a.circuit)) a.statut = 'validee';
+    journal(req, c, `avenant n° ${a.n} validé au niveau « ${a.circuit[i].role} »`);
+    commandeSave(c);
+  })();
+  res.json({ commande: vue(c) });
+});
+
+r.post('/:id/avenants/:n/rejet', (req, res) => {
+  const c = req.commande, a = avenantDe(req, res), motif = String((req.body || {}).motif || '').trim();
+  if (!a) return;
+  if (!valide(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Valider un bon de commande » requise.');
+  if (a.statut !== 'validation') return err(res, 409, 'AMENDMENT_NOT_SUBMITTED', 'Cet avenant n’est pas en attente de validation.');
+  if (!motif || motif.length > 1000) return err(res, 422, 'REJECTION_REASON_REQUIRED', 'Le rejet doit être motivé (1 000 caractères au plus).');
+  const i = C.prochaine(a.circuit), e = C.controle(a.circuit, i, req.user, [a.creePar]);
+  if (e) return err(res, e.status, e.code, e.error);
+  db.transaction(() => {
+    a.statut = 'rejete'; a.rejet = { niveau: i, role: a.circuit[i].role, motif, by: req.user.id, at: frDate() };
+    journal(req, c, `avenant n° ${a.n} rejeté (${a.circuit[i].role}) — motif : ${motif}`);
+    commandeSave(c);
+  })();
+  res.json({ commande: vue(c) });
+});
+
+/** Émission de l'avenant : numéro dérivé de la commande, empreinte, nouvelle version de la commande en vigueur. */
+r.post('/:id/avenants/:n/emettre', (req, res) => {
+  const c = req.commande, a = avenantDe(req, res);
+  if (!a) return;
+  if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Établir les bons de commande » requise.');
+  if (a.statut !== 'validee') return err(res, 409, 'AMENDMENT_NOT_VALIDATED', 'Seul un avenant validé peut être émis.');
+  if (!['emise', 'en_reception', 'receptionnee'].includes(c.statut)) return err(res, 409, 'ORDER_NOT_AMENDABLE', 'La commande n’accepte plus d’avenant.');
+  db.transaction(() => {
+    const precedente = { version: c.version || 0, lignes: c.lignes, dateLivraison: c.dateLivraison, empreinte: a.n > 1 ? (c.avenants[a.n - 2] || {}).empreinte || c.empreinte : c.empreinte };
+    a.numero = c.numero + '-A' + a.n;
+    a.emisLe = frDate(); a.emisPar = { id: req.user.id, nom: req.user.nom };
+    a.empreinte = crypto.createHash('sha256').update(JSON.stringify({ numero: a.numero, commande: c.numero, emisLe: a.emisLe, motif: a.motif,
+      lignes: a.lignes, total: a.nouveauTotal, dateLivraison: a.dateLivraison, precedente: precedente.empreinte })).digest('hex');
+    a.statut = 'emis';
+    c.versions = (c.versions || []).concat([precedente]);
+    c.lignes = a.lignes; c.dateLivraison = a.dateLivraison; c.version = a.n;
+    // la réception reprend selon les nouvelles quantités
+    const v = vue(c);
+    if (c.receptions.length) {
+      const complete = v.rapprochement.every((x) => x.ecart <= 1e-9);
+      c.statut = complete ? 'receptionnee' : 'en_reception';
+      if (!complete) delete c.receptionProvisoire;
+    } else c.statut = 'emise';
+    journal(req, c, `avenant ${a.numero} émis — empreinte ${a.empreinte.slice(0, 16)}…`);
+    commandeSave(c);
+  })();
   res.json({ commande: vue(c) });
 });
 

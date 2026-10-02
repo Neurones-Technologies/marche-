@@ -99,7 +99,7 @@ function vDashboard(m){
   var appro=(state.approvals||[]).filter(function(a){ return a.done && a.at; }).map(function(a){ return a.at; });
   var ss=state.standstill||{};
   [['Publication du dossier', state.cadre ? state.cadre.at : null, !!state.cdc.cdcPublie],
-   ['Ouverture des plis (prévue)', state.cdc.ouverture || 'date à fixer au cahier des charges', !!state.depClosed],
+   ['Ouverture des plis (prévue)', state.cdc.ouverture ? String(state.cdc.ouverture).split('-').reverse().join('/') : 'date à fixer au cahier des charges', !!state.depClosed],
    ['Clôture du dépouillement', state.fxFrozen ? state.fxFrozen.at : null, !!state.depClosed],
    ['Validation de l\u2019évaluation', dateAudit('Évaluation validée'), !!state.evalDone],
    ['Attribution prononcée', appro.length ? appro[appro.length-1] : null, allApproved()],
