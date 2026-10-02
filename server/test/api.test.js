@@ -15,7 +15,7 @@ async function call(method, url, body, cookie) {
   return { status: res.status, json: await res.json().catch(() => ({})), cookie: (res.headers.get('set-cookie') || '').split(';')[0] };
 }
 async function upload(doc, name, buf, cookie) {
-  const res = await fetch(base + '/api/files?doc=' + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: buf });
+  const res = await fetch(base + '/api/procedures/p1/files?doc=' + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: buf });
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');
@@ -25,26 +25,28 @@ test('connexion refusée avec un mauvais mot de passe', async () => {
   const r = await call('POST', '/api/auth/login', { email: 'y.koffi@bal.ci', password: 'faux' });
   assert.equal(r.status, 401);
 });
-test('état inaccessible sans session', async () => { assert.equal((await call('GET', '/api/state')).status, 401); });
+test('état inaccessible sans session', async () => { assert.equal((await call('GET', '/api/procedures/p1/state')).status, 401); });
 
-test('le soumissionnaire ne voit ni offres ni notes et ne peut pas modifier le CDC', async () => {
+test('le soumissionnaire ne voit pas une procédure non publiée', async () => {
   const c = await login('contact.sotrap@bal.ci');
-  const s = (await call('GET', '/api/state', null, c)).json.state;
-  assert.equal(s.offers.length, 0);
-  assert.deepEqual(s.quality, {});
-  const r = await call('PATCH', '/api/state', { changes: { cdc: { ...s.cdc, objet: 'piraté' } } }, c);
-  assert.equal(r.status, 403);
+  assert.equal((await call('GET', '/api/procedures/p1/state', null, c)).status, 404);
+  assert.deepEqual((await call('GET', '/api/procedures', null, c)).json.procedures, []);
 });
 
 test('publication du CDC puis dépôt d’offre avec accusé et audit', async () => {
   const achats = await login('y.koffi@bal.ci');
-  const st = (await call('GET', '/api/state', null, achats)).json;
-  const pub = await call('PATCH', '/api/state', { changes: { cdc: { ...st.state.cdc, cdcPublie: true } }, base: { cdc: st.revs.cdc } }, achats);
+  const st = (await call('GET', '/api/procedures/p1/state', null, achats)).json;
+  const pub = await call('PATCH', '/api/procedures/p1/state', { changes: { cdc: { ...st.state.cdc, cdcPublie: true } }, base: { cdc: st.revs.cdc } }, achats);
   assert.equal(pub.status, 200);
   const soum = await login('contact.sotrap@bal.ci');
-  const bad = await call('POST', '/api/offers', { name: 'X', iso: 'CI', devise: 'XOF', montant: -5, lots: ['l1'] }, soum);
+  // publiée, la procédure est visible du soumissionnaire, mais ni les offres ni les notes
+  const s = (await call('GET', '/api/procedures/p1/state', null, soum)).json.state;
+  assert.equal(s.offers.length, 0);
+  assert.deepEqual(s.quality, {});
+  assert.equal((await call('PATCH', '/api/procedures/p1/state', { changes: { cdc: { ...s.cdc, objet: 'piraté' } } }, soum)).status, 403);
+  const bad = await call('POST', '/api/procedures/p1/offers', { name: 'X', iso: 'CI', devise: 'XOF', montant: -5, lots: ['l1'] }, soum);
   assert.equal(bad.status, 422);
-  const noFiles = await call('POST', '/api/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', montant: 91000000, delai: 90, garantie: 24, refsCount: 4, lots: ['l1', 'l2'] }, soum);
+  const noFiles = await call('POST', '/api/procedures/p1/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', montant: 91000000, delai: 90, garantie: 24, refsCount: 4, lots: ['l1', 'l2'] }, soum);
   assert.equal(noFiles.status, 422);
   assert.match(noFiles.json.error, /Pièces manquantes/);
   assert.equal((await upload('registre', 'virus.exe', Buffer.from('MZ....'), soum)).status, 415);
@@ -52,10 +54,10 @@ test('publication du CDC puis dépôt d’offre avec accusé et audit', async ()
   const evalCookie = await login('f.assamoi@bal.ci');
   assert.equal((await upload('registre', 'a.pdf', PDF, evalCookie)).status, 403);
   for (const d of ['registre', 'fiscal', 'cnps', 'caution']) assert.equal((await upload(d, d + '.pdf', PDF, soum)).status, 201);
-  const ok = await call('POST', '/api/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', montant: 91000000, delai: 90, garantie: 24, refsCount: 4, lots: ['l1', 'l2'] }, soum);
+  const ok = await call('POST', '/api/procedures/p1/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', montant: 91000000, delai: 90, garantie: 24, refsCount: 4, lots: ['l1', 'l2'] }, soum);
   assert.equal(ok.status, 201);
   assert.match(ok.json.receipt.num, /^DEP-\d{4}$/);
-  const after = (await call('GET', '/api/state', null, achats)).json.state;
+  const after = (await call('GET', '/api/procedures/p1/state', null, achats)).json.state;
   assert.ok(after.offers.some((o) => o.name === 'SOTRAP SARL'));
   assert.ok(after.audit.some((e) => e.a.includes('Dépôt enregistré')));
   const piece = after.offers.find((o) => o.name === 'SOTRAP SARL').pieces[0];
@@ -71,44 +73,44 @@ test('publication du CDC puis dépôt d’offre avec accusé et audit', async ()
 
 test('notation : déclaration de conflit d’intérêts obligatoire, une seule fois par personne', async () => {
   const ev = await login('f.assamoi@bal.ci');
-  const st = (await call('GET', '/api/state', null, ev)).json;
+  const st = (await call('GET', '/api/procedures/p1/state', null, ev)).json;
   const q = JSON.parse(JSON.stringify(st.state.quality)); const id = Object.keys(q)[0]; q[id].metho = 55;
-  let r = await call('PATCH', '/api/state', { changes: { quality: q } }, ev);
+  let r = await call('PATCH', '/api/procedures/p1/state', { changes: { quality: q } }, ev);
   assert.equal(r.status, 403);
   // impossible de déclarer pour autrui
-  r = await call('PATCH', '/api/state', { changes: { coi: { u3: { declare: true, conflit: false } } } }, ev);
+  r = await call('PATCH', '/api/procedures/p1/state', { changes: { coi: { u3: { declare: true, conflit: false } } } }, ev);
   assert.equal(r.status, 403);
-  r = await call('PATCH', '/api/state', { changes: { coi: { u2: { declare: true, conflit: false, t: 'now' } } } }, ev);
+  r = await call('PATCH', '/api/procedures/p1/state', { changes: { coi: { u2: { declare: true, conflit: false, t: 'now' } } } }, ev);
   assert.equal(r.status, 200);
   // Déclaration faite : le refus vient maintenant du séquencement (dépouillement non clôturé).
   // Le parcours complet jusqu'à la notation acceptée est dans sequencement.test.js.
-  const st2 = (await call('GET', '/api/state', null, ev)).json;
-  r = await call('PATCH', '/api/state', { changes: { quality: q }, base: { quality: st2.revs.quality } }, ev);
+  const st2 = (await call('GET', '/api/procedures/p1/state', null, ev)).json;
+  r = await call('PATCH', '/api/procedures/p1/state', { changes: { quality: q }, base: { quality: st2.revs.quality } }, ev);
   assert.equal(r.status, 409);
   assert.equal(r.json.code, 'GATE_DEPOUILLEMENT_NOT_CLOSED');
 });
 
 test('séparation des rôles : l’évaluateur ne peut pas approuver ni signer', async () => {
   const ev = await login('f.assamoi@bal.ci');
-  const st = (await call('GET', '/api/state', null, ev)).json.state;
+  const st = (await call('GET', '/api/procedures/p1/state', null, ev)).json.state;
   const ap = JSON.parse(JSON.stringify(st.approvals)); ap[0].done = true;
-  assert.equal((await call('PATCH', '/api/state', { changes: { approvals: ap } }, ev)).status, 403);
-  assert.equal((await call('PATCH', '/api/state', { changes: { contractSigned: true } }, ev)).status, 403);
+  assert.equal((await call('PATCH', '/api/procedures/p1/state', { changes: { approvals: ap } }, ev)).status, 403);
+  assert.equal((await call('PATCH', '/api/procedures/p1/state', { changes: { contractSigned: true } }, ev)).status, 403);
 });
 
 test('signature du marché impossible tant que tous les niveaux n’ont pas approuvé', async () => {
   const c = await login('a.diomande@bal.ci');
-  const r = await call('PATCH', '/api/state', { changes: { contractSigned: true } }, c);
+  const r = await call('PATCH', '/api/procedures/p1/state', { changes: { contractSigned: true } }, c);
   assert.equal(r.status, 403);
   assert.match(r.json.error, /approbation/);
 });
 
 test('conflit de révision détecté (409)', async () => {
   const c = await login('y.koffi@bal.ci');
-  const st = (await call('GET', '/api/state', null, c)).json;
+  const st = (await call('GET', '/api/procedures/p1/state', null, c)).json;
   const crit = st.state.criteria;
-  assert.equal((await call('PATCH', '/api/state', { changes: { criteria: crit }, base: { criteria: st.revs.criteria } }, c)).status, 200);
-  assert.equal((await call('PATCH', '/api/state', { changes: { criteria: crit }, base: { criteria: st.revs.criteria } }, c)).status, 409);
+  assert.equal((await call('PATCH', '/api/procedures/p1/state', { changes: { criteria: crit }, base: { criteria: st.revs.criteria } }, c)).status, 200);
+  assert.equal((await call('PATCH', '/api/procedures/p1/state', { changes: { criteria: crit }, base: { criteria: st.revs.criteria } }, c)).status, 409);
 });
 
 test('le journal d’audit est chaîné et vérifiable', async () => {
@@ -120,13 +122,13 @@ test('le journal d’audit est chaîné et vérifiable', async () => {
 
 test('un administrateur ne peut pas se retirer la gestion des rôles', async () => {
   const c = await login('administrateur@bal.ci');
-  const st = (await call('GET', '/api/state', null, c)).json.state;
+  const st = (await call('GET', '/api/procedures/p1/state', null, c)).json.state;
   const roles = JSON.parse(JSON.stringify(st.roles)); roles.admin.perms['roles.edit'] = false;
-  assert.equal((await call('PATCH', '/api/state', { changes: { roles } }, c)).status, 403);
+  assert.equal((await call('PATCH', '/api/procedures/p1/state', { changes: { roles } }, c)).status, 403);
 });
 
 test('requêtes d’écriture non JSON refusées', async () => {
-  const res = await fetch(base + '/api/audit', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'a=1' });
+  const res = await fetch(base + '/api/procedures/p1/audit', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'a=1' });
   assert.equal(res.status, 415);
 });
 
@@ -139,7 +141,7 @@ test('gestion des comptes : création, changement de rôle, désactivation', asy
   assert.equal(l.status, 200);
   assert.equal((await call('PATCH', '/api/auth/users/' + made.json.id, { role: 'evaltech' }, admin)).status, 200);
   assert.equal((await call('PATCH', '/api/auth/users/' + made.json.id, { active: false }, admin)).status, 200);
-  assert.equal((await call('GET', '/api/state', null, l.cookie)).status, 401); // session coupée aussitôt
+  assert.equal((await call('GET', '/api/procedures/p1/state', null, l.cookie)).status, 401); // session coupée aussitôt
   const buyer = await login('y.koffi@bal.ci');
   assert.equal((await call('POST', '/api/auth/users', { nom: 'X', role: 'audit', password: 'Initial2026ok' }, buyer)).status, 403);
 });

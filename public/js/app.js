@@ -89,7 +89,7 @@ var UI = { q:'', sort:'nom' };
 /* Clés partagées avec le serveur ; view / offerIndex / draft restent propres à chaque session. */
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
-  'mailFrom','mailSuffix','approvals','offers'];
+  'mailFrom','mailSuffix','approvals','offers','circuitModele'];
 var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre'];
 var synced = {}, revs = {}, serverRev = 0, flushing = false, dirty = false, flushTimer = null;
 var EMPTY_DRAFT = function(){ return { name:'', iso:'CI', devise:'XOF', montant:'', delai:'', garantie:'', refsCount:'', lots:[], docs:{} }; };
@@ -123,21 +123,22 @@ function flush(){
   dirty=false;
   if(!Object.keys(changes).length) return;
   flushing=true;
-  MP.api('PATCH','/api/state',{changes:changes, base:revs}).then(function(r){
+  return MP.api('PATCH',MP.url('/state'),{changes:changes, base:revs}).then(function(r){
     Object.keys(sent).forEach(function(k){ synced[k]=sent[k]; if(r.revs && r.revs[k]) revs[k]=r.revs[k]; });
     serverRev=r.rev;
   }).catch(function(err){
     toast(err.message||'Enregistrement impossible.');
-    return MP.api('GET','/api/state').then(function(p){ applyServer(p,false); render(); });
+    return MP.api('GET',MP.url('/state')).then(function(p){ applyServer(p,false); render(); });
   }).then(function(){ flushing=false; if(dirty) flush(); });
 }
 function poll(){
   if(!state || flushing || dirty) return Promise.resolve();
-  return MP.api('GET','/api/state?since='+serverRev).then(function(p){
+  return MP.api('GET',MP.url('/state?since='+serverRev)).then(function(p){
     if(p.unchanged) return;
     var ae=document.activeElement;
     if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest && ae.closest('#main')) return; // ne pas perturber une saisie
-    applyServer(p,true); render();
+    applyServer(p,true);
+    return MP.refreshProcs().then(render); // une autre procédure a pu être créée, publiée ou archivée
   }).catch(function(){});
 }
 
@@ -152,7 +153,7 @@ function logit(a){
   var u=me(), who=u.nom+' — '+((state.roles[u.role]&&state.roles[u.role].lab)||u.role);
   state.audit.unshift({ t:new Date().toLocaleString('fr-FR'), who:who, a:a });
   if (state.audit.length>200) state.audit.length=200;
-  MP.api('POST','/api/audit',{a:a}).catch(function(){});
+  MP.api('POST',MP.url('/audit'),{a:a}).catch(function(){});
   toast(a);
 }
 /* Conserve le focus clavier et la position de defilement au travers d'un rendu */
@@ -893,6 +894,7 @@ function vide(parent, ic, titre, texte){
 var VIEWS=[
   {id:'dashboard',  label:'Tableau de bord', grp:'Pilotage'},
   {id:'notifs',     label:'Notifications', grp:'Pilotage'},
+  {id:'procedures', label:'Procédures', grp:'Pilotage'},
   {id:'cdc',        label:'Cahier des charges', grp:'Préparation', perm:'cdc.edit'},
   {id:'dao',        label:'DAO', grp:'Préparation', perm:'cdc.edit'},
   {id:'criteres',   label:'Grille de critères', grp:'Préparation', perm:'criteres.edit'},
@@ -1085,21 +1087,20 @@ function vDashboard(m){
   });
 
   var oth=add(g2,'div','card');
-  add(oth,'div','panel-head','Autres procédures du portefeuille');
+  add(oth,'div','panel-head','Autres procédures en cours');
   var ob=add(oth,'div','pad');
-  [['AO-2026-013','Travaux de rénovation — siège régional','Évaluation','c-blue','11 offres'],
-   ['DC-2026-041','Maintenance climatisation — agences Abidjan','Dépouillement','c-amber','5 offres'],
-   ['RC-2026-008','Audit sécurité — infrastructure IT','Brouillon','c-grey','—'],
-   ['AO-2026-012','Acquisition de véhicules de service','Attribué','c-green','9 offres'],
-   ['AO-2026-009','Fourniture de groupes électrogènes','Attribué','c-green','6 offres']
-  ].forEach(function(x){
+  var autres=MP.procs().filter(function(p){ return p.id!==MP.pid() && !p.archive; });
+  if(!autres.length) add(ob,'p','muted','Aucune autre procédure en cours.');
+  autres.forEach(function(p){
     var r=add(ob,'div','docline');
     var lf=add(r,'div');
-    add(lf,'div',null,x[0]+' — '+x[1]).style.fontWeight='600';
-    add(lf,'div','muted',x[4]);
-    add(r,'span','chip '+x[3],x[2]);
+    add(lf,'div',null,p.ref+' — '+(p.objet||'')).style.fontWeight='600';
+    var st=statutProcedure(p); add(r,'span','chip '+st[1],st[0]);
+    var bo=add(r,'button','btn btn-ghost btn-sm','Ouvrir');
+    bo.addEventListener('click',function(){ ouvrirProcedure(p.id,'dashboard'); });
   });
-  add(add(oth,'div','panel-foot'),'span','muted','Contexte de démonstration : seule la procédure '+REF()+' est instrumentée dans ce prototype.');
+  var fo=add(oth,'div','panel-foot');
+  add(fo,'span','muted','Toutes les procédures, y compris archivées, sont dans l’écran Procédures.');
 
   var n=add(m,'div','note');
   add(n,'strong',null,'Préférence communautaire. ');
@@ -1426,7 +1427,8 @@ var ICONS = {
   clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z|M12 7v5l3 2',
   info:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z|M12 11v5M12 8h.01',
   arrow:'M5 12h14M13 6l6 6-6 6',
-  lock:'M6 11h12v10H6z|M8 11V7a4 4 0 0 1 8 0v4'
+  lock:'M6 11h12v10H6z|M8 11V7a4 4 0 0 1 8 0v4',
+  folder:'M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z'
 };
 function icon(parent, name){
   var NS='http://www.w3.org/2000/svg', s=document.createElementNS(NS,'svg');
@@ -1438,7 +1440,7 @@ function icon(parent, name){
   return s;
 }
 /* Icône de chaque écran du menu. */
-var NAV_ICONS = { dashboard:'home', notifs:'bell', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
+var NAV_ICONS = { dashboard:'home', notifs:'bell', procedures:'folder', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
   reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
   recours:'scale', pv:'stamp', audit:'list', roles:'key', comptes:'users', params:'cog', regles:'ring' };
 
@@ -2004,7 +2006,7 @@ function vPortail(m){
   if(!d.files) d.files={};
   if(!PIECES_OK){
     PIECES_OK=true;
-    MP.api('GET','/api/files/mine').then(function(list){
+    MP.api('GET',MP.url('/files/mine')).then(function(list){
       d.files={}; Object.keys(d.docs).forEach(function(k){ d.docs[k]=false; });
       list.forEach(function(f){ d.files[f.doc]=f; d.docs[f.doc]=true; });
       if(state.view==='portail') render();
@@ -2118,7 +2120,7 @@ function vPortail(m){
       var f=inp.files&&inp.files[0]; if(!f) return;
       if(f.size>10*1024*1024){ toast('Fichier trop volumineux (10 Mo maximum).'); return; }
       btn.disabled=true; btn.textContent='Envoi…';
-      MP.upload('/api/files?doc='+encodeURIComponent(doc.id), f).then(function(m){
+      MP.upload(MP.url('/files?doc=')+encodeURIComponent(doc.id), f).then(function(m){
         d.files=d.files||{}; d.files[doc.id]=m; d.docs[doc.id]=true; toast('Pièce jointe enregistrée.'); save(); render();
       }).catch(function(e){ toast(e.message||'Envoi impossible.'); render(); });
     });
@@ -2126,7 +2128,7 @@ function vPortail(m){
       var rm=add(act,'button','btn btn-ghost btn-sm','Retirer');
       rm.setAttribute('aria-label','Retirer le fichier : '+doc.label);
       rm.addEventListener('click',function(){
-        MP.api('DELETE','/api/files/'+meta.id).then(function(){ delete d.files[doc.id]; d.docs[doc.id]=false; save(); render(); })
+        MP.api('DELETE',MP.url('/files/'+meta.id)).then(function(){ delete d.files[doc.id]; d.docs[doc.id]=false; save(); render(); })
           .catch(function(e){ toast(e.message||'Suppression impossible.'); });
       });
     }
@@ -2181,7 +2183,7 @@ function vPortail(m){
   sub.disabled = errs.length>0; guard('portail.use',sub);
   sub.addEventListener('click',function(){
     sub.disabled=true;
-    MP.api('POST','/api/offers',{ name:d.name.trim(), iso:d.iso, devise:d.devise, montant:Number(d.montant), delai:Number(d.delai)||0,
+    MP.api('POST',MP.url('/offers'),{ name:d.name.trim(), iso:d.iso, devise:d.devise, montant:Number(d.montant), delai:Number(d.delai)||0,
       garantie:Number(d.garantie)||0, refsCount:Number(d.refsCount)||0, lots:d.lots, docs:d.docs }).then(function(r){
       var offer=r.offer, receipt=r.receipt;
       SEED_OFFERS.push(offer); state.quality[offer.id]={metho:offer.aiMetho, refs:offer.aiRefs};
@@ -2301,7 +2303,7 @@ function vComptes(m){
         Object.keys(state.roles).forEach(function(r){ var o=add(sel,'option',null,state.roles[r].lab); o.value=r; if(r===u.role) o.selected=true; });
         sel.disabled = u.id===me0;
         sel.addEventListener('change',function(){
-          MP.api('PATCH','/api/auth/users/'+u.id,{role:sel.value}).then(function(){ msg('Rôle modifié — '+u.nom); return MP.api('GET','/api/state'); })
+          MP.api('PATCH','/api/auth/users/'+u.id,{role:sel.value}).then(function(){ msg('Rôle modifié — '+u.nom); return MP.api('GET',MP.url('/state')); })
             .then(function(p){ var us=p.state.users; state.users=us; synced.users=JSON.stringify(us); charger(); })
             .catch(function(e){ msg(e.message); charger(); });
         });
@@ -2341,7 +2343,7 @@ function vComptes(m){
     go.disabled=true;
     MP.api('POST','/api/auth/users',{nom:nom.value.trim(), email:mail.value.trim(), role:rs.value, password:pw.value}).then(function(u){
       msg('Compte créé — '+u.nom); nom.value=''; mail.value=''; pw.value='';
-      return MP.api('GET','/api/state').then(function(p){ state.users=p.state.users; synced.users=JSON.stringify(p.state.users); });
+      return MP.api('GET',MP.url('/state')).then(function(p){ state.users=p.state.users; synced.users=JSON.stringify(p.state.users); });
     }).then(charger).catch(function(e){ msg(e.message); }).then(function(){ go.disabled=false; });
   });
 }
@@ -2421,6 +2423,91 @@ function vRoles(m){
   var nb=add(m,'div','note');
   add(nb,'strong',null,'Pourquoi la séparation des fonctions compte ici. ');
   nb.appendChild(document.createTextNode("Un même agent qui note les offres et approuve l'attribution rend la procédure indéfendable en cas de recours : il n'existe plus de contrôle croisé à opposer au soumissionnaire évincé. L'outil signale ces cumuls sans les interdire, parce que dans une petite structure ils sont parfois inévitables — mais ils doivent alors être assumés et documentés."));
+}
+
+/* ============ Procédures ============ */
+function statutProcedure(p){
+  if(p.archive) return ['Archivée','c-grey'];
+  if(p.signe) return ['Marché signé','c-green'];
+  if(p.infructueux) return ['Infructueuse','c-red'];
+  if(p.evaluation) return ['Évaluation validée','c-teal'];
+  if(p.depouillement) return ['Dépouillement clôturé','c-teal'];
+  if(p.publie) return ['Publiée','c-amber'];
+  return ['En préparation','c-grey'];
+}
+function vProcedures(m){
+  var h=add(m,'div','head'); var l=add(h,'div');
+  add(l,'h1',null,'Procédures');
+  add(l,'p','lede', can('offres.read')
+    ? "Chaque procédure a son dossier, ses offres, son évaluation et son journal. Les paramètres, les rôles et les comptes sont communs à toute l’organisation."
+    : "Les appels d’offres publiés auxquels vous pouvez répondre.");
+
+  var list=MP.procs();
+  var actives=list.filter(function(p){ return !p.archive; }), archivees=list.filter(function(p){ return p.archive; });
+  function ligne(parent,p){
+    var row=add(parent,'div','docline');
+    var lf=add(row,'div'); lf.style.flex='1 1 280px';
+    var t=add(lf,'div'); add(t,'strong',null,p.ref);
+    if(p.id===MP.pid()) add(t,'span','chip c-teal','Ouverte').style.marginLeft='8px';
+    add(lf,'div','muted',p.objet||'');
+    var st=statutProcedure(p); add(row,'span','chip '+st[1],st[0]);
+    if(p.id!==MP.pid()){
+      var bo=add(row,'button','btn btn-ghost btn-sm','Ouvrir'); fk(bo,'proc-open-'+p.id);
+      bo.addEventListener('click',function(){ ouvrirProcedure(p.id,'dashboard'); });
+    }
+    if(can('params.edit')){
+      var ba=add(row,'button','btn btn-ghost btn-sm',p.archive?'Désarchiver':'Archiver'); fk(ba,'proc-arch-'+p.id);
+      ba.addEventListener('click',function(){
+        var faire=function(){
+          MP.api('PATCH','/api/procedures/'+encodeURIComponent(p.id),{archive:!p.archive})
+            .then(function(){ return MP.refreshProcs(); }).then(function(){ toast('Procédure '+p.ref+(p.archive?' désarchivée.':' archivée.')); render(); })
+            .catch(function(e){ toast(e.message); });
+        };
+        if(p.archive) faire();
+        else ask("Une procédure archivée se consulte toujours, mais plus rien ne peut y être modifié. Elle disparaît de la liste des soumissionnaires.", faire, 'Archiver '+p.ref+' ?', 'Archiver');
+      });
+    }
+  }
+  var k1=add(m,'div','card');
+  var ph=add(k1,'div','panel-head'); add(ph,'span',null,'En cours');
+  add(ph,'span','chip c-grey',actives.length+' procédure(s)');
+  var b1=add(k1,'div','pad');
+  if(!actives.length) vide(b1,'📁','Aucune procédure en cours', can('cdc.edit') ? 'Créez la première ci-dessous.' : 'Aucun appel d’offres n’est ouvert pour le moment.');
+  actives.forEach(function(p){ ligne(b1,p); });
+  if(archivees.length){
+    var k2=add(m,'div','card'); k2.style.marginTop='18px';
+    add(k2,'div','panel-head','Archivées');
+    var b2=add(k2,'div','pad');
+    archivees.forEach(function(p){ ligne(b2,p); });
+  }
+
+  if(!can('cdc.edit')) return;
+  var k3=add(m,'div','card'); k3.style.marginTop='18px';
+  add(k3,'div','panel-head','Nouvelle procédure');
+  var b3=add(k3,'div','pad');
+  var f=add(b3,'div','frm');
+  function champ(lab,id,type){
+    var w=add(f,'div'); add(w,'label',null,lab).setAttribute('for',id);
+    var i=add(w,type==='textarea'?'textarea':'input'); i.id=id; fk(i,id);
+    if(type==='textarea'){ i.rows=2; w.style.gridColumn='1/-1'; } else i.type='text';
+    return i;
+  }
+  var ir=champ('Référence','np-ref'); ir.maxLength=40; ir.placeholder='AO-2026-020';
+  var io=champ('Objet du marché','np-objet','textarea'); io.maxLength=500;
+  var w=add(f,'div'); add(w,'label',null,'Profil réglementaire').setAttribute('for','np-profil');
+  var sp=add(w,'select'); sp.id='np-profil'; fk(sp,'np-profil');
+  Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(sp,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
+  sp.value=(state.org && state.org.profilDefaut) || MPProfils.DEFAUT;
+  var foot=add(k3,'div','panel-foot');
+  add(foot,'span','muted','Le dossier part du cahier des charges modèle, de la grille de critères par défaut et du circuit d’approbation par défaut. Il reste à compléter avant publication.');
+  var bc=add(foot,'button','btn btn-primary','Créer la procédure'); fk(bc,'np-go');
+  bc.addEventListener('click',function(){
+    bc.disabled=true;
+    MP.api('POST','/api/procedures',{ ref:ir.value.trim(), objet:io.value.trim(), profil:sp.value })
+      .then(function(r){ return MP.refreshProcs().then(function(){ return r.id; }); })
+      .then(function(id){ toast('Procédure '+ir.value.trim()+' créée.'); ouvrirProcedure(id,'cdc'); })
+      .catch(function(e){ toast(e.message); bc.disabled=false; });
+  });
 }
 
 /* ============ Paramètres ============ */
@@ -2509,7 +2596,7 @@ function vParams(m){
   });
 
   var k5=add(m,'div','card'); k5.style.marginTop='18px';
-  add(k5,'div','panel-head','5 · Circuit d\u2019approbation');
+  add(k5,'div','panel-head','5 · Circuit d\u2019approbation de la procédure '+REF());
   var b5=add(k5,'div','pad');
   var rk=Object.keys(state.roles);
   state.approvals.forEach(function(a,i){
@@ -2537,7 +2624,11 @@ function vParams(m){
     });
   });
   var f5=add(k5,'div','panel-foot');
-  add(f5,'span','muted',state.approvals.length+' niveau(x) configuré(s). L\u2019ordre détermine la séquence d\u2019approbation.');
+  add(f5,'span','muted',state.approvals.length+' niveau(x) configuré(s). L\u2019ordre détermine la séquence d\u2019approbation. Une nouvelle procédure part du circuit par défaut.');
+  add(f5,'button','btn btn-ghost btn-sm','Enregistrer comme circuit par défaut').addEventListener('click',function(){
+    state.circuitModele=state.approvals.map(function(a){ return {role:a.role, who:a.who}; });
+    logit('Circuit d\u2019approbation par défaut : '+state.circuitModele.map(function(a){ return a.role; }).join(' → ')); save(); render();
+  });
   add(f5,'button','btn btn-ghost btn-sm','+ Ajouter un niveau').addEventListener('click',function(){
     state.approvals.push({role:'Nouveau niveau de validation', who:'À désigner', done:false});
     logit('Niveau d\u2019approbation ajouté'); save(); render();
@@ -2989,11 +3080,29 @@ function coiBanner(m){
   return true;
 }
 
-var ROUTER={dashboard:vDashboard, notifs:vNotifs, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
+var ROUTER={dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
 function isAdminView(id){ return VIEWS.some(function(v){ return v.id===id && v.grp==='Administration'; }); }
+/* Sélecteur de la procédure courante, en tête du menu. Les procédures archivées n'y figurent que si l'une est ouverte. */
+function renderProcSel(){
+  var box=document.getElementById('side-proc'); box.textContent='';
+  var list=MP.procs().filter(function(p){ return !p.archive || p.id===MP.pid(); });
+  add(box,'label','navgrp','Procédure').setAttribute('for','proc-sel');
+  var s=add(box,'select'); s.id='proc-sel';
+  list.forEach(function(p){ var o=add(s,'option',null,p.ref+(p.archive?' (archivée)':'')+' — '+(p.objet||'')); o.value=p.id; });
+  s.value=MP.pid();
+  s.addEventListener('change',function(){ ouvrirProcedure(s.value); });
+}
+/* Ouvre une autre procédure : les saisies en attente partent d'abord, l'écran courant est conservé s'il existe. */
+function ouvrirProcedure(id, vue){
+  if(id===MP.pid()){ if(vue) go(vue); return; }
+  if(flushTimer) clearTimeout(flushTimer);
+  var v=vue||state.view;
+  Promise.resolve(flush()).then(function(){ return MP.switchTo(id); }).then(function(){ if(viewAllowed(v)) go(v); closeMenu(); })
+    .catch(function(e){ toast(e.message||'Procédure inaccessible.'); });
+}
 function renderHeader(){
   var org=state.org||{};
   var t=document.getElementById('tenant'); t.textContent='';
@@ -3007,6 +3116,7 @@ function render(){
   var sy = window.scrollY;
 
   renderNav();
+  renderProcSel();
   renderHeader();
   var ph=phase(), chip=document.getElementById('phase-chip');
   chip.textContent=ph.k; chip.className='chip '+ph.c;
@@ -3015,6 +3125,11 @@ function render(){
   for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===state.view) lbl=VIEWS[i].label;
   document.title = (lbl? lbl+' — ' : '')+'Marché+';
   var m=document.getElementById('main'); m.textContent='';
+  var cur=MP.current();
+  if(cur && cur.archive && !isAdminView(state.view) && state.view!=='procedures'){
+    var na=add(m,'div','note'); add(na,'strong',null,'Procédure archivée. ');
+    na.appendChild(document.createTextNode('Elle se consulte mais ne se modifie plus.'));
+  }
   (ROUTER[state.view]||vDashboard)(m);
 
   if(prevFk){
@@ -3037,8 +3152,9 @@ document.addEventListener('keydown',function(e){
 var resetBtn=document.getElementById('btn-reset-all');
 resetBtn.addEventListener('click',function(){
   ask("Toutes les saisies, les offres déposées, les décisions et la piste d'audit seront effacées. Cette action est irréversible.", function(){
-    MP.api('POST','/api/admin/reset',{}).then(function(){ return MP.api('GET','/api/state'); }).then(function(p){
-      state=null; synced={}; applyServer(p,false); state.view='dashboard'; render(); toast('Démonstration réinitialisée.');
+    // la démonstration ne compte plus que la procédure p1 : on la rouvre
+    MP.api('POST','/api/admin/reset',{}).then(function(){ return MP.refreshProcs(); }).then(function(){ return MP.switchTo('p1',{fromLogin:true}); }).then(function(){
+      toast('Démonstration réinitialisée.');
     }).catch(function(e){ toast(e.message||'Réinitialisation impossible.'); });
   }, 'Réinitialiser la démonstration ?', 'Tout effacer');
 });
@@ -3051,6 +3167,17 @@ window.MarchePlus = {
     resetBtn.style.display = can('params.edit')||can('roles.edit') ? '' : 'none'; render();
   },
   poll:poll,
+  /* Aucune procédure visible (soumissionnaire sans appel d'offres publié) : rien à afficher qu'un message. */
+  none:function(user){
+    state=null; synced={};
+    document.getElementById('navs').textContent=''; document.getElementById('side-proc').textContent='';
+    document.getElementById('phase-chip').style.display='none';
+    resetBtn.style.display='none';
+    var m=document.getElementById('main'); m.textContent='';
+    var c=add(m,'div','card empty');
+    add(c,'h2',null,'Aucun appel d’offres ouvert');
+    add(c,'p','muted', user && user.role==='soum' ? 'Aucune procédure n’est publiée pour le moment. Les appels d’offres apparaîtront ici dès leur publication.' : 'Aucune procédure n’est encore créée sur cette instance.');
+  },
   stop:function(){ if(flushTimer) clearTimeout(flushTimer); state=null; synced={}; dirty=false; }
 };
 })();

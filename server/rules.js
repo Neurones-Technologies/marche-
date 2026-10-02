@@ -3,7 +3,7 @@
    le même fichier que celui exécuté par le navigateur. */
 const R = require('../public/js/regles.js');
 const P = require('../public/js/profils.js');
-const { seed, kvGet, offersAll, frDate } = require('./db');
+const { seed, frDate } = require('./db');
 
 // clé d'état -> habilitations (au moins une requise). '*' = tout utilisateur connecté.
 // recours.handle figure sur evalDone, approvals et standstill pour le seul cas du recours déclaré fondé.
@@ -18,7 +18,7 @@ const WRITE_PERMS = {
   evalDone: ['eval.validate', 'recours.handle'],
   approvals: ['decision.approve', 'params.edit', 'recours.handle'],
   org: ['params.edit'], seuils: ['params.edit'], docDefs: ['params.edit'],
-  mailFrom: ['params.edit'], mailSuffix: ['params.edit'],
+  mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'],
   offers: ['params.edit'],
   roles: ['roles.edit'], users: ['roles.edit'], delegations: ['roles.edit'],
   notifRules: ['notif.manage'],
@@ -36,14 +36,17 @@ const CAPS = { notifs: 120, emails: 80, qa: 500, additifs: 200, clarifs: 500, re
 function isObj(x) { return x && typeof x === 'object' && !Array.isArray(x); }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const refus = (status, code, error) => ({ status, code, error });
-const stored = (k) => (kvGet(k) || {}).value;
+/* État de la procédure en cours de traitement (db.store) : posé au début de validateChange et effectsOf,
+   appelés de façon synchrone dans la même requête. */
+let ST = null;
+const stored = (k) => ST.get(k);
 
 /** Valeur après application du lot de changements : celle envoyée si la clé est modifiée, sinon celle en base. */
 function nextOf(changes) { return (k) => (k in changes ? changes[k] : stored(k)); }
 
 function ctxOf(get) {
   return {
-    offers: offersAll(), org: get('org'), fxFrozen: stored('fxFrozen'), cadre: stored('cadre'), cdc: get('cdc'), criteria: get('criteria'),
+    offers: ST.offers(), org: get('org'), fxFrozen: stored('fxFrozen'), cadre: stored('cadre'), cdc: get('cdc'), criteria: get('criteria'),
     quality: get('quality'), justif: get('justif'), excluded: get('excluded'), confirmed: get('confirmed'), docDefs: get('docDefs'),
   };
 }
@@ -61,8 +64,9 @@ function hasFoundedAppeal(changes) {
   return changes.recours.some((r, i) => r && r.statut === 'fonde' && cur[i] && cur[i].statut === 'ouvert');
 }
 
-/** Valide un changement de clé. Retourne null si OK ; sinon un message (403) ou { status, code, error }. */
+/** Valide un changement de clé de la procédure req.store. Retourne null si OK ; sinon un message (403) ou { status, code, error }. */
 function validateChange(key, value, req, changes = { [key]: value }) {
+  ST = req.store;
   const perms = WRITE_PERMS[key];
   if (!perms) return `Clé d'état inconnue ou non modifiable : ${key}`;
   if (!perms.includes('*') && !perms.some((p) => req.can(p))) return `Habilitation insuffisante pour « ${key} ».`;
@@ -114,7 +118,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       break;
     case 'quality': {
       if (!isObj(value)) return 'Notes invalides.';
-      const coi = ((kvGet('coi') || {}).value || {})[uid];
+      const coi = (stored('coi') || {})[uid];
       if (!coi || !coi.declare || coi.conflit) return 'Déclaration d’absence de conflit d’intérêts requise avant de noter.';
       for (const o of Object.values(value)) for (const v of Object.values(o || {})) if (!(Number(v) >= 0 && Number(v) <= 100)) return 'Une note doit être comprise entre 0 et 100.';
       if (same(value, cur)) break;
@@ -246,7 +250,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       // Les offres sont construites par le serveur au dépôt (POST /api/offers) et ne se modifient plus ensuite :
       // changer un montant, une devise, un délai ou une pièce après dépôt serait une négociation déguisée.
       if (!Array.isArray(value) || value.some((o) => !o || !o.id)) return 'Liste d’offres invalide.';
-      const byId = new Map(offersAll().map((o) => [o.id, o]));
+      const byId = new Map(ST.offers().map((o) => [o.id, o]));
       if (value.length !== byId.size || value.some((o) => !byId.has(o.id) || !same(o, byId.get(o.id))))
         return refus(409, 'OFFER_LOCKED', 'Une offre déposée ne peut pas être modifiée.');
       break;
@@ -262,7 +266,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
     }
     case 'users': {
       if (!Array.isArray(value)) return 'Liste d’utilisateurs invalide.';
-      const roles = (kvGet('roles') || {}).value || {};
+      const roles = stored('roles') || {};
       if (value.some((u) => !u || !u.id || !roles[u.role])) return 'Utilisateur ou rôle invalide.';
       break;
     }
@@ -283,6 +287,11 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (errs.length) return refus(422, 'SETTING_OUT_OF_BOUNDS', 'Réglage refusé par le profil réglementaire : ' + errs.map((e) => `${e.regle} (${e.motif})`).join(' ; ') + '.');
       break;
     }
+    case 'circuitModele':
+      if (!Array.isArray(value) || !value.length || value.some((a) => !isObj(a) || typeof a.role !== 'string' || !a.role.trim()))
+        return 'Circuit modèle invalide : au moins un niveau, chacun avec un intitulé.';
+      value.forEach((a, i) => { value[i] = { role: String(a.role).slice(0, 120), who: String(a.who || '').slice(0, 120) }; });
+      break;
     case 'docDefs': {
       if (!Array.isArray(value) || value.some((d) => !isObj(d) || !d.id)) return 'Liste de pièces invalide.';
       const ids = new Set(value.map((d) => d.id));
@@ -305,6 +314,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
  * historique de séparation des fonctions, gel du cadre réglementaire et des taux, classement arrêté. Retourne { kv, audit }.
  */
 function effectsOf(changes, req) {
+  ST = req.store;
   const uid = req.user.id, next = nextOf(changes);
   const s = sod(), before = JSON.stringify(s), kv = {}, audit = [];
   const add = (list) => { if (!list.includes(uid)) list.push(uid); };

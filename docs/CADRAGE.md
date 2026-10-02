@@ -166,7 +166,8 @@ Déjà en place : dépôt dématérialisé, réception, dépouillement, conformi
 - **Jalons** issus de la commande : livraisons, prestations, échéances de paiement, garanties à libérer.
 - **Réceptions** par le service demandeur : quantité reçue, conformité, réserves, photos ou procès-verbal.
   Réception provisoire, puis définitive.
-- **Rapprochement** commande / réception / facture : on ne paie que ce qui a été commandé **et** reçu.
+- **Rapprochement** commande / réception : ce qui a été livré correspond-il à ce qui a été commandé ? La facture
+  et le paiement restent dans l'ERP du client (voir §6).
 - **Retards et pénalités** calculés selon les clauses de la commande, avenants tracés.
 - **IA** : comparaison entre le bon de livraison et la commande, repérage d'écarts (référence, quantité, prix),
   alertes sur les jalons à risque.
@@ -234,6 +235,28 @@ marge de préférence plafonnée à 15 %, au moins 2 niveaux d'approbation, piè
 CNPS, caution de soumission). Hors de cette étape : le choix du type de procédure selon les seuils, la publicité
 obligatoire et les délais minimaux de remise des offres.
 
+### Étape 2, premier incrément : plusieurs procédures, réalisé le 02/10/2026
+
+- **Données** : une table `procedures` et une table `pkv` (état d'une procédure, clé par clé). Les clés
+  d'organisation (paramètres, pièces, rôles, notifications, circuit par défaut) restent dans `kv`. Offres, accusés,
+  pièces jointes et entrées d'audit portent leur procédure ; l'empreinte d'une entrée d'audit de procédure inclut
+  son identifiant.
+- **API** : `GET/POST /api/procedures`, `PATCH /api/procedures/:id` (archivage), et sous `/api/procedures/:id/` :
+  `state`, `offers`, `audit`, `files`. Un soumissionnaire ne voit que les procédures publiées et non archivées ; une
+  procédure archivée se consulte mais ne se modifie plus (`PROCEDURE_ARCHIVED`). Référence unique (`REFERENCE_TAKEN`).
+- **Création** : une nouvelle procédure part du cahier des charges modèle, de la grille par défaut, du profil choisi
+  et du **circuit d'approbation par défaut** (nouvelle clé `circuitModele`, enregistrable depuis Paramètres).
+- **Interface** : sélecteur de procédure en tête du menu, écran « Procédures » (liste, ouverture, création,
+  archivage), bandeau sur une procédure archivée. La carte « Autres procédures » du tableau de bord affiche les vraies
+  procédures au lieu des exemples fictifs du prototype.
+- **Migration** : l'unique procédure d'une instance existante devient p1, révisions et chaîne d'audit conservées.
+- Tests : 45 au total, dont 7 sur les procédures (cloisonnement, visibilité, dépôt, archivage) et 2 sur la migration
+  d'une base à l'ancien schéma.
+
+Restent pour l'étape 2 : les **écritures ciblées** (lot B) et le **découpage d'`app.js`**. Restes du prototype
+repérés en chemin, non traités : le calendrier du tableau de bord (dates écrites en dur) et le texte « Prototype de
+démonstration » de son introduction ; le jeu de démonstration AO-2026-014 est créé même quand `SEED_DEMO=0`.
+
 Pourquoi cet ordre : les modules 1, 4 et 5 reposent sur des notions (partenaire, commande, circuit) que le
 socle actuel n'a pas. Les construire sur l'état clé/valeur d'une procédure unique obligerait à tout refaire
 ensuite.
@@ -255,11 +278,36 @@ clients. Conséquences :
 - **À prévoir plus tard** : une console pour l'éditeur (créer une instance, la mettre à jour, la sauvegarder),
   puisque chaque nouveau client ajoute une instance à exploiter.
 
+**Premier cadre public : UEMOA, décliné pour la Côte d'Ivoire** (décidé le 02/10/2026). C'est le profil
+`uemoa-ci` de l'étape 1. Les autres pays de l'UEMOA seront des variantes de ce profil.
+
+**Le bon de commande est émis par Marché+** (décidé le 02/10/2026), et non par l'ERP du client. Conséquences :
+
+- **Marché+ est la référence de l'engagement** : numéro de commande, lignes, montants, conditions et jalons de
+  paiement viennent de Marché+, repris de l'offre retenue et du dossier. C'est sur cette commande que le
+  module 4 rapproche les livraisons.
+- **Numérotation propre à chaque client**, continue et sans trou (comme les accusés de dépôt `DEP-0001`),
+  attribuée par le serveur. Le format (préfixe, année) est un paramètre du client.
+- **Document officiel** : le bon de commande est produit en PDF avec les mentions du client (raison sociale,
+  identifiants fiscaux, signataires), son empreinte SHA-256 est inscrite à l'audit, et il est transmis au
+  titulaire par le portail. La mise en page est un modèle paramétrable.
+- **Circuit de validation de la commande** avant émission, par le moteur de circuits (étape 3), avec seuils
+  de montant. En marché public, la commande suit la signature du marché ; en privé, elle peut la remplacer
+  pour les petits achats.
+- **Avenants et annulations** : une commande émise ne se modifie pas. On émet un avenant numéroté, ou une
+  annulation motivée, tous deux journalisés.
+- **Lien avec la comptabilité** : un export des commandes émises (CSV, puis connecteur si besoin) suffit au
+  départ pour que le client enregistre ses engagements dans son ERP. Marché+ n'a pas besoin de l'ERP pour
+  fonctionner.
+
+**Marché+ s'arrête à la réception** (décidé le 02/10/2026) : pas de facture ni de bon à payer. Le module 4
+va jusqu'à la réception définitive (quantités, conformité, réserves, pénalités de retard) ; la facture et le
+paiement restent dans l'ERP du client, qui reçoit l'export des commandes et des réceptions. Le rapprochement du
+§4 porte donc sur la commande et la réception seulement.
+
 ## 7. Décisions à prendre
 
 | Question | Pourquoi elle compte |
 |---|---|
-| Quels cadres publics viser en premier (pays, bailleurs) ? | Chaque cadre est un profil à écrire et à faire valider par un juriste. |
-| Le bon de commande est-il émis par Marché+, ou transmis à l'ERP du client (SAP, Sage…) ? | Ça détermine si le module 4 gère aussi la facture et le paiement, ou seulement la réception. |
 | Qui constate une réception : le demandeur, le magasin, un tiers ? | Ça définit les rôles et le circuit d'acceptation. |
 | Quel fournisseur d'IA, hébergé où ? | Contrainte de résidence des données, coût par document. |

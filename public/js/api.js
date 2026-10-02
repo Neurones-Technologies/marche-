@@ -26,10 +26,38 @@
         });
       });
   }
-  window.MP = { api: api, upload: upload };
+  /* Procédure courante. La liste vient du serveur (un soumissionnaire n'y voit que les procédures publiées) ;
+     le choix est mémorisé par utilisateur dans ce navigateur. */
+  var PID = null, PROCS = [], ME = null;
+  var procKey = function () { return 'marcheplus.proc.' + (ME ? ME.id : ''); };
+  function loadProcs() {
+    return api('GET', '/api/procedures').then(function (r) { PROCS = r.procedures || []; return PROCS; });
+  }
+  function choose() {
+    var saved = null; try { saved = localStorage.getItem(procKey()); } catch (e) { /* stockage indisponible */ }
+    var has = function (id) { return PROCS.some(function (p) { return p.id === id; }); };
+    if (saved && has(saved)) return saved;
+    var actives = PROCS.filter(function (p) { return !p.archive; });
+    return (actives[0] || PROCS[0] || {}).id || null;
+  }
+  function url(path) { return '/api/procedures/' + encodeURIComponent(PID) + path; }
+  /* Ouvre une procédure : charge son état et redémarre l'interface dessus. */
+  function switchTo(id, opts) {
+    PID = id;
+    try { localStorage.setItem(procKey(), id); } catch (e) { /* stockage indisponible */ }
+    return api('GET', url('/state')).then(function (p) { window.MarchePlus.start(p, opts || {}); });
+  }
+  window.MP = {
+    api: api, upload: upload, url: url, switchTo: switchTo,
+    pid: function () { return PID; },
+    procs: function () { return PROCS; },
+    current: function () { return PROCS.filter(function (p) { return p.id === PID; })[0] || null; },
+    refreshProcs: loadProcs,
+  };
 
   function showLogin(msg) {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    ME = null; PID = null; PROCS = [];
     if (window.MarchePlus) window.MarchePlus.stop();
     $('usr').hidden = true;
     $('login').hidden = false;
@@ -41,14 +69,18 @@
 
   /* fromLogin : connexion explicite (on part de l'accueil) ; sinon rechargement de page (on reprend l'écran). */
   function enter(fromLogin) {
-    return api('GET', '/api/state').then(function (p) {
-      return api('GET', '/api/auth/me').then(function (m) {
+    return api('GET', '/api/auth/me').then(function (m) {
+      ME = m.user;
+      return loadProcs().then(function () {
         $('login').hidden = true;
         $('usr').hidden = false;
         $('usr-name').textContent = m.user.nom + ' · ' + m.user.roleLab;
         $('usr-av').textContent = m.user.nom.replace(/[^A-Za-zÀ-ÿ ]/g, ' ').split(/\s+/).filter(Boolean).map(function (x) { return x[0]; }).join('').slice(0, 2).toUpperCase();
-        window.MarchePlus.start(p, { fromLogin: fromLogin === true });
-        if (!pollTimer) pollTimer = setInterval(function () { window.MarchePlus.poll(); }, 8000);
+        var id = choose();
+        if (!id) { window.MarchePlus.none(m.user); return; }
+        return switchTo(id, { fromLogin: fromLogin === true }).then(function () {
+          if (!pollTimer) pollTimer = setInterval(function () { window.MarchePlus.poll(); }, 8000);
+        });
       });
     });
   }

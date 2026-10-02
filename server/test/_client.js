@@ -20,12 +20,12 @@ async function login(email) {
   assert.equal(r.status, 200);
   return r.cookie;
 }
-const getState = async (cookie) => (await call('GET', '/api/state', null, cookie)).json.state;
-const patch = (cookie, changes) => call('PATCH', '/api/state', { changes }, cookie);
+const getState = async (cookie, pid = 'p1') => (await call('GET', `/api/procedures/${pid}/state`, null, cookie)).json.state;
+const patch = (cookie, changes, pid = 'p1') => call('PATCH', `/api/procedures/${pid}/state`, { changes }, cookie);
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
 module.exports = { call, login, getState, patch, clone, upload: (...a) => uploadImpl(...a) };
-async function uploadImpl(doc, name, buf, cookie) {
-  const res = await fetch(base + '/api/files?doc=' + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: buf });
+async function uploadImpl(doc, name, buf, cookie, pid = 'p1') {
+  const res = await fetch(base + `/api/procedures/${pid}/files?doc=` + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: buf });
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }

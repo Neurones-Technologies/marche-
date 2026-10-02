@@ -136,6 +136,10 @@ paramètres, rôles), édité par une seule personne à la fois, peut garder l'e
 
 ## Lot C — Plusieurs procédures (3 à 4 semaines)
 
+> **Socle réalisé le 02/10/2026** (premier incrément de l'étape 2 de [CADRAGE.md](CADRAGE.md)) : tables
+> `procedures` et `pkv`, routes `/api/procedures/:id/…`, sélecteur et écran « Procédures », migration vers p1.
+> Le détail est dans CADRAGE.md. Le texte ci-dessous est le chiffrage d'origine.
+
 C'est le premier besoin d'un vrai client, et le plus gros chantier : la procédure `AO-2026-014` est la seule
 qui existe, et elle est écrite en dur (21 fois dans `app.js`, 2 fois dans `index.html`).
 

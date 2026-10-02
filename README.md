@@ -1,6 +1,6 @@
 # Marché+
 
-Plateforme de gestion d'un appel d'offres (démonstration : AO-2026-014, Banque Atlantique du Littoral) :
+Plateforme de gestion des appels d'offres d'une organisation (démonstration : AO-2026-014, Banque Atlantique du Littoral) :
 cahier des charges, dossier d'appel d'offres, dépôt dématérialisé, dépouillement, conformité, évaluation,
 décision, procès-verbal, recours, rôles et piste d'audit.
 
@@ -14,15 +14,21 @@ public/            front (HTML/CSS/JS sans build) : index.html, css/, js/api.js 
                    js/regles.js (calculs métier, partagés avec le serveur), js/profils.js (profils réglementaires)
 server/
   index.js         Express, helmet (CSP), service du front
-  db.js            SQLite (better-sqlite3) : schéma, jeu de données initial, audit chaîné
+  db.js            SQLite (better-sqlite3) : schéma, état de l'organisation (kv) et de chaque procédure (pkv),
+                   jeu de données initial, migrations, audit chaîné
   auth.js          JWT en cookie HttpOnly/SameSite=Strict, middleware d'habilitations
   rules.js         règles métier côté serveur : qui peut écrire quoi, et dans quel ordre
-  routes/          /api/auth/*, /api/state, /api/offers, /api/audit, /api/admin/reset
+  routes/          /api/auth/*, /api/procedures (liste, création, archivage),
+                   /api/procedures/:id/{state,offers,audit,files}, /api/files/:id, /api/audit/verify, /api/admin/reset
   seed/seed.json   données de référence extraites du prototype
-  test/            tests (node:test) : API, calculs partagés, parcours complet d'une procédure
+  test/            tests (node:test) : API, calculs partagés, parcours complet, profils, procédures, migration
 ```
 
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
+
+- **Plusieurs procédures** : chacune a son dossier, ses offres, son évaluation, ses accusés et son journal ; les
+  paramètres, rôles et comptes sont communs à l'organisation. Un soumissionnaire ne voit que les procédures publiées.
+  Une procédure archivée se consulte mais ne se modifie plus.
 
 - **Authentification** par compte et mot de passe (bcrypt), limitation des tentatives, session 8 h.
 - **Habilitations vérifiées côté serveur** pour chaque écriture (publier le CDC, noter, approuver, signer, etc.).
@@ -48,7 +54,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 ```bash
 npm install
 npm start            # http://localhost:3000
-npm test             # 36 tests (Node 22 requis pour better-sqlite3)
+npm test             # 45 tests (Node 22 requis pour better-sqlite3)
 ```
 
 Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :

@@ -64,7 +64,7 @@ test('clôture du dépouillement : les taux de change sont figés et journalisé
 });
 
 test('après clôture : offres, grille, préférence et confirmations sont verrouillées', async () => {
-  const r = await call('POST', '/api/offers', { name: 'Retardataire SA', iso: 'CI', devise: 'XOF', montant: 50000000, delai: 60, lots: ['l1'] }, soum);
+  const r = await call('POST', '/api/procedures/p1/offers', { name: 'Retardataire SA', iso: 'CI', devise: 'XOF', montant: 50000000, delai: 60, lots: ['l1'] }, soum);
   assert.equal(r.status, 422);
   assert.match(r.json.error, /clôturé/);
   const s = await getState(admin);

@@ -20,17 +20,20 @@ app.use(helmet({
     },
   },
 }));
-app.use((req, res, next) => (req.path.startsWith('/api/files') ? next() : express.json({ limit: '1mb' })(req, res, next)));
+// Téléversement d'une pièce : corps binaire, ni analysé en JSON ni soumis à l'exigence JSON ci-dessous.
+const FILES = /^\/api\/(procedures\/[^/]+\/)?files(\/|$)/;
+app.use((req, res, next) => (FILES.test(req.path) ? next() : express.json({ limit: '1mb' })(req, res, next)));
 
 // Les requêtes d'écriture doivent être du JSON (protection CSRF complémentaire au cookie SameSite=Strict)
 app.use('/api', (req, res, next) => {
-  if (req.path.startsWith('/files')) return next();
+  if (FILES.test(req.originalUrl.split('?')[0])) return next();
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !req.is('application/json')) return res.status(415).json({ error: 'JSON requis.' });
   next();
 });
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/files', require('./routes/files'));
-app.use('/api', require('./routes/state'));
+app.use('/api/files', require('./routes/files').global);
+app.use('/api/procedures', require('./routes/procedures'));
+app.use('/api', require('./routes/admin'));
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Route inconnue.' }));
 

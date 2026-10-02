@@ -7,8 +7,11 @@ const { requireAuth, needPerm, whoLabel } = require('../auth');
 const cfg = require('../config');
 
 fs.mkdirSync(cfg.filesDir, { recursive: true });
-const r = express.Router();
-r.use(requireAuth);
+/* Deux routeurs : `proc`, monté sous /api/procedures/:pid/files (dépôt et brouillon de la procédure req.pid),
+   et `global`, monté sous /api/files (téléchargement d'une pièce par son identifiant). */
+const r = express.Router({ mergeParams: true });
+const g = express.Router();
+g.use(requireAuth);
 
 const MAX = cfg.maxFileMb * 1024 * 1024;
 // Types admis, vérifiés sur les premiers octets (pas seulement sur l'extension)
@@ -36,24 +39,24 @@ r.post('/', needPerm('portail.use'), express.raw({ type: () => true, limit: MAX 
   const t = TYPES[ext];
   if (!t || !t.magic(body)) return res.status(415).json({ error: 'Format non admis (PDF, PNG, JPG, DOCX, XLSX) ou fichier altéré.' });
   const pendingCount = db.prepare('SELECT COUNT(*) c FROM files WHERE owner=? AND offer_id IS NULL').get(req.user.id).c;
-  const old = db.prepare('SELECT id FROM files WHERE owner=? AND doc_id=? AND offer_id IS NULL').all(req.user.id, doc);
+  const old = db.prepare('SELECT id FROM files WHERE owner=? AND procedure_id=? AND doc_id=? AND offer_id IS NULL').all(req.user.id, req.pid, doc);
   if (!old.length && pendingCount >= 40) return res.status(422).json({ error: 'Trop de pièces en attente.' });
   const id = crypto.randomUUID();
   fs.writeFileSync(diskPath(id), body, { mode: 0o600 });
   const sha = crypto.createHash('sha256').update(body).digest('hex');
   db.transaction(() => {
     old.forEach((o) => { try { fs.unlinkSync(diskPath(o.id)); } catch (e) { /* déjà absent */ } db.prepare('DELETE FROM files WHERE id=?').run(o.id); });
-    db.prepare('INSERT INTO files(id,owner,doc_id,name,mime,size,sha256) VALUES(?,?,?,?,?,?,?)').run(id, req.user.id, doc, name, t.mime, body.length, sha);
+    db.prepare('INSERT INTO files(id,owner,doc_id,name,mime,size,sha256,procedure_id) VALUES(?,?,?,?,?,?,?,?)').run(id, req.user.id, doc, name, t.mime, body.length, sha, req.pid);
   })();
   res.status(201).json(pub({ id, doc_id: doc, name, size: body.length, sha256: sha, created_at: new Date().toISOString() }));
 });
 
 /** Mes pièces en attente (brouillon de dépôt) */
 r.get('/mine', needPerm('portail.use'), (req, res) =>
-  res.json(db.prepare('SELECT * FROM files WHERE owner=? AND offer_id IS NULL ORDER BY created_at').all(req.user.id).map(pub)));
+  res.json(db.prepare('SELECT * FROM files WHERE owner=? AND procedure_id=? AND offer_id IS NULL ORDER BY created_at').all(req.user.id, req.pid).map(pub)));
 
 r.delete('/:id', needPerm('portail.use'), (req, res) => {
-  const f = db.prepare('SELECT * FROM files WHERE id=? AND owner=? AND offer_id IS NULL').get(req.params.id, req.user.id);
+  const f = db.prepare('SELECT * FROM files WHERE id=? AND owner=? AND procedure_id=? AND offer_id IS NULL').get(req.params.id, req.user.id, req.pid);
   if (!f) return res.status(404).json({ error: 'Pièce introuvable ou déjà déposée.' });
   try { fs.unlinkSync(diskPath(f.id)); } catch (e) { /* déjà absent */ }
   db.prepare('DELETE FROM files WHERE id=?').run(f.id);
@@ -61,13 +64,13 @@ r.delete('/:id', needPerm('portail.use'), (req, res) => {
 });
 
 /** Téléchargement : propriétaire (brouillon) ou lecteur des offres (pièces déposées) */
-r.get('/:id', (req, res) => {
+g.get('/:id', (req, res) => {
   const f = db.prepare('SELECT * FROM files WHERE id=?').get(req.params.id);
   const ok = f && ((f.offer_id == null && f.owner === req.user.id) || (f.offer_id != null && (req.can('offres.read') || f.owner === req.user.id)));
   if (!ok) return res.status(404).json({ error: 'Pièce introuvable.' });
-  if (f.offer_id != null) auditAppend(req.user.id, whoLabel(req.user), `Pièce consultée — ${f.name} (offre ${f.offer_id})`);
+  if (f.offer_id != null) auditAppend(req.user.id, whoLabel(req.user), `Pièce consultée — ${f.name} (offre ${f.offer_id})`, f.procedure_id);
   res.set({ 'Content-Type': f.mime, 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'Cache-Control': 'private, no-store' });
   res.sendFile(path.resolve(diskPath(f.id)));
 });
 
-module.exports = r;
+module.exports = { proc: r, global: g };

@@ -69,6 +69,10 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 }
 .navs { display: flex; flex-direction: column; gap: var(--space-half); overflow-y: auto; flex: 1 1 auto; }
 .navgrp { padding: var(--space-4) var(--space-3) var(--space-1); color: var(--color-side-muted); font-size: var(--fs-tiny); }
+/* Procédure courante, en tête du menu : suit les couleurs de la barre latérale (sombre dans « institutionnel »). */
+.side-proc { padding: 0 var(--space-1) var(--space-2); border-bottom: var(--border-w) solid var(--color-side-line); }
+.side-proc .navgrp { display: block; padding: 0 var(--space-2) var(--space-1); }
+.side-proc select { width: 100%; font-size: var(--fs-small); background: var(--color-side-bg); color: var(--color-side-text); border-color: var(--color-side-muted); }
 .navb {
   display: flex; align-items: center; gap: var(--space-3); background: none; border: none; border-radius: var(--radius-sm);
   color: var(--color-side-text); text-align: left; min-height: var(--control-h); padding: var(--space-2) var(--space-3); font-size: var(--fs-table);
