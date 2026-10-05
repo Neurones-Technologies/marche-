@@ -30,12 +30,12 @@ test('soumissionnaire : rien avant publication, puis l’appel d’offres à ré
 
 test('besoin : chaque étape apparaît chez la personne qui doit agir', async () => {
   const b = (await call('POST', '/api/besoins', { objet: 'Imprimantes', budget: 5000000 }, demandeur)).json.besoin;
-  assert.ok((await titres(demandeur)).includes(`Soumettre le besoin ${b.id}`));
+  assert.ok((await titres(demandeur)).includes(`Soumettre la demande ${b.id}`));
   await call('POST', `/api/besoins/${b.id}/soumettre`, {}, demandeur);
-  assert.ok((await titres(approb)).some((t) => t === `Valider le besoin ${b.id}`));
+  assert.ok((await titres(approb)).some((t) => t === `Valider la demande ${b.id}`));
   assert.ok(!(await titres(demandeur)).some((t) => t.startsWith('Valider')), 'le demandeur ne valide pas son propre besoin');
   await call('POST', `/api/besoins/${b.id}/approbations/0`, {}, approb);
-  assert.ok((await titres(achats)).includes(`Transformer le besoin ${b.id} en procédure`));
+  assert.ok((await titres(achats)).includes(`Transformer la demande ${b.id} en procédure`));
   const ch = (await call('GET', '/api/accueil', null, demandeur)).json.chiffres;
   assert.equal(ch.besoins.valide, 1);
   assert.equal(ch.procedures, undefined, 'le demandeur ne voit pas le portefeuille des procédures');

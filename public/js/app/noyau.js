@@ -29,9 +29,9 @@ var PERMS = [
   {id:'clarif.send',     lab:"Demander une clarification à un soumissionnaire", grp:'Traitement'},
   {id:'recours.handle',  lab:"Instruire un recours",                grp:'Décision'},
   {id:'contract.sign',   lab:"Signer le marché",                    grp:'Décision'},
-  {id:'besoin.create',   lab:"Exprimer un besoin",                  grp:'Besoins'},
-  {id:'besoin.approve',  lab:"Valider un besoin",                   grp:'Besoins'},
-  {id:'besoin.manage',   lab:"Instruire les besoins et en faire des procédures", grp:'Besoins'},
+  {id:'besoin.create',   lab:"Exprimer une demande d’achat",       grp:'Demandes d’achat'},
+  {id:'besoin.approve',  lab:"Valider une demande d’achat",        grp:'Demandes d’achat'},
+  {id:'besoin.manage',   lab:"Instruire les demandes d’achat et en faire des procédures", grp:'Demandes d’achat'},
   {id:'partenaires.manage', lab:"Référencer les partenaires",          grp:'Partenaires'},
   {id:'commande.manage', lab:"Établir et émettre les bons de commande", grp:'Exécution'},
   {id:'commande.approve',lab:"Valider un bon de commande",          grp:'Exécution'}
@@ -506,9 +506,9 @@ function vide(parent, ic, titre, texte){
    procédure ouverte (groupe « Procédure », avec son sélecteur), puis l'administration. */
 var VIEWS=[
   {id:'accueil',    label:'Tableau de bord', grp:'Accueil'},
-  {id:'besoins',    label:'Besoins', grp:'Registres', perms:['besoin.create','besoin.approve','besoin.manage']},
+  {id:'besoins',    label:'Demandes d’achat', grp:'Registres', perms:['besoin.create','besoin.approve','besoin.manage']},
   {id:'procedures', label:'Appels d’offres', grp:'Registres'},
-  {id:'commandes',  label:'Commandes et réceptions', grp:'Registres'},
+  {id:'commandes',  label:'Exécution', grp:'Registres'},
   {id:'partenaires', label:'Partenaires', grp:'Registres', perm:'partenaires.manage'},
   {id:'referencement', label:'Mon référencement', grp:'Registres', role:true, perm:'portail.use'},
   {id:'dashboard',  label:'Vue d’ensemble', grp:'Procédure'},

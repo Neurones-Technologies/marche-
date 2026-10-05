@@ -35,7 +35,7 @@ function vAccueil(m){
       if(sous) add(t,'div','kpi-sous',sous);
     }
     tuile('À faire pour moi', r.taches.length, r.taches.length ? 'action(s) qui vous attendent' : 'rien en attente', 'check', null, false);
-    if(c.besoins) tuile('Besoins en validation', c.besoins.soumis, c.besoins.valide+' validé(s), à transformer', 'clipboard', 'besoins');
+    if(c.besoins) tuile('Demandes d’achat en validation', c.besoins.soumis, c.besoins.valide+' validée(s), à transformer', 'clipboard', 'besoins');
     if(c.procedures && c.procedures.parPhase){
       var pp=c.procedures.parPhase, enCours=c.procedures.total-(pp.signee||0)-(pp.archivee||0)-(pp.infructueuse||0);
       tuile('Appels d’offres en cours', enCours, c.procedures.total+' au total', 'folder', 'procedures');

@@ -50,7 +50,7 @@ function vProcedures(m){
     ]);
     colonnes.push({lab:'Phase', rendu:function(p,td){ chipCellule(td, p.phase.lab, COUL[p.phase.id]); }});
     tableau(zone,{ cle:'procedures', lignes:list, colonnes:colonnes,
-      vide: can('cdc.edit') ? 'Aucune procédure : utilisez « Nouvelle procédure », ou partez d\u2019un besoin validé.' : 'Aucun appel d\u2019offres n\u2019est ouvert pour le moment.',
+      vide: can('cdc.edit') ? 'Aucune procédure : utilisez « Nouvelle procédure », ou partez d\u2019une demande d\u2019achat validée.' : 'Aucun appel d\u2019offres n\u2019est ouvert pour le moment.',
       recherche:function(p){ return [p.ref, p.objet, p.titulaire, p.besoin && p.besoin.service, p.besoin && p.besoin.id].join(' '); },
       filtres:[
         { lab:'Phase', options:Object.keys(phases).sort(function(a,b){ return phases[a].rang-phases[b].rang; }).map(function(id){ return [id, phases[id].lab]; }), test:function(p,v){ return p.phase.id===v; } },

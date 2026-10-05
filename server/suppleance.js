@@ -13,7 +13,7 @@ const { db, kvGet, kvSet, frDate } = require('./db');
 /* Circuits couverts, et l'habilitation que la validation exige. Un avenant suit la délégation « commande ». */
 const CIRCUITS = {
   attribution: { lab: 'Attribution d’un appel d’offres', perm: 'decision.approve' },
-  besoin: { lab: 'Validation des besoins', perm: 'besoin.approve' },
+  besoin: { lab: 'Validation des demandes d’achat', perm: 'besoin.approve' },
   commande: { lab: 'Bons de commande et avenants', perm: 'commande.approve' },
   referencement: { lab: 'Référencement des partenaires', perm: 'partenaires.manage' },
 };

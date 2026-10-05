@@ -6,7 +6,7 @@
    Le serveur décide (server/suppleance.js, routes /api/suppleances) ; ces fonctions servent l'affichage. */
 "use strict";
 
-var TYPES_SUPPLEANCE = { attribution:'Attribution d’un appel d’offres', besoin:'Validation des besoins', commande:'Bons de commande et avenants', referencement:'Référencement des partenaires' };
+var TYPES_SUPPLEANCE = { attribution:'Attribution d’un appel d’offres', besoin:'Validation des demandes d’achat', commande:'Bons de commande et avenants', referencement:'Référencement des partenaires' };
 var ETATS_DELEGATION = { en_cours:['En cours','c-green'], a_venir:['À venir','c-amber'], terminee:['Terminée','c-grey'], annulee:['Annulée','c-grey'] };
 function dateFr(d){ return String(d||'').split('-').reverse().join('/'); }
 function aujourdhuiIso(){ return new Date().toISOString().slice(0,10); }

@@ -38,8 +38,8 @@ Organisation de l'interface (menu) :
   déroulant ; une notification qui arrive pendant la session s'affiche un instant en bas à droite (« push »).
 - **Accueil** : tableau de bord de l'organisation, avec « À faire pour moi » (les actions qui attendent
   l'utilisateur, calculées par le serveur selon ses habilitations) et les chiffres clés de chaque registre.
-- **Registres** : besoins, appels d'offres (toutes les procédures, en cours et passées : phase, titulaire, montant
-  attribué, besoin d'origine, commandes ; filtres par phase, année et recherche), commandes et réceptions,
+- **Registres** : demandes d'achat, appels d'offres (toutes les procédures, en cours et passées : phase, titulaire, montant
+  attribué, besoin d'origine, commandes ; filtres par phase, année et recherche), « Exécution » (commandes et réceptions),
   partenaires (ou « Mon référencement » pour un prestataire).
 - **Détail d'un appel d'offres** : il n'a pas d'entrée dans le menu ; on l'ouvre depuis le registre (icône œil de
   la ligne) : un AO en cours s'ouvre sur l'écran où l'on s'était arrêté (à défaut, l'étape en cours), un AO terminé

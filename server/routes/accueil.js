@@ -69,13 +69,13 @@ r.get('/accueil', requireAuth, (req, res) => {
     const n = (s) => bs.filter((b) => b.statut === s).length;
     chiffres.besoins = { brouillon: n('brouillon'), soumis: n('soumis'), valide: n('valide'), rejete: n('rejete'), transforme: n('transforme') };
     bs.forEach((b) => {
-      if (b.par === moi && b.statut === 'rejete') tache('Besoins', `Corriger le besoin ${b.id}`, b.objet + ' — rejeté : ' + (b.rejet || {}).motif, { vue: 'besoins', id: b.id });
-      if (b.par === moi && b.statut === 'brouillon') tache('Besoins', `Soumettre le besoin ${b.id}`, b.objet, { vue: 'besoins', id: b.id });
+      if (b.par === moi && b.statut === 'rejete') tache('Demandes d’achat', `Corriger la demande ${b.id}`, b.objet + ' — rejeté : ' + (b.rejet || {}).motif, { vue: 'besoins', id: b.id });
+      if (b.par === moi && b.statut === 'brouillon') tache('Demandes d’achat', `Soumettre la demande ${b.id}`, b.objet, { vue: 'besoins', id: b.id });
       if (b.statut === 'soumis' && can('besoin.approve')) {
         const i = C.prochaine(b.circuit);
-        if (i >= 0 && !C.controle(b.circuit, i, req.user, [b.par], SU.sup(req.user, 'besoin', b.id))) tache('Besoins', `Valider le besoin ${b.id}`, `${b.objet} — ${b.circuit[i].role}`, { vue: 'besoins', id: b.id });
+        if (i >= 0 && !C.controle(b.circuit, i, req.user, [b.par], SU.sup(req.user, 'besoin', b.id))) tache('Demandes d’achat', `Valider la demande ${b.id}`, `${b.objet} — ${b.circuit[i].role}`, { vue: 'besoins', id: b.id });
       }
-      if (b.statut === 'valide' && can('besoin.manage')) tache('Besoins', `Transformer le besoin ${b.id} en procédure`, b.objet, { vue: 'besoins', id: b.id });
+      if (b.statut === 'valide' && can('besoin.manage')) tache('Demandes d’achat', `Transformer la demande ${b.id} en procédure`, b.objet, { vue: 'besoins', id: b.id });
     });
   }
 

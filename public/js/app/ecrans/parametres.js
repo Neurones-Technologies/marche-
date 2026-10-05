@@ -142,7 +142,7 @@ function vParams(m){
   champ(f6,'Adresse expéditrice',state.mailFrom,function(v){ state.mailFrom=v; });
   champ(f6,'Domaine des destinataires',state.mailSuffix,function(v){ state.mailSuffix=v; });
   vParamsCadre(m,o);
-  vParamsCircuitOrg(m,'circuitBesoin','8 · Circuit de validation des besoins','Un besoin suit ce circuit à sa soumission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce budget. Le demandeur ne valide jamais son propre besoin.');
+  vParamsCircuitOrg(m,'circuitBesoin','8 · Circuit de validation des demandes d’achat','Une demande d’achat suit ce circuit à sa soumission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce budget. Le demandeur ne valide jamais sa propre demande.');
   vParamsCircuitOrg(m,'circuitReferencement','9 · Parcours de référencement des partenaires','Un dossier de référencement suit ces étapes ; les pièces déposées sont validées au dernier niveau.');
   vParamsInscription(m,o);
   vParamsCircuitOrg(m,'circuitCommande','11 · Circuit de validation des bons de commande','Une commande suit ce circuit avant émission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (en XOF). Celui qui établit la commande ne la valide pas.');

@@ -56,7 +56,7 @@ test('le suppléant valide pendant la période, et la décision porte « pour A.
   assert.equal(e.pour.via, 'delegation');
   assert.equal(e.pour.nom, 'A. Diomandé');
   const journal = (await call('GET', '/api/audit', null, admin)).json.entrees;
-  assert.ok(journal.some((x) => /validé au niveau .*pour A\. Diomandé, délégation du/.test(x.a)), 'mention dans le journal');
+  assert.ok(journal.some((x) => /validée au niveau .*pour A\. Diomandé, délégation du/.test(x.a)), 'mention dans le journal');
   // le suppléant a été prévenu, et lui seul (notification ciblée sur son compte)
   assert.ok((await getState(ctrl)).notifs.some((n) => n.titre === 'Vous suppléez A. Diomandé'));
   assert.ok(!(await getState(evaltech)).notifs.some((n) => n.titre === 'Vous suppléez A. Diomandé'));

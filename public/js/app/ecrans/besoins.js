@@ -1,4 +1,4 @@
-/* Marché+ — Écran Besoins (module 2 : de l'intention à la publication).
+/* Marché+ — Écran Demandes d'achat (module 2 : de l'intention à la publication).
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
    Les besoins appartiennent à l'organisation : ils se chargent par /api/besoins, hors de l'état de la procédure. */
 "use strict";
@@ -11,7 +11,7 @@ UI.besoin = null;
 
 function vBesoins(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,'Besoins');
+  add(l,'h1',null,'Demandes d’achat');
 
   var grille=add(m,'div'); grille.style.cssText='display:grid;grid-template-columns:minmax(0,1fr);gap:18px';
   var zoneListe=add(grille,'div'); add(zoneListe,'p','muted','Chargement…');
@@ -23,7 +23,7 @@ function vBesoins(m){
       zoneListe.textContent=''; detail.textContent=''; formulaire.textContent='';
       var liste_=(r.besoins||[]).slice().reverse();
       tableau(zoneListe,{ cle:'besoins', lignes:liste_,
-        vide: can('besoin.create') ? 'Aucun besoin : utilisez « Nouveau besoin ».' : 'Aucun besoin n’a encore été exprimé.',
+        vide: can('besoin.create') ? 'Aucune demande d’achat : utilisez « Nouvelle demande ».' : 'Aucune demande d’achat n’a encore été exprimée.',
         colonnes:[
           {lab:'N°', val:function(b){ return b.id; }},
           {lab:'Objet', val:function(b){ return b.objet; }},
@@ -34,7 +34,7 @@ function vBesoins(m){
         ],
         recherche:function(b){ return [b.id, b.objet, b.parNom, b.service].join(' '); },
         filtres:[{ lab:'Statut', options:Object.keys(STATUTS_BESOIN).map(function(k){ return [k, STATUTS_BESOIN[k][0]]; }), test:function(b,v){ return b.statut===v; } }],
-        nouveau: can('besoin.create') ? { lab:'Nouveau besoin', action:function(){ creation(r.regles); } } : null,
+        nouveau: can('besoin.create') ? { lab:'Nouvelle demande', action:function(){ creation(r.regles); } } : null,
         actions:function(b,td){
           boutonCellule(td, UI.besoin===b.id ? 'Affiché' : 'Ouvrir', function(){ UI.besoin=b.id; charger(); }, 'bes-open-'+b.id).disabled = UI.besoin===b.id;
         }
@@ -61,7 +61,7 @@ function vBesoins(m){
       vals[cle]=i;
       return i;
     }
-    champ('objet','Objet du besoin','textarea');
+    champ('objet','Objet de la demande','textarea');
     champ('service','Service demandeur');
     var bu=champ('budget','Budget estimé (XOF)','number'); bu.min='0'; bu.step='100000';
     champ('dateSouhaitee','Date souhaitée','date');
@@ -80,21 +80,21 @@ function vBesoins(m){
 
   /* Fenêtre « Nouveau besoin ». */
   function creation(regles){
-    ouvrirFenetre('Exprimer un nouveau besoin', function(c,foot){
+    ouvrirFenetre('Nouvelle demande d’achat', function(c,foot){
       var lire=champs(c,{},true,regles);
       add(foot,'span','muted','Enregistré en brouillon ; vous le soumettez ensuite à validation.');
       var an=add(foot,'button','btn btn-ghost','Annuler'); fk(an,'bes-annuler'); an.addEventListener('click',fermerFenetre);
       var go_=add(foot,'button','btn btn-primary','Enregistrer le brouillon'); fk(go_,'bes-creer');
       go_.addEventListener('click',function(){
         go_.disabled=true;
-        MP.api('POST','/api/besoins',lire()).then(function(r){ toast('Besoin '+r.besoin.id+' enregistré.'); fermerFenetre(); UI.besoin=r.besoin.id; charger(); })
+        MP.api('POST','/api/besoins',lire()).then(function(r){ toast('Demande '+r.besoin.id+' enregistrée.'); fermerFenetre(); UI.besoin=r.besoin.id; charger(); })
           .catch(function(e){ toast(e.message); go_.disabled=false; });
       });
     }, { large:true });
   }
 
   function fiche(parent, b, regles){
-    retourListe(parent,'Tous les besoins',function(){ UI.besoin=null; charger(); },'bes-retour');
+    retourListe(parent,'Toutes les demandes',function(){ UI.besoin=null; charger(); },'bes-retour');
     var k=add(parent,'div','card');
     var ph=add(k,'div','panel-head'); add(ph,'span',null,b.id+' — '+b.objet);
     var st=STATUTS_BESOIN[b.statut]||[b.statut,'c-grey']; add(ph,'span','chip '+st[1],st[0]);
@@ -103,7 +103,7 @@ function vBesoins(m){
     if(b.rejet){
       var w=add(corps,'div','warn'); w.style.marginTop='0';
       add(w,'strong',null,'Rejeté au niveau « '+b.rejet.role+' », le '+b.rejet.at+'. ');
-      w.appendChild(document.createTextNode('Motif : '+b.rejet.motif+(mien?' Corrigez le besoin puis soumettez-le de nouveau.':'')));
+      w.appendChild(document.createTextNode('Motif : '+b.rejet.motif+(mien?' Corrigez la demande puis soumettez-la de nouveau.':'')));
     }
     var lire=champs(corps,b,editable,regles);
     if(b.typeLab) add(corps,'p',null,'Type de procédure retenu à la soumission : '+b.typeLab+'.').style.marginTop='8px';
@@ -112,14 +112,14 @@ function vBesoins(m){
     add(foot,'span','muted','Demandé par '+b.parNom+' le '+b.cree+'.');
     if(editable){
       var be=add(foot,'button','btn btn-ghost btn-sm','Enregistrer'); fk(be,'bes-enr-'+b.id);
-      be.addEventListener('click',function(){ agir('PUT','/'+enc(b.id),lire(),'Besoin '+b.id+' enregistré.'); });
+      be.addEventListener('click',function(){ agir('PUT','/'+enc(b.id),lire(),'Demande '+b.id+' enregistrée.'); });
       var bs=add(foot,'button','btn btn-primary btn-sm','Soumettre à validation'); fk(bs,'bes-soum-'+b.id);
       bs.addEventListener('click',function(){
-        ask('Une fois soumis, le besoin ne se modifie plus, sauf s’il est rejeté. Il suit le circuit de validation de l’organisation.', function(){
+        ask('Une fois soumise, la demande ne se modifie plus, sauf si elle est rejetée. Elle suit le circuit de validation de l’organisation.', function(){
           MP.api('PUT','/api/besoins/'+enc(b.id),lire())
-            .then(function(){ return agir('POST','/'+enc(b.id)+'/soumettre',{},'Besoin '+b.id+' soumis à validation.'); })
+            .then(function(){ return agir('POST','/'+enc(b.id)+'/soumettre',{},'Demande '+b.id+' soumise à validation.'); })
             .catch(function(e){ toast(e.message); });
-        },'Soumettre le besoin '+b.id+' ?','Soumettre');
+        },'Soumettre la demande '+b.id+' ?','Soumettre');
       });
     }
 
@@ -136,20 +136,20 @@ function vBesoins(m){
         if(Number(e.seuil)>0) add(d,'div','muted','à partir de '+xof(Number(e.seuil)));
         if(e.done){ add(row,'span','chip c-green','Validé le '+e.at); parQui(d,e); }
         else if(!MPCircuits.requise(e)) add(row,'span','chip c-grey','Non requis pour ce montant');
-        else if(i===fp && can('roles.edit') && !(can('besoin.approve') && !mien)) suppleanceNiveau(row,'besoin',b.id,i,e,'Besoin '+b.id);
+        else if(i===fp && can('roles.edit') && !(can('besoin.approve') && !mien)) suppleanceNiveau(row,'besoin',b.id,i,e,'Demande '+b.id);
         else if(i===fp && can('besoin.approve') && !mien){
-          suppleanceNiveau(row,'besoin',b.id,i,e,'Besoin '+b.id);
+          suppleanceNiveau(row,'besoin',b.id,i,e,'Demande '+b.id);
           var ba=add(row,'button','btn btn-primary btn-sm','Valider'); fk(ba,'bes-val-'+i);
           ba.addEventListener('click',function(){
             ask('Cette validation est horodatée, nominative et consignée à la piste d’audit.', function(){
-              agir('POST','/'+enc(b.id)+'/approbations/'+i,{},'Besoin '+b.id+' validé au niveau « '+e.role+' ».');
+              agir('POST','/'+enc(b.id)+'/approbations/'+i,{},'Demande '+b.id+' validée au niveau « '+e.role+' ».');
             },'Valider au titre « '+e.role+' » ?','Valider');
           });
           var br=add(row,'button','btn btn-ghost btn-sm','Rejeter'); fk(br,'bes-rej-'+i);
           br.addEventListener('click',function(){
-            demander('Le besoin retourne au demandeur, qui pourra le corriger et le soumettre de nouveau.', function(motif){
-              agir('POST','/'+enc(b.id)+'/rejet',{motif:motif},'Besoin '+b.id+' rejeté.');
-            },'Rejeter le besoin '+b.id+' ?','Rejeter','Motif du rejet');
+            demander('La demande retourne au demandeur, qui pourra la corriger et la soumettre de nouveau.', function(motif){
+              agir('POST','/'+enc(b.id)+'/rejet',{motif:motif},'Demande '+b.id+' rejetée.');
+            },'Rejeter la demande '+b.id+' ?','Rejeter','Motif du rejet');
           });
         } else if(i===fp) add(row,'span','chip c-amber', mien && can('besoin.approve') ? 'Validation par une autre personne' : 'En attente');
         else add(row,'span','chip c-grey','En attente');
@@ -172,14 +172,14 @@ function vBesoins(m){
       bc2.addEventListener('click',function(){
         bc2.disabled=true;
         MP.api('POST','/api/besoins/'+enc(b.id)+'/procedure',{ref:ir.value.trim(), profil:sp.value})
-          .then(function(r){ toast('Procédure '+ir.value.trim()+' créée à partir du besoin '+b.id+'.'); return MP.refreshProcs().then(function(){ ouvrirProcedure(r.procedure,'cdc'); }); })
+          .then(function(r){ toast('Procédure '+ir.value.trim()+' créée à partir de la demande '+b.id+'.'); return MP.refreshProcs().then(function(){ ouvrirProcedure(r.procedure,'cdc'); }); })
           .catch(function(e){ toast(e.message); bc2.disabled=false; });
       });
     }
     if(b.statut==='transforme' && b.procedure){
       var kt=add(parent,'div','note'); kt.style.marginTop='18px';
       add(kt,'strong',null,'Procédure '+b.procedureRef+'. ');
-      kt.appendChild(document.createTextNode('Ce besoin a été transformé en procédure. '));
+      kt.appendChild(document.createTextNode('Cette demande a été transformée en procédure. '));
       var bo=add(kt,'button','btn btn-ghost btn-sm','Ouvrir la procédure'); fk(bo,'bes-ouvrir');
       bo.addEventListener('click',function(){ MP.refreshProcs().then(function(){ ouvrirProcedure(b.procedure,'dashboard'); }); });
     }

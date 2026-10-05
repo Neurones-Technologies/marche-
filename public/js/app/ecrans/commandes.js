@@ -1,4 +1,4 @@
-/* Marché+ — Écran Commandes et réceptions (module 4 : bon de commande et suivi d'exécution).
+/* Marché+ — Écran Exécution : commandes et réceptions (module 4 : bon de commande et suivi d'exécution).
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
    Les commandes se chargent par /api/commandes ; le serveur filtre ce que chacun voit (achats, valideurs,
    réceptionnaire désigné, titulaire par le portail). */
@@ -15,7 +15,7 @@ function montantDevise(n, devise){ return sep(Math.round(Number(n)||0))+' '+(dev
 
 function vCommandes(m){
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,'Commandes et réceptions');
+  add(l,'h1',null,'Exécution');
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
 
   function charger(){

@@ -92,7 +92,7 @@ test('transformation en procédure : pré-remplie, suivie en lecture par le dema
   assert.equal(s.cdc.procedure, 'Appel d’offres restreint');
   assert.equal(s.cdc.budgetEstime, 30000000);
   assert.equal(s.cdc.besoin, b1.id);
-  assert.ok(s.audit.some((e) => e.a.startsWith(`Procédure créée à partir du besoin ${b1.id}`)));
+  assert.ok(s.audit.some((e) => e.a.startsWith(`Procédure créée à partir de la demande d’achat ${b1.id}`)));
   // le demandeur voit désormais cette procédure, sans les offres ni les notes
   assert.deepEqual((await call('GET', '/api/procedures', null, demandeur)).json.procedures.map((p) => p.id), [pid]);
   const vue = await getState(demandeur, pid);
