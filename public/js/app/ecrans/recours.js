@@ -65,7 +65,7 @@ function vRecours(m){
   } else {
     if(J>0){ var cd=add(e1.corps,'div','clore-info'); chipCellule(cd, reste>0 ? 'Délai de recours : '+reste+' jour(s) restant(s)' : 'Délai de recours expiré', reste>0?'c-amber':'c-green'); }
     var nbN=motifsNotifies(rows).length;
-    var bv=add(e1.act,'button','btn btn-ghost btn-sm','Motifs communiqués ('+nbN+')'); fk(bv,'notif-voir');
+    var bv=add(e1.act,'button','btn btn-ghost btn-sm','Motifs communiqués ('+nbN+')'); fk(bv,'notif-voir'); bv.setAttribute('data-consult','');
     bv.addEventListener('click',ouvrirMotifs);
   }
 
@@ -84,7 +84,7 @@ function vRecours(m){
       add(lg,'strong',null,'Recours '+(i+1)+' — '+r.de);
       chipCellule(lg,S[0],S[1]);
       var b=add(lg,'button','btn btn-sm '+(r.statut==='ouvert' && can('recours.handle')?'btn-primary':'btn-ghost'), r.statut==='ouvert' && can('recours.handle') ? 'Instruire' : 'Voir');
-      fk(b,'recours-'+i); b.addEventListener('click',function(){ ouvrirRecours(i); });
+      fk(b,'recours-'+i); b.setAttribute('data-consult',''); b.addEventListener('click',function(){ ouvrirRecours(i); });
     });
     if(K.recoursActif && notifie && !state.contractSigned){
       var bs=add(e2.act,'button','btn btn-ghost btn-sm','Simuler un recours'); fk(bs,'recours-simuler');

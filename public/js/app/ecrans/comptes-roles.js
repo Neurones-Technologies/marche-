@@ -16,7 +16,7 @@ function vComptes(m){
   function charger(){
     MP.api('GET','/api/auth/users').then(function(list){
       zone.textContent=''; formulaire.textContent='';
-      tableau(zone,{ cle:'comptes', titre:'Comptes', lignes:list, vide:'Aucun compte.',
+      tableau(zone,{ cle:'comptes', lignes:list, vide:'Aucun compte.',
         colonnes:[
           {lab:'Nom', val:function(u){ return u.nom; }},
           {lab:'Courriel', val:function(u){ return u.email; }},

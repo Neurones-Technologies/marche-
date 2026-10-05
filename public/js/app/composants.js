@@ -42,6 +42,7 @@ var ICONS = {
   chevR:'m9 6 6 6-6 6',
   plus:'M12 5v14M5 12h14',
   x:'M6 6l12 12M18 6 6 18',
+  archive:'M3 4h18v4H3z|M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8|M10 12h4',
   eye:'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z|M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   clipboard:'M9 4h6v3H9z|M9 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-3|M9 12h6M9 16h4'
 };
@@ -421,6 +422,7 @@ function dessinerFenetre(){
   var sc=f.corps.scrollTop;
   f.corps.textContent=''; f.pied.textContent='';
   if(f.remplir(f.corps, f.pied)===false){ fermerFenetre(); return; }
+  if(UI.lectureSeule){ figer(f.corps); figer(f.pied); }
   f.h.textContent = typeof f.titre==='function' ? f.titre() : f.titre;
   [].forEach.call(f.bx.querySelectorAll('input[data-fk],textarea[data-fk],select[data-fk]'),function(z){
     var k=z.getAttribute('data-fk'); if(k in saisies && z.type!=='checkbox' && z.type!=='radio') z.value=saisies[k];
@@ -450,8 +452,21 @@ function grilleLecture(parent, paires){
 }
 /* Bouton « voir le détail » d'une ligne de tableau : bouton texte si une action attend, icône sinon. */
 function boutonDetail(td, action, fkey, lab){
-  if(lab) return boutonCellule(td, lab, action, fkey, true);
-  return boutonIcone(td, 'eye', 'Voir le détail', action, fkey);
+  var b = lab ? boutonCellule(td, lab, action, fkey, true) : boutonIcone(td, 'eye', 'Voir le détail', action, fkey);
+  b.setAttribute('data-consult',''); // ouvre une fenêtre : reste actif sur une étape terminée
+  return b;
+}
+/* Étape terminée (ou procédure archivée) : tout ce qui modifie est désactivé ; restent la consultation (fenêtres de
+   détail, impression, recherche, filtres, pagination, sommaire) et la navigation. Un élément marqué data-consult
+   reste actif. Le bouton « + » des tableaux disparaît. */
+function figer(zone){
+  if(!zone) return;
+  [].forEach.call(zone.querySelectorAll('input,select,textarea,button'),function(e){
+    if(e.closest('.dt-pied,.sec-sommaire,.proc-etapes,.proc-foot,.fen-tete,.guide') || e.matches('.dt-recherche,.dt-outils select,.sec-bascule,.sec-mini,.icon-action,[data-consult]')) return;
+    if(e.closest('.dt-outils')){ e.style.display='none'; return; }
+    e.disabled=true;
+    if(e.tagName==='BUTTON' && !e.title) e.title='Étape terminée : consultation seule.';
+  });
 }
 /* Bouton-icône (imprimer, exporter…) : libellé au survol (title) et pour les lecteurs d'écran (aria-label). */
 function boutonIcone(parent, ic, libelle, action, fkey){

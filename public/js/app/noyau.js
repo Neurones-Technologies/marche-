@@ -266,8 +266,8 @@ function ask(msg, onYes, titre, libelleOui){
 }
 /* L'impression peut etre bloquee par le bac a sable : on le signale au lieu de rester muet */
 function imprimer(){
-  try{ imprimer(); }catch(e){}
-  toast("Si la fenêtre d'impression ne s'ouvre pas, utilisez l'impression de votre navigateur (Ctrl+P ou Cmd+P).");
+  try{ window.print(); }
+  catch(e){ toast("Si la fenêtre d'impression ne s'ouvre pas, utilisez l'impression de votre navigateur (Ctrl+P ou Cmd+P)."); }
 }
 
 /* ============ Helpers ============ */
@@ -552,25 +552,10 @@ function homeView(){ return 'accueil'; }
 function renderNav(){
   var box=document.getElementById('navs'); box.textContent='';
   var grp=null;
-  // les écrans de la procédure ne figurent pas dans le menu : une seule entrée « En cours » y mène (frise dans la page)
-  var vis=VIEWS.filter(vueVisible), procVues=vis.filter(function(v){ return v.grp==='Procédure'; }), enCoursPose=false;
-  vis=vis.filter(function(v){ return v.grp!=='Procédure'; });
-  function enCours(){
-    enCoursPose=true;
-    if(!procVues.length) return;
-    add(box,'div','navgrp','En cours');
-    var b=el('button','navb');
-    icon(b,'folder');
-    var seul = procVues.length===1 ? procVues[0] : null; // prestataire : « Déposer une offre » ; demandeur : vue d'ensemble
-    b.appendChild(document.createTextNode(seul && seul.id!=='dashboard' ? seul.label+' — '+REF() : REF()));
-    b.title=(state.cdc&&state.cdc.objet)||'';
-    if(vueDeProcedure(state.view)) b.setAttribute('aria-current','page');
-    fk(b,'nav-en-cours');
-    b.addEventListener('click',function(){ closeMenu(); go(seul ? seul.id : vueProcedureCourante()); });
-    box.appendChild(b);
-  }
+  // les écrans de la procédure ne figurent pas dans le menu : on ouvre un appel d'offres depuis le registre, et
+  // « Appels d'offres » reste l'entrée active pendant qu'on est dans son détail
+  var vis=VIEWS.filter(vueVisible).filter(function(v){ return v.grp!=='Procédure'; });
   vis.forEach(function(v){
-    if(v.grp==='Administration' && !enCoursPose) enCours();
     if(v.grp!==grp){
       grp=v.grp;
       add(box,'div','navgrp',grp);
@@ -590,11 +575,10 @@ function renderNav(){
     } else if(v.id==='notifs'&&nonLues().length>0){
       b.appendChild(el('span','n',String(nonLues().length)));
     }
-    if(v.id===state.view) b.setAttribute('aria-current','page');
+    if(v.id===state.view || (v.id==='procedures' && vueDeProcedure(state.view))) b.setAttribute('aria-current','page');
     b.addEventListener('click',function(){ closeMenu(); go(v.id); });
     box.appendChild(b);
   });
-  if(!enCoursPose) enCours();
 }
 /* Écran de la procédure ouverte (groupe « Procédure ») : frise, sous-onglets, pastille de phase s'y rapportent. */
 function vueDeProcedure(id){ return VIEWS.some(function(v){ return v.id===id && v.grp==='Procédure'; }); }

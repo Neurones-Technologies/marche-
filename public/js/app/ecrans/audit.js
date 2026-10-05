@@ -15,7 +15,7 @@ function vAudit(m){
       vres.textContent=r.ok ? 'Intact — '+r.entries+' entrée(s) chaînée(s), empreinte '+r.head.slice(0,12)+'…' : 'ALTÉRÉ à l’entrée n° '+r.brokenAt;
     }).catch(function(e){ vres.className='chip c-red'; vres.textContent=e.message; }).then(function(){ vbtn.disabled=false; });
   });
-  tableau(m,{ cle:'audit', titre:'Journal', lignes:state.audit, vide:'Aucune action enregistrée.',
+  tableau(m,{ cle:'audit', lignes:state.audit, vide:'Aucune action enregistrée.',
     colonnes:[
       {lab:'Date', val:function(e){ return e.t; }},
       {lab:'Action', val:function(e){ return e.a; }},

@@ -16,10 +16,6 @@ function montantDevise(n, devise){ return sep(Math.round(Number(n)||0))+' '+(dev
 function vCommandes(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Commandes et réceptions');
-  if(can('commande.manage')){
-    var ex=add(h,'a','icon-btn icon-action'); icon(ex,'download'); ex.href='/api/commandes/export.csv'; ex.setAttribute('download','commandes.csv');
-    ex.title='Exporter les commandes émises pour la comptabilité (CSV)'; ex.setAttribute('aria-label',ex.title); fk(ex,'cmd-export');
-  }
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
 
   function charger(){
@@ -34,7 +30,7 @@ function vCommandes(m){
   }
 
   function dessiner(list, eligibles){
-    tableau(zone,{ cle:'commandes', titre:'Commandes', lignes:list.slice().reverse(),
+    tableau(zone,{ cle:'commandes', lignes:list.slice().reverse(),
       vide: can('commande.manage') ? 'Aucune commande : utilisez « Nouvelle commande » à partir d’une procédure attribuée.' : 'Aucune commande ne vous concerne pour le moment.',
       colonnes:[
         {lab:'N°', val:function(c){ return c.numero || 'Brouillon'; }},
@@ -147,7 +143,7 @@ function vCommandes(m){
 
   /* Document : la pièce telle qu'elle est (ou sera) émise ; imprimable et enregistrable en PDF depuis le navigateur. */
   function documentCommande(c){
-    var k=add(zone,'div','card pad bc-doc'); k.id='bc-doc'; k.style.marginTop='18px';
+    var k=add(zone,'div','card pad bc-doc doc-imprimable'); k.id='bc-doc'; k.style.marginTop='18px';
     var t=add(k,'div'); t.style.cssText='display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap';
     var g=add(t,'div'); add(g,'strong',null,(c.emetteur||state.org||{}).nom||''); add(g,'div','muted',[(c.emetteur||state.org||{}).ville,(c.emetteur||state.org||{}).pays].filter(Boolean).join(' · '));
     var d=add(t,'div'); d.style.textAlign='right';

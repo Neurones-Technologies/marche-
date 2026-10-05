@@ -40,19 +40,17 @@ function vProcedures(m){
     var phases={}; list.forEach(function(p){ phases[p.phase.id]=p.phase; });
     var interne = list.some(function(p){ return 'offres' in p; });
     var colonnes=[
-      {lab:'Référence', rendu:function(p,td){ add(td,'strong',null,p.ref); if(p.id===MP.pid()) add(td,'span','chip c-teal','Ouverte').style.marginLeft='6px'; }},
-      {lab:'Objet', val:function(p){ return p.objet||''; }},
-      {lab:'Type', val:function(p){ return p.type||'—'; }},
+      {lab:'Référence', rendu:function(p,td){ add(td,'strong','nowrap',p.ref); if(p.id===MP.pid()){ var d=add(td,'div'); d.style.marginTop='4px'; chipCellule(d,'Ouverte','c-teal'); } }},
+      {lab:'Objet', rendu:function(p,td){ var o=add(td,'div','dt-extrait',p.objet||''); o.style.minWidth='180px'; o.title=p.objet||''; if(p.type) add(td,'div','muted',p.type); }},
       {lab:'Publiée le', val:function(p){ return p.publieeLe ? String(p.publieeLe).split(' ')[0] : '—'; }}
     ];
     if(interne) colonnes=colonnes.concat([
       {lab:'Offres', num:true, val:function(p){ return p.offres; }},
       {lab:'Titulaire', val:function(p){ return p.titulaire||'—'; }},
-      {lab:'Montant attribué', num:true, val:function(p){ return p.montantAttribue ? xof(p.montantAttribue) : '—'; }},
-      {lab:'Commandes', num:true, val:function(p){ return p.commandes && p.commandes.emises ? p.commandes.emises+' — '+xof(p.commandes.montant) : '—'; }}
+      {lab:'Montant attribué', num:true, val:function(p){ return p.montantAttribue ? xof(p.montantAttribue) : '—'; }}
     ]);
     colonnes.push({lab:'Phase', rendu:function(p,td){ chipCellule(td, p.phase.lab, COUL[p.phase.id]); }});
-    tableau(zone,{ cle:'procedures', titre:'Appels d\u2019offres', lignes:list, colonnes:colonnes,
+    tableau(zone,{ cle:'procedures', lignes:list, colonnes:colonnes,
       vide: can('cdc.edit') ? 'Aucune procédure : utilisez « Nouvelle procédure », ou partez d\u2019un besoin validé.' : 'Aucun appel d\u2019offres n\u2019est ouvert pour le moment.',
       recherche:function(p){ return [p.ref, p.objet, p.titulaire, p.besoin && p.besoin.service, p.besoin && p.besoin.id].join(' '); },
       filtres:[
@@ -61,8 +59,13 @@ function vProcedures(m){
       ],
       nouveau: can('cdc.edit') ? { lab:'Nouvelle procédure', action:function(){ UI.procedureNouvelle=true; render(); } } : null,
       actions:function(p,td){
-        if(p.id!==MP.pid()) boutonCellule(td,'Ouvrir',function(){ MP.refreshProcs().then(function(){ ouvrirProcedure(p.id, can('offres.read')||can('cdc.edit') ? 'dashboard' : 'portail'); }); },'proc-open-'+p.id);
-        if(can('params.edit')) boutonCellule(td, p.archive?'Désarchiver':'Archiver', function(){ archiver(p); }, 'proc-arch-'+p.id);
+        // le détail de l'appel d'offres s'ouvre d'ici (il n'a plus d'entrée dans le menu)
+        var b=boutonIcone(td,'eye','Ouvrir le détail de '+p.ref,function(){
+          var vue = can('offres.read')||can('cdc.edit') ? 'dashboard' : 'portail';
+          if(p.id===MP.pid()) go(vue); else MP.refreshProcs().then(function(){ ouvrirProcedure(p.id, vue); });
+        },'proc-open-'+p.id);
+        b.setAttribute('data-consult','');
+        if(can('params.edit')) boutonIcone(td,'archive',(p.archive?'Désarchiver ':'Archiver ')+p.ref,function(){ archiver(p); },'proc-arch-'+p.id);
       }
     });
   }

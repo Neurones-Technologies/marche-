@@ -440,7 +440,7 @@ function vDAO(m){
   /* Document */
   var doc=add(m,'div','card'); doc.style.marginTop='18px';
   add(doc,'div','panel-head','Corps du dossier');
-  var db=add(doc,'div','pad'); var pv=add(db,'div','pv');
+  var db=add(doc,'div','pad'); var pv=add(db,'div','pv doc-imprimable');
   add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — '+REF()).style.cssText='font-weight:700;font-size:16px;color:var(--ink)';
   add(pv,'p',null, c.autorite+' — '+c.procedure);
   add(pv,'p',null, 'Objet : '+c.objet);

@@ -1,75 +1,112 @@
 /* Marché+ — Écran Procès-verbal.
-   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
+   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
+   Le procès-verbal se présente comme un document : une page posée sur une table grise, avec en-tête de
+   l'autorité contractante, titre, informations de la procédure, sections numérotées, tableaux et cartouches de
+   signature. La barre de la carte porte la référence, l'état et l'impression (seule la page est imprimée). */
 "use strict";
 
 function vPV(m){
   if(!allApproved()) return locked(m,"Le procès-verbal est généré une fois les niveaux d'approbation franchis.",'decision',"Aller au circuit d'approbation");
-  var rows=ranking(), win=rows[0], c=state.cdc;
+  var rows=ranking(), win=rows[0], c=state.cdc, org=state.org||{};
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,"Procès-verbal d'attribution");
-  boutonIcone(h,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'pv-imprimer');
 
-  var card=add(m,'div','card pad'); var pv=add(card,'div','pv');
-  add(pv,'div',null,'PROCÈS-VERBAL D\u2019ANALYSE ET D\u2019ATTRIBUTION').style.cssText='font-weight:700;font-size:15px;color:var(--ink)';
-  add(pv,'div',null,'Référence : '+REF()+' — '+c.objet).style.marginTop='4px';
-  add(pv,'div',null, c.autorite+' — '+c.procedure+' — ouverture des plis : '+c.ouverture);
+  var carte=add(m,'section','card doc-carte'); carte.setAttribute('aria-label','Procès-verbal');
+  var barre=add(carte,'div','doc-barre');
+  add(barre,'span','doc-barre-lab','Procès-verbal — '+REF());
+  chipCellule(barre, state.contractSigned ? 'Marché signé' : 'Attribution prononcée', state.contractSigned ? 'c-green' : 'c-amber');
+  boutonIcone(barre,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'pv-imprimer');
 
-  add(pv,'h4',null,'1. Offres reçues et conversion');
-  add(pv,'p',null,'Taux arrêtés à la date d\u2019ouverture : 1 EUR = 655,957 XOF ; 1 USD = 601,40 XOF.');
-  var u=add(pv,'ul');
-  SEED_OFFERS.forEach(function(o){
-    add(u,'li',null, o.name+' ('+o.pays+') — '+sep(o.montant)+' '+o.devise+' soit '+xof(montantXOF(o))+' — délai '+o.delai+' jours'+(excluded(o)?' — écartée':''));
+  var pv=add(add(carte,'div','doc-scene'),'article','pv-doc doc-imprimable');
+
+  /* En-tête */
+  var et=add(pv,'header','pvd-entete');
+  var eg=add(et,'div'); add(eg,'div','pvd-org',org.nom||c.autorite); add(eg,'div',null,[org.ville,org.pays].filter(Boolean).join(' · '));
+  var ed=add(et,'div','pvd-ref'); var r1=add(ed,'div'); r1.appendChild(document.createTextNode('Réf. ')); add(r1,'strong',null,REF());
+  add(ed,'div',null,'Établi le '+new Date().toLocaleDateString('fr-FR'));
+
+  var ti=add(pv,'div','pvd-titre');
+  add(ti,'h2',null,'Procès-verbal d’analyse et d’attribution');
+  add(ti,'p',null,c.objet);
+
+  var dl=add(pv,'dl','pvd-meta');
+  [['Autorité contractante',c.autorite],['Procédure',c.procedure],['Ouverture des plis',c.ouverture],['Taux arrêtés','1 EUR = 655,957 XOF ; 1 USD = 601,40 XOF']].forEach(function(x){
+    var d=add(dl,'div'); add(d,'dt',null,x[0]); add(d,'dd',null,x[1]||'—');
   });
 
-  add(pv,'h4',null,'2. Conformité administrative');
-  add(pv,'p',null, conformes().length+' offre(s) déclarée(s) conforme(s) sur '+SEED_OFFERS.length+'. Les pièces exigées varient selon que le soumissionnaire est établi en Côte d\u2019Ivoire, dans l\u2019espace UEMOA ou hors zone.');
-  var u0=add(pv,'ul');
-  SEED_OFFERS.filter(excluded).forEach(function(o){
-    var mis=missingDocs(o);
-    add(u0,'li',null, o.name+' — '+(mis.length? mis.map(function(d){return d.label;}).join(' ; ') : 'écartée par décision du comité'));
-  });
+  var n=0;
+  function section(titre){ var s=add(pv,'section','pvd-sec'); var h3=add(s,'h3'); add(h3,'span','pvd-n',String(++n)); h3.appendChild(document.createTextNode(titre)); return s; }
+  function table(parent, entetes, lignes){
+    var t=add(parent,'table','pvd-table'), tr=add(add(t,'thead'),'tr');
+    entetes.forEach(function(e){ add(tr,'th',e.num?'num':null,e.lab); });
+    var tb=add(t,'tbody');
+    lignes.forEach(function(lg){ var r=add(tb,'tr',lg.cls||null); lg.v.forEach(function(v,i){ add(r,'td',entetes[i].num?'num':null,v); }); });
+    return t;
+  }
 
-  add(pv,'h4',null,'3. Préférence communautaire');
-  add(pv,'p',null, c.prefActive
-    ? 'Une marge de préférence de '+c.prefTaux+' % a été appliquée en faveur des soumissionnaires établis dans l\u2019espace UEMOA, aux seules fins de comparaison des offres.'
-    : 'Aucune marge de préférence communautaire n\u2019a été appliquée.');
+  /* 1. Offres reçues */
+  var s1=section('Offres reçues et conversion');
+  table(s1,[{lab:'Soumissionnaire'},{lab:'Pays'},{lab:'Montant',num:true},{lab:'Contre-valeur',num:true},{lab:'Délai',num:true},{lab:'Statut'}],
+    SEED_OFFERS.map(function(o){ return { cls:excluded(o)?'pvd-ecarte':null, v:[o.name,o.pays,sep(o.montant)+' '+o.devise,xof(montantXOF(o)),o.delai+' j',excluded(o)?'Écartée':'Conforme'] }; }));
 
-  add(pv,'h4',null,'4. Grille d\u2019évaluation appliquée');
-  add(pv,'p',null, state.criteria.map(function(x){ return x.label+' ('+x.weight+' %)'; }).join(' · '));
+  /* 2. Conformité */
+  var s2=section('Conformité administrative');
+  add(s2,'p',null, conformes().length+' offre(s) déclarée(s) conforme(s) sur '+SEED_OFFERS.length+'. Les pièces exigées varient selon que le soumissionnaire est établi en Côte d’Ivoire, dans l’espace UEMOA ou hors zone.');
+  var ec=SEED_OFFERS.filter(excluded);
+  if(ec.length){ var u0=add(s2,'ul'); ec.forEach(function(o){ var mis=missingDocs(o);
+    add(u0,'li',null, o.name+' — '+(mis.length? mis.map(function(d){return d.label;}).join(' ; ') : 'écartée par décision du comité')); }); }
 
-  add(pv,'h4',null,'5. Classement');
-  var ol=add(pv,'ol');
-  rows.forEach(function(r){ add(ol,'li',null, r.o.name+' ('+r.o.pays+') — '+r.total.toFixed(1)+'/100'); });
+  /* 3. Préférence communautaire */
+  add(section('Préférence communautaire'),'p',null, c.prefActive
+    ? 'Une marge de préférence de '+c.prefTaux+' % a été appliquée en faveur des soumissionnaires établis dans l’espace UEMOA, aux seules fins de comparaison des offres.'
+    : 'Aucune marge de préférence communautaire n’a été appliquée.');
 
-  add(pv,'h4',null,'6. Attribution proposée');
-  add(pv,'p',null,'Le marché est proposé à l\u2019attribution en faveur de '+win.o.name+' ('+win.o.pays+'), pour un montant de '+sep(win.o.montant)+' '+win.o.devise+' soit '+xof(montantXOF(win.o))+', et un délai d\u2019exécution de '+win.o.delai+' jours.');
-  if(!isUemoa(win.o)) add(pv,'p',null,'L\u2019attributaire n\u2019étant pas établi dans l\u2019espace UEMOA, le marché est soumis à la retenue à la source de '+c.retenueNonResident+' % sur les prestations de source locale ; les droits et taxes à l\u2019importation sont à la charge de : '+c.douaneACharge+'.');
+  /* 4. Grille */
+  table(section('Grille d’évaluation appliquée'),[{lab:'Critère'},{lab:'Pondération',num:true}],
+    state.criteria.map(function(x){ return { v:[x.label, x.weight+' %'] }; }));
 
-  add(pv,'h4',null,'7. Approbations recueillies');
-  var u2=add(pv,'ul'); state.approvals.forEach(function(a){
-    add(u2,'li',null, a.role+' — '+a.who+' — '+(a.done ? 'approuvé'+(a.at?' le '+a.at:'') : 'non requis pour ce montant'));
+  /* 5. Classement */
+  table(section('Classement'),[{lab:'Rang',num:true},{lab:'Soumissionnaire'},{lab:'Pays'},{lab:'Note',num:true}],
+    rows.map(function(r,i){ return { cls:i===0?'pvd-premier':null, v:[String(i+1), r.o.name, r.o.pays, r.total.toFixed(1)+' / 100'] }; }));
+
+  /* 6. Attribution */
+  var s6=section('Attribution proposée');
+  add(s6,'p','pvd-encadre','Le marché est proposé à l’attribution en faveur de '+win.o.name+' ('+win.o.pays+'), pour un montant de '+sep(win.o.montant)+' '+win.o.devise+' soit '+xof(montantXOF(win.o))+', et un délai d’exécution de '+win.o.delai+' jours.');
+  if(!isUemoa(win.o)) add(s6,'p',null,'L’attributaire n’étant pas établi dans l’espace UEMOA, le marché est soumis à la retenue à la source de '+c.retenueNonResident+' % sur les prestations de source locale ; les droits et taxes à l’importation sont à la charge de : '+c.douaneACharge+'.');
+
+  /* 7. Approbations : cartouches de signature */
+  var s7=section('Approbations recueillies');
+  var sg=add(s7,'div','pvd-signatures');
+  state.approvals.forEach(function(a){
+    var b=add(sg,'div','pvd-sign');
+    add(b,'strong',null,a.role); add(b,'div','muted',a.who);
+    add(b,'div','pvd-sign-etat'+(a.done?'':' non'), a.done ? 'Approuvé'+(a.at?' le '+a.at:'') : 'Non requis pour ce montant');
   });
   (state.rejets||[]).forEach(function(x){
-    add(pv,'p',null,'Rejet antérieur au niveau « '+x.role+' », le '+x.at+' — motif : '+x.motif+'. La procédure a été reprise à l\u2019évaluation.');
+    add(s7,'p',null,'Rejet antérieur au niveau « '+x.role+' », le '+x.at+' — motif : '+x.motif+'. La procédure a été reprise à l’évaluation.').style.marginTop='12px';
   });
 
-  add(pv,'h4',null,'8. Questions, additifs et clarifications');
-  add(pv,'p',null, state.qa.length+' question(s) de candidats traitée(s) · '+state.additifs.length+' additif(s) publié(s) · '+state.clarifs.length+' demande(s) de clarification, sans modification de prix ni de contenu des offres.');
+  /* 8. Questions, additifs, clarifications */
+  add(section('Questions, additifs et clarifications'),'p',null, state.qa.length+' question(s) de candidats traitée(s) · '+state.additifs.length+' additif(s) publié(s) · '+state.clarifs.length+' demande(s) de clarification, sans modification de prix ni de contenu des offres.');
 
-  add(pv,'h4',null,'9. Déclarations de conflit d\u2019intérêts');
+  /* 9. Conflits d'intérêts */
+  var s9=section('Déclarations de conflit d’intérêts');
   var dcl=Object.keys(state.coi);
-  if(!dcl.length) add(pv,'p',null,'Aucune déclaration enregistrée à ce stade.');
-  else { var ud=add(pv,'ul'); dcl.forEach(function(uid){
+  if(!dcl.length) add(s9,'p',null,'Aucune déclaration enregistrée à ce stade.');
+  else { var ud=add(s9,'ul'); dcl.forEach(function(uid){
     var u=null; state.users.forEach(function(x){ if(x.id===uid) u=x; });
     var d=state.coi[uid];
     add(ud,'li',null,(u?u.nom:uid)+' — '+(d.conflit?'conflit déclaré, déport de la notation':'absence de conflit déclarée')+' le '+d.t);
   }); }
 
-  add(pv,'h4',null,'10. Recours');
-  if(!state.recours.length) add(pv,'p',null, state.standstill.startedAt? 'Aucun recours déposé dans le délai ouvert.' : 'Délai de recours non encore ouvert à la date du présent procès-verbal.');
-  else { var ur=add(pv,'ul'); state.recours.forEach(function(r){
+  /* 10. Recours */
+  var s10=section('Recours');
+  if(!state.recours.length) add(s10,'p',null, state.standstill.startedAt? 'Aucun recours déposé dans le délai ouvert.' : 'Délai de recours non encore ouvert à la date du présent procès-verbal.');
+  else { var ur=add(s10,'ul'); state.recours.forEach(function(r){
     add(ur,'li',null, r.de+' — '+r.objet+' — '+(r.statut==='ouvert'?'en instruction':(r.statut==='rejete'?'rejeté':'déclaré fondé'))); }); }
 
-  add(pv,'h4',null,'11. Traçabilité');
-  add(pv,'p',null, state.audit.length+' action(s) consignée(s) dans la piste d\u2019audit, dont les confirmations d\u2019extraction, les décisions de conformité et les écarts motivés entre score proposé et score retenu.');
+  /* 11. Traçabilité */
+  add(section('Traçabilité'),'p',null, state.audit.length+' action(s) consignée(s) dans la piste d’audit, dont les confirmations d’extraction, les décisions de conformité et les écarts motivés entre score proposé et score retenu.');
+
+  add(pv,'footer','pvd-pied','Document établi avec Marché+ le '+new Date().toLocaleString('fr-FR')+' — '+REF());
 }

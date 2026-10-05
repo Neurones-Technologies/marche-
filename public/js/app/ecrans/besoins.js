@@ -22,7 +22,7 @@ function vBesoins(m){
     MP.api('GET','/api/besoins').then(function(r){
       zoneListe.textContent=''; detail.textContent=''; formulaire.textContent='';
       var liste_=(r.besoins||[]).slice().reverse();
-      tableau(zoneListe,{ cle:'besoins', titre:'Besoins', lignes:liste_,
+      tableau(zoneListe,{ cle:'besoins', lignes:liste_,
         vide: can('besoin.create') ? 'Aucun besoin : utilisez « Nouveau besoin ».' : 'Aucun besoin n’a encore été exprimé.',
         colonnes:[
           {lab:'N°', val:function(b){ return b.id; }},

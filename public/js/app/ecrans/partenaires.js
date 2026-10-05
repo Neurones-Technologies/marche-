@@ -180,7 +180,7 @@ function vPartenaires(m){
       .catch(function(e){ toast(e.message); charger(); });
   }
   function dessiner(list){
-    tableau(zone,{ cle:'partenaires', titre:'Partenaires', lignes:list, vide:'Aucun partenaire : les prestataires s’inscrivent depuis l’écran de connexion.',
+    tableau(zone,{ cle:'partenaires', lignes:list, vide:'Aucun partenaire : les prestataires s’inscrivent depuis l’écran de connexion.',
       colonnes:[
         {lab:'N°', val:function(p){ return p.id; }},
         {lab:'Raison sociale', val:function(p){ return p.raisonSociale; }},

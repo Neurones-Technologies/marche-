@@ -61,8 +61,16 @@ function render(){
     var corps=cadreProcedureHaut(m);
     (ROUTER[state.view]||vDashboard)(corps);
     organiserSections(corps, state.view);
+    // étape terminée ou procédure archivée : l'écran se consulte, il ne se modifie plus
+    var etp=etapeDe(state.view), arch=!!(MP.current() && MP.current().archive);
+    UI.lectureSeule = arch || !!(etp && etapesStatut()[etp.id]==='done');
+    if(UI.lectureSeule){
+      if(!arch){ var nf=el('div','fige-note'); icon(nf,'lock'); nf.appendChild(document.createTextNode('Étape terminée : les informations se consultent mais ne se modifient plus.')); corps.insertBefore(nf,corps.firstChild); }
+      figer(corps);
+    }
     cadreProcedureBas(m);
   } else {
+    UI.lectureSeule=false;
     var cur=MP.current();
     if(cur && cur.archive && vueDeProcedure(state.view)){
       var na=add(m,'div','note'); add(na,'strong',null,'Procédure archivée. ');

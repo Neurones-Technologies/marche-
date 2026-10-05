@@ -167,7 +167,7 @@ function vCDC(m){
   var k8=add(m,'div','card'); k8.style.marginTop='18px';
   var ph8=add(k8,'div','panel-head'); add(ph8,'span',null,'8 · Génération du dossier d\u2019appel d\u2019offres');
   var gob=add(ph8,'button','btn btn-primary btn-sm','Générer le dossier complet →');
-  gob.addEventListener('click',function(){ logit('Dossier d\u2019appel d\u2019offres généré'); go('dao'); });
+  gob.addEventListener('click',function(){ logit('Dossier d\u2019appel d\u2019offres généré'); go('dao'); }); gob.setAttribute('data-consult','');
   var prb=boutonIcone(ph8,'printer','Imprimer l\u2019extrait',null,'cdc-imprimer');
   prb.addEventListener('click',function(){ imprimer(); });
   var b8=add(k8,'div','pad'); var pv=add(b8,'div','pv');

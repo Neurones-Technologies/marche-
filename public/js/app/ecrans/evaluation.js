@@ -71,7 +71,7 @@ function vEvaluation(m){
       {lab:'Origine', rendu:function(o,td){ originChip(td,o); }},
       {lab:'Motif', rendu:function(o,td){ var mis=missingDocs(o); add(td,'div','dt-extrait', mis.length ? mis.map(function(d){return d.label;}).join(' ; ') : 'Décision manuelle'); }}
     ],
-    actions:function(o,td){ boutonCellule(td,'Conformité',function(){ go('conformite'); },'eval-conf-'+o.id); }
+    actions:function(o,td){ boutonCellule(td,'Conformité',function(){ go('conformite'); },'eval-conf-'+o.id).setAttribute('data-consult',''); }
   });
 
   var miss=missingJustifs(), wt=weightTotal();
