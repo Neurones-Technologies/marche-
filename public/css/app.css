@@ -158,13 +158,12 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 .cloche .ic { width: var(--icon-lg); height: var(--icon-lg); }
 .cloche-n { position: absolute; top: 3px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-pill); background: var(--color-brand); color: var(--color-on-brand); font-size: 11px; font-weight: var(--fw-strong); line-height: 18px; text-align: center; box-shadow: 0 0 0 2px var(--color-surface); }
 .usr { display: inline-flex; align-items: center; }
-/* Séparation des fonctions (rôles) */
-.cumuls { margin-bottom: var(--space-5); padding: var(--space-4) var(--space-5); background: var(--color-pending-bg); border: var(--border-w) solid var(--color-pending-bg); border-radius: var(--radius); }
-.cumuls-tete { display: flex; gap: var(--space-3); align-items: flex-start; }
-.cumuls-tete p { margin-top: var(--space-1); color: var(--color-text-2); font-size: var(--fs-table); max-width: var(--text-max); }
-.cumuls-ic { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: var(--color-surface); color: var(--color-pending); }
-.cumuls-liste { list-style: none; margin: var(--space-3) 0 0 calc(36px + var(--space-3)); padding: 0; }
-.cumuls-liste li { padding: var(--space-2) 0; border-top: var(--border-w) solid rgba(138, 82, 5, .15); font-size: var(--fs-table); }
+/* Rôles : mention « points d'attention » et son icône d'information. */
+.attention { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-1) 0 var(--space-3); border-radius: var(--radius-pill); background: var(--color-pending-bg); color: var(--color-pending); font-size: var(--fs-small); font-weight: var(--fw-strong); }
+.attention .attention-info { width: 28px; height: 28px; min-width: 0; min-height: 0; padding: 0; border: none; border-radius: 50%; background: none; color: var(--color-pending); }
+.attention .attention-info:hover { background: var(--color-surface); color: var(--color-pending); }
+.attention .attention-info .ic { width: var(--icon-sm); height: var(--icon-sm); }
+.attention-liste li { align-items: flex-start; }
 /* Lien de retour à la liste, en tête d'un détail. */
 .retour { display: inline-flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-3); padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1); background: none; border: none; border-radius: var(--radius-sm); font: inherit; font-size: var(--fs-table); font-weight: var(--fw-strong); color: var(--color-brand-text); cursor: pointer; }
 .retour:hover { background: var(--color-brand-soft); }

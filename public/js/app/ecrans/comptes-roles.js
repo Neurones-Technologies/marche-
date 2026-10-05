@@ -1,7 +1,7 @@
 /* Marché+ — « Utilisateurs et accès » : deux onglets, Comptes et Rôles.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
    Comptes : un tableau (avatar, rôle, statut, dernière connexion) ; création et modification en fenêtre.
-   Rôles : une carte par rôle (membres, habilitations, cumuls incompatibles) ; les habilitations se règlent en
+   Rôles : une carte par rôle (membres, habilitations, points d'attention en fenêtre) ; les habilitations se règlent en
    fenêtre, par interrupteurs groupés. */
 "use strict";
 
@@ -110,22 +110,6 @@ function vRoles(m){
   add(l,'h1',null,'Utilisateurs et accès');
 
   var rk=Object.keys(state.roles);
-  var confl=[];
-  rk.forEach(function(r){ incompatOf(state.roles[r].perms).forEach(function(x){ confl.push({r:r,x:x}); }); });
-  if(confl.length){
-    // séparation des fonctions : un rôle qui cumule deux habilitations à confier à des personnes différentes
-    var w=add(m,'div','cumuls');
-    var wt=add(w,'div','cumuls-tete'); icon(add(wt,'span','cumuls-ic'),'shield');
-    var wx=add(wt,'div');
-    add(wx,'strong',null,'Séparation des fonctions : '+confl.length+' point'+(confl.length>1?'s':'')+' d’attention');
-    add(wx,'p',null,'Certaines tâches doivent être faites par des personnes différentes, pour qu’un contrôle existe. Les rôles ci-dessous réunissent deux de ces tâches : l’outil le signale sans l’interdire. Si ce n’est pas voulu, retirez l’une des deux habilitations du rôle.');
-    var ul=add(w,'ul','cumuls-liste');
-    confl.forEach(function(cc){
-      var li=add(ul,'li');
-      var t=add(li,'div'); add(t,'strong',null,state.roles[cc.r].lab); t.appendChild(document.createTextNode(' peut à la fois '+cumulLab(cc.x)+'.'));
-      add(li,'div','muted',cc.x[2]);
-    });
-  }
 
   var g=add(m,'div','roles-grille');
   rk.forEach(function(r){
@@ -143,10 +127,33 @@ function vRoles(m){
       var pile=add(mb,'div','av-pile'); membres.slice(0,5).forEach(function(u){ avatar(pile,u.nom).title=u.nom; });
       add(mb,'span','muted', membres.length===1 ? membres[0].nom : membres.length+' membres');
     }
-    if(inc) chipCellule(k, inc+' point'+(inc>1?'s':'')+' d’attention','c-amber');
+    if(inc){
+      var pa=add(k,'div','attention');
+      add(pa,'span',null, inc+' point'+(inc>1?'s':'')+' d’attention');
+      var bi=boutonIcone(pa,'info','Voir le détail des points d’attention — '+R_.lab,function(){ pointsAttention(r); },'attention-'+r);
+      bi.classList.add('attention-info');
+    }
     var pied=add(k,'div','role-pied');
     var b=add(pied,'button','btn btn-ghost btn-sm','Habilitations'); fk(b,'role-'+r);
     b.addEventListener('click',function(){ ouvrirHabilitations(r); });
+  });
+}
+
+/* Fenêtre « points d'attention » d'un rôle : les habilitations qu'il cumule alors qu'elles devraient revenir à
+   des personnes différentes (séparation des fonctions), et pourquoi. */
+function pointsAttention(r){
+  ouvrirFenetre(function(){ return 'Points d’attention — '+((state.roles[r]||{}).lab||r); }, function(c,p){
+    var R_=state.roles[r]; if(!R_) return false;
+    var inc=incompatOf(R_.perms); if(!inc.length) return false;
+    add(c,'p','muted','Certaines tâches doivent être faites par des personnes différentes, pour qu’un contrôle existe. Ce rôle en réunit deux : l’outil le signale sans l’interdire. Si ce n’est pas voulu, retirez l’une des deux habilitations.').style.marginBottom='14px';
+    var ul=add(c,'ul','fen-liste attention-liste');
+    inc.forEach(function(x){
+      var li=add(ul,'li'); var d=add(li,'div');
+      add(d,'strong',null,'Peut à la fois '+cumulLab(x)+'.');
+      add(d,'div','muted',x[2]);
+    });
+    var bh=add(p,'button','btn btn-primary','Modifier les habilitations'); fk(bh,'attention-habilitations');
+    bh.addEventListener('click',function(){ ouvrirHabilitations(r); });
   });
 }
 

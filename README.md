@@ -44,7 +44,7 @@ Organisation de l'interface (menu) :
   la ligne) : un AO en cours s'ouvre sur l'écran où l'on s'était arrêté (à défaut, l'étape en cours), un AO terminé
   sur sa clôture. « Appels d'offres » reste en surbrillance. Une étape terminée se consulte sans se modifier. Dans la page, une frise de six étapes (Préparer, Publication
   et offres, Dépouiller, Évaluer, Décider, Clore) montre ce qui est fait, en cours ou à venir ; une étape à plusieurs
-  écrans les présente en sous-onglets ; « Étape suivante » en bas, avec les outils (vue d'ensemble, journal d'audit),
+  écrans les présente en sous-onglets ; « Étape suivante » en bas,
   et le changement de procédure en en-tête quand il y en a plusieurs. De l'étape 2 à l'étape 6, les informations
   sont en tableaux (recherche, filtres, pagination, bouton « + ») et le détail d'une ligne s'ouvre dans une fenêtre :
   question et réponse, pli reçu, vérification d'une offre, pièces et signaux d'un soumissionnaire, clarification,

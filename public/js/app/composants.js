@@ -107,8 +107,7 @@ function montant(parent, texte){
 function initiales(nom){ return String(nom).replace(/[^A-Za-zÀ-ÿ ]/g,' ').split(/\s+/).filter(function(x){ return x.length>2 || /^[A-Z]/.test(x); }).map(function(x){ return x[0]; }).join('').slice(0,2).toUpperCase(); }
 
 /* Parcours de la procédure, en tête de chaque écran de procédure. */
-/* Le déroulé d'une procédure, en six étapes. Une étape regroupe un ou plusieurs écrans (sous-onglets). La vue
-   d'ensemble et le journal d'audit ne sont pas des étapes : ce sont des outils, en pied de page. */
+/* Le déroulé d'une procédure, en six étapes. Une étape regroupe un ou plusieurs écrans (sous-onglets). */
 var ETAPES = [
   {id:'prep',    lab:'Préparer',              vues:['cdc','dao','criteres']},
   {id:'publi',   lab:'Publication et offres', vues:['qa','reception']},
@@ -117,7 +116,6 @@ var ETAPES = [
   {id:'decide',  lab:'Décider',               vues:['decision']},
   {id:'close',   lab:'Clore',                 vues:['recours','pv']}
 ];
-var OUTILS_PROCEDURE = ['dashboard','audit'];
 var FLOW_LAB = { done:'terminée', now:'en cours', blocked:'bloquée', todo:'à venir' };
 function etapesStatut(){
   var s=lifeStatus(), recu=state.depClosed || (state.cdc.cdcPublie && SEED_OFFERS.length);
@@ -182,7 +180,7 @@ function cadreProcedureHaut(m){
   }
   return add(m,'div');
 }
-/* Pied : étape précédente et suivante, et les outils de la procédure. */
+/* Pied : étape précédente et suivante. */
 function cadreProcedureBas(m){
   var etape=etapeDe(state.view), pied=add(m,'div','proc-foot');
   var nav=add(pied,'div'); nav.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
@@ -192,12 +190,6 @@ function cadreProcedureBas(m){
     if(prec && vuesPermises(prec).length){ var bp=add(nav,'button','btn btn-ghost btn-sm','← '+prec.lab); fk(bp,'etape-prec'); bp.addEventListener('click',function(){ go(vuesPermises(prec)[0]); }); }
     if(suiv && vuesPermises(suiv).length){ var bs=add(nav,'button','btn btn-primary btn-sm','Étape suivante : '+suiv.lab+' →'); fk(bs,'etape-suiv'); bs.addEventListener('click',function(){ go(vuesPermises(suiv)[0]); }); }
   }
-  var outils=add(pied,'div'); outils.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
-  OUTILS_PROCEDURE.filter(viewAllowed).forEach(function(v){
-    var def=VIEWS.filter(function(x){ return x.id===v; })[0];
-    var bo=add(outils,'button','btn btn-ghost btn-sm'+(v===state.view?' on':''),def.label); fk(bo,'outil-'+v);
-    bo.addEventListener('click',function(){ go(v); });
-  });
 }
 
 /* ============ Tableau de données ============
