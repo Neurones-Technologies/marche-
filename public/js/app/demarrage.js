@@ -53,13 +53,13 @@ function render(){
   var lbl=null;
   for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===state.view) lbl=VIEWS[i].label;
   document.title = (lbl? lbl+' — ' : '')+'Marché+';
-  var m=document.getElementById('main'); m.textContent='';
+  var m=document.getElementById('main'); m.textContent=''; m.classList.remove('avec-sommaire'); // posée par organiserSections
   if(vueDeProcedure(state.view) && avecCadreProcedure()){
     // écran de procédure : en-tête, frise des étapes, sous-onglets, puis l'écran, puis précédente / suivante
     UI.derniereVueProc=state.view;
     var corps=cadreProcedureHaut(m);
     (ROUTER[state.view]||vDashboard)(corps);
-    organiserSections(corps, state.view);
+    organiserSections(corps, state.view, true);
     cadreProcedureBas(m);
   } else {
     var cur=MP.current();
@@ -114,7 +114,7 @@ window.MarchePlus = {
     document.getElementById('navs').textContent='';
     document.getElementById('phase-chip').style.display='none';
     resetBtn.style.display='none';
-    var m=document.getElementById('main'); m.textContent='';
+    var m=document.getElementById('main'); m.textContent=''; m.classList.remove('avec-sommaire');
     var c=add(m,'div','card empty');
     add(c,'h2',null,'Aucun appel d’offres ouvert');
     add(c,'p','muted', user && user.role==='soum' ? 'Aucune procédure n’est publiée pour le moment. Les appels d’offres apparaîtront ici dès leur publication.' : 'Aucune procédure n’est encore créée sur cette instance.');

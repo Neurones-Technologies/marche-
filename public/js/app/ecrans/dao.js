@@ -426,7 +426,7 @@ function vDAO(m){
     var v=daoVolume([pi]);
     var row=add(sb,'div','docline');
     var go2=add(row,'button','btn btn-ghost btn-sm');
-    go2.style.cssText='text-align:left;flex:1 1 300px;border:none;background:none;padding:6px 0;min-height:44px';
+    go2.style.cssText='text-align:left;justify-content:flex-start;flex:1 1 300px;border:none;background:none;padding:6px 0;min-height:44px';
     var lf=add(go2,'div');
     add(lf,'div',null,pi.titre).style.cssText='font-weight:600;color:var(--teal-dark)';
     add(lf,'div','muted', pi.arts.length+' article(s) · environ '+v.pages+' page(s)');

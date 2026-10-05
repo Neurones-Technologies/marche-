@@ -269,58 +269,122 @@ function tableau(parent, o){
   dessiner();
   return carte;
 }
-/* ============ Écrans longs : sommaire collé, sections repliables ============
-   Un écran qui compte au moins quatre sections (cartes à en-tête, posées directement dans le contenu) reçoit un
-   sommaire qui reste visible pendant le défilement, suit la section affichée, et mène à chacune d'un clic. Chaque
-   section se replie depuis son en-tête ; par défaut seule la première est ouverte. L'état est gardé par écran
+/* ============ Panneau latéral : étape, sommaire collé, sections repliables ============
+   Les écrans des six étapes de la procédure ont tous, à droite, un panneau qui reste visible pendant le défilement :
+   l'étape en cours et l'avancement de la procédure, le sommaire de la page (dès deux sections) et le passage à
+   l'étape suivante. Les autres écrans ne reçoivent le panneau (sommaire seul) qu'à partir de quatre sections.
+   Une section est une carte à en-tête (.panel-head) posée directement dans le contenu. Elle porte une pastille
+   numérotée, se replie depuis son en-tête et s'éclaire quand on la lit. Par défaut, toutes les sections sont
+   ouvertes, sauf sur un écran d'au moins quatre sections où seule la première l'est. L'état est gardé par écran
    dans UI.replis, pour survivre aux rendus. */
 UI.replis = {};
 function titreSection(head){
   var t=head.firstChild && head.firstChild.nodeType===1 ? head.firstChild.textContent : head.textContent;
   return String(t||'').trim();
 }
-function organiserSections(conteneur, cle){
+/* Pastille de l'en-tête. « 7 · Titre » devient une pastille 7 suivie du titre ; le texte de l'en-tête reste
+   « 7 · Titre » (le séparateur est seulement masqué à l'écran). Un titre sans numéro reçoit son rang, décoratif. */
+function pastilleSection(head, rang){
+  var n=head.firstChild, cible=null;
+  if(n && n.nodeType===3) cible=n;
+  else if(n && n.nodeType===1 && n.firstChild && n.firstChild.nodeType===3) cible=n.firstChild;
+  var b=document.createElement('span'); b.className='sec-badge';
+  var m=cible && cible.textContent.match(/^\s*(\d+)\s*·\s*/);
+  if(m){
+    b.textContent=m[1]; var sep=document.createElement('span'); sep.className='sr-only'; sep.textContent=' · '; b.appendChild(sep);
+    cible.textContent=cible.textContent.slice(m[0].length);
+    cible.parentNode.insertBefore(b,cible);
+  } else {
+    b.textContent=String(rang); b.setAttribute('aria-hidden','true');
+    head.insertBefore(b,head.firstChild);
+  }
+}
+function organiserSections(conteneur, cle, avecEtape){
   var cartes=[].slice.call(conteneur.children).filter(function(e){ return e.classList.contains('card') && e.firstElementChild && e.firstElementChild.classList.contains('panel-head'); });
   SUIVI_SECTIONS=null;
-  if(cartes.length<4) return;
+  var etape = avecEtape ? etapeDe(cle) : null;
+  if(!etape && cartes.length<4) return;
+  var avecSommaire = cartes.length>=2;
   var etat = UI.replis[cle] = UI.replis[cle] || {};
-  var sections=cartes.map(function(c,i){
+  var sections = avecSommaire ? cartes.map(function(c,i){
     var head=c.firstElementChild, titre=titreSection(head);
-    if(!(titre in etat)) etat[titre] = i>0; // première section ouverte, les autres repliées
-    c.classList.add('sec-carte'); c.id='sec-'+i;
+    if(!(titre in etat)) etat[titre] = cartes.length>=4 && i>0; // écran long : seule la première section est ouverte
+    c.classList.add('sec-carte'); if(!c.id) c.id='sec-'+i;
+    pastilleSection(head, i+1);
     var bt=document.createElement('button'); bt.type='button'; bt.className='sec-bascule'; icon(bt,'chevD');
     head.appendChild(bt);
-    function appliquer(){
+    function appliquer(anime){
       c.classList.toggle('replie', !!etat[titre]);
+      if(anime && !etat[titre]){ c.classList.remove('sec-ouvre'); void c.offsetWidth; c.classList.add('sec-ouvre'); }
       bt.setAttribute('aria-expanded', etat[titre] ? 'false' : 'true');
       bt.setAttribute('aria-label', (etat[titre] ? 'Déplier' : 'Replier')+' la section « '+titre.replace(/^\d+\s*·\s*/,'')+' »');
     }
-    bt.addEventListener('click',function(){ etat[titre]=!etat[titre]; appliquer(); });
-    appliquer();
-    return { carte:c, titre:titre, ouvrir:function(){ etat[titre]=false; appliquer(); } };
-  });
+    function basculer(){ etat[titre]=!etat[titre]; appliquer(true); }
+    bt.addEventListener('click',function(e){ e.stopPropagation(); basculer(); });
+    // en-tête cliquable quand la section est repliée (sauf ses propres boutons, champs et liens)
+    head.addEventListener('click',function(e){ if(etat[titre] && !e.target.closest('button,a,input,select,textarea,label')) basculer(); });
+    appliquer(false);
+    return { carte:c, titre:titre, ouvrir:function(){ if(etat[titre]){ etat[titre]=false; appliquer(true); } } };
+  }) : [];
 
   conteneur.classList.add('avec-sommaire');
-  var aside=add(conteneur,'aside','sec-sommaire'); aside.setAttribute('aria-label','Sommaire de la page');
+  var aside=add(conteneur,'aside','sec-sommaire'); aside.setAttribute('aria-label', etape ? 'Étape et sommaire de la page' : 'Sommaire de la page');
   var boite=add(aside,'div','sec-boite');
-  add(boite,'div','sec-titre','Sommaire');
-  var ol=add(boite,'ol','sec-liste'), liens=[];
-  sections.forEach(function(s,i){
-    var li=add(ol,'li');
-    var a=add(li,'button','sec-lien'); a.type='button'; fk(a,'sommaire-'+i);
-    var m=s.titre.match(/^(\d+)\s*·\s*(.*)$/);
-    add(a,'span','sec-num', m ? m[1] : String(i+1));
-    add(a,'span','sec-lib', m ? m[2] : s.titre);
-    a.addEventListener('click',function(){ s.ouvrir(); SUIVI_VERROU=Date.now()+1200; s.carte.scrollIntoView({behavior:'smooth', block:'start'}); actif(i); });
-    liens.push(a);
-  });
-  var tous=add(boite,'div','sec-tous');
-  var bd=add(tous,'button','sec-mini','Tout déplier'); bd.type='button'; fk(bd,'sommaire-deplier');
-  var br=add(tous,'button','sec-mini','Tout replier'); br.type='button'; fk(br,'sommaire-replier');
-  bd.addEventListener('click',function(){ sections.forEach(function(s){ etat[s.titre]=false; }); render(); });
-  br.addEventListener('click',function(){ sections.forEach(function(s){ etat[s.titre]=true; }); render(); });
 
-  function actif(i){ liens.forEach(function(a,j){ a.classList.toggle('on', i===j); if(i===j) a.setAttribute('aria-current','true'); else a.removeAttribute('aria-current'); }); }
+  // 1. L'étape en cours et l'avancement de la procédure
+  if(etape){
+    var st=etapesStatut(), rang=ETAPES.indexOf(etape);
+    var te=add(boite,'div','sec-etape');
+    add(te,'div','sec-surtitre','Étape '+(rang+1)+' sur '+ETAPES.length);
+    add(te,'div','sec-etape-nom',etape.lab);
+    var barre=add(te,'div','sec-avance'); barre.setAttribute('role','img');
+    var faites=ETAPES.filter(function(e){ return st[e.id]==='done'; }).length;
+    barre.setAttribute('aria-label',faites+' étape(s) terminée(s) sur '+ETAPES.length);
+    ETAPES.forEach(function(e){ var seg=add(barre,'span','sec-seg '+st[e.id]+(e===etape?' ici':'')); seg.title=e.lab+' — '+FLOW_LAB[st[e.id]]; });
+    add(te,'span','sec-statut '+st[etape.id], FLOW_LAB[st[etape.id]].replace(/^./,function(c){ return c.toUpperCase(); }));
+  }
+
+  // 2. Le sommaire de la page
+  var liens=[], ol=null;
+  if(avecSommaire){
+    var tete=add(boite,'div','sec-titre-ligne');
+    add(tete,'div','sec-titre', etape ? 'Sur cette page' : 'Sommaire');
+    var tous=add(tete,'div','sec-tous');
+    var bd=boutonIcone(tous,'chevD','Tout déplier',function(){ sections.forEach(function(s){ etat[s.titre]=false; }); render(); },'sommaire-deplier');
+    var br=boutonIcone(tous,'chevD','Tout replier',function(){ sections.forEach(function(s){ etat[s.titre]=true; }); render(); },'sommaire-replier');
+    bd.classList.add('sec-mini'); br.classList.add('sec-mini','sec-mini-replier');
+    ol=add(boite,'ol','sec-liste');
+    sections.forEach(function(s,i){
+      var li=add(ol,'li');
+      var a=add(li,'button','sec-lien'); a.type='button'; fk(a,'sommaire-'+i);
+      var m=s.titre.match(/^(\d+)\s*·\s*(.*)$/);
+      add(a,'span','sec-num', m ? m[1] : String(i+1));
+      var lib=add(a,'span','sec-lib', m ? m[2] : s.titre); a.title=lib.textContent;
+      a.addEventListener('click',function(){ s.ouvrir(); SUIVI_VERROU=Date.now()+1200; s.carte.scrollIntoView({behavior:'smooth', block:'start'}); actif(i); });
+      liens.push(a);
+    });
+  }
+
+  // 3. Passage à l'étape suivante
+  if(etape){
+    var suiv=ETAPES[ETAPES.indexOf(etape)+1];
+    if(suiv && vuesPermises(suiv).length){
+      var bs=add(boite,'button','sec-suivante'); bs.type='button'; fk(bs,'panneau-suivante');
+      var tx=add(bs,'span'); add(tx,'span','sec-suivante-lab','Étape suivante'); add(tx,'span','sec-suivante-nom',suiv.lab);
+      var fl=add(bs,'span','sec-suivante-ic'); icon(fl,'chevR');
+      bs.addEventListener('click',function(){ go(vuesPermises(suiv)[0]); });
+    }
+  }
+
+  function actif(i){
+    liens.forEach(function(a,j){
+      a.classList.toggle('on', i===j); a.classList.toggle('vu', j<i);
+      if(i===j) a.setAttribute('aria-current','true'); else a.removeAttribute('aria-current');
+    });
+    sections.forEach(function(s,j){ s.carte.classList.toggle('actif', i===j); });
+    if(ol) ol.style.setProperty('--avance', sections.length>1 ? String(i/(sections.length-1)) : '0');
+  }
+  if(!sections.length) return;
   actif(0);
   // suit la section affichée : la dernière dont le haut a franchi le haut de l'écran (sous la barre du haut)
   SUIVI_SECTIONS = function(){
