@@ -198,16 +198,19 @@
     r.addEventListener('input', function () { RECHERCHE = r.value; var pos = r.selectionStart; vueEspaces(); var n = $('cs-recherche'); n.focus(); n.setSelectionRange(pos, pos); });
   }
 
+  var OPERATEURS = [];
   function vueOperateurs() {
     $('cs-vue').innerHTML = '<div class="cs-entete"><div><h1>Opérateurs</h1><p>Les personnes qui ont accès à cette console.</p></div><button class="btn btn-primary" data-action="nouvel-operateur">' + ic('plus') + 'Ajouter un opérateur</button></div><div id="cs-ops" class="cs-charge">Chargement…</div>';
     api('GET', '/operateurs').then(function (j) {
+      OPERATEURS = j.operateurs;
       $('cs-ops').outerHTML = '<div class="cs-table-cadre"><table class="cs-table"><thead><tr><th>Opérateur</th><th>Statut</th><th>Dernière connexion</th><th>Ajouté le</th><th><span class="pf-sr">Actions</span></th></tr></thead><tbody>' +
         j.operateurs.map(function (o) {
           var moi = MOI && o.id === MOI.operateur.id;
           return '<tr><td><div class="cs-ent"><span class="cs-avatar petit">' + esc(initiales(o.nom)) + '</span><div><strong>' + esc(o.nom) + (moi ? ' <span class="cs-muet">(vous)</span>' : '') + '</strong><small>' + esc(o.email) + '</small></div></div></td>' +
             '<td>' + (o.actif ? '<span class="cs-statut actif">Actif</span>' : '<span class="cs-statut suspendu">Désactivé</span>') + '</td>' +
             '<td>' + depuis(o.derniere_connexion) + '</td><td>' + date(o.cree_le) + '</td>' +
-            '<td class="cs-actions">' + (moi ? '' : '<button class="btn btn-ghost btn-sm" data-action="basculer-operateur" data-id="' + o.id + '" data-actif="' + (o.actif ? 0 : 1) + '">' + (o.actif ? 'Désactiver' : 'Réactiver') + '</button>') + '</td></tr>';
+            '<td class="cs-actions"><button class="cs-icone" data-action="modifier-operateur" data-id="' + o.id + '" title="Modifier" aria-label="Modifier ' + esc(o.nom) + '">' + ic('crayon') + '</button>' +
+            (moi ? '' : '<button class="btn btn-ghost btn-sm" data-action="basculer-operateur" data-id="' + o.id + '" data-actif="' + (o.actif ? 0 : 1) + '">' + (o.actif ? 'Désactiver' : 'Réactiver') + '</button>') + '</td></tr>';
         }).join('') + '</tbody></table></div>';
     }).catch(function (x) { $('cs-ops').textContent = x.message; });
   }
@@ -225,6 +228,14 @@
   var espaceDe = function (slug) { return ETAT.espaces.filter(function (e) { return e.slug === slug; })[0]; };
   var demandeDe = function (id) { return ETAT.inscriptions.filter(function (i) { return String(i.id) === String(id); })[0]; };
   var MSG = '<div class="pf-message" role="alert" hidden></div>';
+  /* Mot de passe initial : 14 caractères tirés au hasard (majuscule, minuscule et chiffre garantis). */
+  function motDePasseAleatoire() {
+    var maj = 'ABCDEFGHJKLMNPQRSTUVWXYZ', min = 'abcdefghijkmnopqrstuvwxyz', chi = '23456789', tout = maj + min + chi;
+    var a = new Uint32Array(14); crypto.getRandomValues(a);
+    var m = maj[a[0] % maj.length] + min[a[1] % min.length] + chi[a[2] % chi.length];
+    for (var i = 3; i < 14; i++) m += tout[a[i] % tout.length];
+    return m;
+  }
 
   function detail(e) {
     var a = e.activite || {};
@@ -363,13 +374,7 @@
         });
       });
     },
-    generer: function () {
-      var maj = 'ABCDEFGHJKLMNPQRSTUVWXYZ', min = 'abcdefghijkmnopqrstuvwxyz', chi = '23456789', tout = maj + min + chi;
-      var a = new Uint32Array(14); crypto.getRandomValues(a);
-      var m = maj[a[0] % maj.length] + min[a[1] % min.length] + chi[a[2] % chi.length];
-      for (var i = 3; i < 14; i++) m += tout[a[i] % tout.length];
-      $('ne-mdp').value = m;
-    },
+    generer: function () { $('ne-mdp').value = motDePasseAleatoire(); },
     'nouvel-operateur': function () {
       ouvrir('Ajouter un opérateur', '<form class="cs-form" novalidate>' + MSG +
         '<label for="no-nom">Nom et prénom</label><input id="no-nom" type="text" maxlength="120">' +
@@ -384,6 +389,30 @@
         });
       });
     },
+    'modifier-operateur': function (b) {
+      var o = OPERATEURS.filter(function (x) { return String(x.id) === b.dataset.id; })[0]; if (!o) return;
+      var moi = MOI && o.id === MOI.operateur.id;
+      ouvrir('Modifier ' + o.nom, '<form class="cs-form" novalidate>' + MSG +
+        '<label for="mo-nom">Nom et prénom</label><input id="mo-nom" type="text" maxlength="120" value="' + esc(o.nom) + '">' +
+        '<label for="mo-email">Courriel</label><input id="mo-email" type="email" value="' + esc(o.email) + '">' +
+        (moi ? '<div class="pf-aide">Votre mot de passe se change par le menu de votre compte (« Changer mon mot de passe »).</div>'
+          : '<label for="mo-mdp">Nouveau mot de passe (facultatif)</label><div class="cs-mdp"><input id="mo-mdp" type="text" autocomplete="off" spellcheck="false" placeholder="Laisser vide pour ne pas le changer"><button type="button" class="btn btn-ghost btn-sm" data-action="generer-op">Générer</button></div>' +
+            '<div class="pf-aide">À transmettre vous-même à l’opérateur, qui le changera ensuite depuis son compte.</div>') +
+        '<div class="cs-pied-fen"><button type="button" class="btn btn-ghost" data-action="fermer">Annuler</button><button class="btn btn-primary" type="submit">Enregistrer</button></div></form>', function (c) {
+        c.querySelector('form').addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var corps = { nom: $('mo-nom').value.trim(), email: $('mo-email').value.trim() };
+          if (!moi && $('mo-mdp').value) corps.motDePasse = $('mo-mdp').value;
+          api('PATCH', '/operateurs/' + o.id, corps).then(function () {
+            fermer(); toast('Opérateur modifié.');
+            if (moi) { MOI.operateur.nom = corps.nom; MOI.operateur.email = corps.email; $('cs-moi').textContent = initiales(corps.nom);
+              $('cs-menu-tete').innerHTML = '<strong>' + esc(corps.nom) + '</strong><small>' + esc(corps.email) + '</small>'; }
+            vueOperateurs();
+          }).catch(function (x) { erreurFenetre(x.message); });
+        });
+      });
+    },
+    'generer-op': function () { $('mo-mdp').value = motDePasseAleatoire(); },
     'basculer-operateur': function (b) {
       api('PATCH', '/operateurs/' + b.dataset.id, { actif: b.dataset.actif === '1' }).then(function () { toast(b.dataset.actif === '1' ? 'Opérateur réactivé.' : 'Opérateur désactivé.'); vueOperateurs(); }).catch(function (x) { toast(x.message); });
     },

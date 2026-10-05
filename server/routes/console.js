@@ -223,14 +223,32 @@ r.post('/operateurs', (req, res) => {
   E.journaliser(qui(req), `Opérateur ajouté — ${nom} (${email})`);
   res.status(201).json({ ok: true, id });
 });
+/** Modification d'un opérateur : nom, courriel, actif ; nouveau mot de passe pour un autre opérateur (le sien se
+    change par /mot-de-passe, avec l'actuel). Champs absents : inchangés. */
 r.patch('/operateurs/:id', (req, res) => {
   const o = reg().prepare('SELECT * FROM operateurs WHERE id=?').get(Number(req.params.id));
   if (!o) return err(res, 404, 'OP_UNKNOWN', 'Opérateur introuvable.');
-  const actif = !!(req.body || {}).actif;
-  if (o.id === req.op.id && !actif) return err(res, 409, 'OP_SELF', 'Vous ne pouvez pas désactiver votre propre compte.');
-  if (!actif && reg().prepare('SELECT count(*) n FROM operateurs WHERE actif=1 AND id<>?').get(o.id).n === 0) return err(res, 409, 'OP_LAST', 'Il faut au moins un opérateur actif.');
-  reg().prepare('UPDATE operateurs SET actif=? WHERE id=?').run(actif ? 1 : 0, o.id);
-  E.journaliser(qui(req), `Opérateur ${actif ? 'réactivé' : 'désactivé'} — ${o.nom}`);
+  const b = req.body || {}, soi = o.id === req.op.id;
+  const nom = b.nom != null ? String(b.nom).trim() : o.nom;
+  const email = b.email != null ? String(b.email).trim().toLowerCase() : o.email;
+  const actif = b.actif != null ? !!b.actif : !!o.actif;
+  const mdp = b.motDePasse != null && b.motDePasse !== '' ? String(b.motDePasse) : null;
+  if (!nom || nom.length > 120) return err(res, 422, 'OP_NAME', 'Le nom est obligatoire.');
+  if (!courrielValide(email)) return err(res, 422, 'OP_EMAIL', 'Courriel invalide.');
+  if (email !== o.email && reg().prepare('SELECT 1 FROM operateurs WHERE lower(email)=? AND id<>?').get(email, o.id)) return err(res, 409, 'OP_TAKEN', 'Ce courriel a déjà un compte.');
+  if (soi && !actif) return err(res, 409, 'OP_SELF', 'Vous ne pouvez pas désactiver votre propre compte.');
+  if (!actif && o.actif && reg().prepare('SELECT count(*) n FROM operateurs WHERE actif=1 AND id<>?').get(o.id).n === 0) return err(res, 409, 'OP_LAST', 'Il faut au moins un opérateur actif.');
+  if (mdp && soi) return err(res, 409, 'OP_SELF_PASSWORD', 'Votre propre mot de passe se change par « Changer mon mot de passe ».');
+  if (mdp && !mdpValide(mdp)) return err(res, 422, 'OP_PASSWORD', MDP_REGLE);
+  const changes = [];
+  if (nom !== o.nom) changes.push(`nom : ${o.nom} → ${nom}`);
+  if (email !== o.email) changes.push(`courriel : ${o.email} → ${email}`);
+  if (actif !== !!o.actif) changes.push(actif ? 'réactivé' : 'désactivé');
+  if (mdp) changes.push('nouveau mot de passe');
+  if (!changes.length) return res.json({ ok: true });
+  reg().prepare('UPDATE operateurs SET nom=?, email=?, actif=?' + (mdp ? ', pass_hash=?' : '') + ' WHERE id=?')
+    .run(...[nom, email, actif ? 1 : 0].concat(mdp ? [bcrypt.hashSync(mdp, 10)] : [], [o.id]));
+  E.journaliser(qui(req), `Opérateur ${o.nom} modifié — ${changes.join(' ; ')}`);
   res.json({ ok: true });
 });
 r.post('/mot-de-passe', (req, res) => {

@@ -122,7 +122,15 @@ test('opérateurs : ajout, désactivation, mot de passe ; tout entre au journal'
   assert.equal((await req(PLAT, 'POST', '/api/console/mot-de-passe', { actuel: 'faux', nouveau: 'Nouveau+2026x' }, op)).status, 403);
   assert.equal((await req(PLAT, 'POST', '/api/console/mot-de-passe', { actuel: PW, nouveau: 'Nouveau+2026x' }, op)).status, 200);
   const j = (await req(PLAT, 'GET', '/api/console/journal', null, op)).json.journal.map((l) => l.action);
-  for (const m of [/Demande n° \d+ reçue/, /acceptée — espace teranga/, /refusée/, /sitarail créé à la main/, /sitarail suspendu/, /sitarail réactivé/, /sitarail supprimé/, /Opérateur ajouté/, /Opérateur désactivé/, /Mot de passe modifié/]) {
+  // modification : nom, courriel, nouveau mot de passe d'un autre opérateur (réactivé)
+  assert.equal((await req(PLAT, 'PATCH', '/api/console/operateurs/' + a.json.id, { email: OP.email }, op)).status, 409, 'courriel déjà pris');
+  assert.equal((await req(PLAT, 'PATCH', '/api/console/operateurs/' + a.json.id, { motDePasse: 'court' }, op)).status, 422);
+  assert.equal((await req(PLAT, 'PATCH', '/api/console/operateurs/' + moi.id, { motDePasse: 'Autre+2026xx' }, op)).status, 409, 'le sien : avec l’actuel');
+  assert.equal((await req(PLAT, 'PATCH', '/api/console/operateurs/' + a.json.id, { nom: 'Marie Kouamé-Diallo', email: 'm.kouame@neuronestech.com', actif: true, motDePasse: 'Reprise+2026m' }, op)).status, 200);
+  assert.equal((await req(PLAT, 'POST', '/api/console/connexion', { email: 'm.kouame@neuronestech.com', motDePasse: 'Reprise+2026m' })).status, 200);
+  assert.ok((await req(PLAT, 'GET', '/api/console/operateurs', null, op)).json.operateurs.some((o) => o.nom === 'Marie Kouamé-Diallo' && o.actif));
+  j.push(...(await req(PLAT, 'GET', '/api/console/journal', null, op)).json.journal.map((l) => l.action));
+  for (const m of [/Opérateur Marie Kouamé modifié — nom/, /Demande n° \d+ reçue/, /acceptée — espace teranga/, /refusée/, /sitarail créé à la main/, /sitarail suspendu/, /sitarail réactivé/, /sitarail supprimé/, /Opérateur ajouté/, /modifié — désactivé/, /Mot de passe modifié/]) {
     assert.ok(j.some((a) => m.test(a)), 'journal : ' + m);
   }
 });
