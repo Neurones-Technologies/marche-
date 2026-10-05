@@ -134,7 +134,7 @@ test('instruction : rejet motivé, nouvelle soumission, référencement et valid
   assert.equal((await fetch(BASE + '/api/files/' + fichier, { headers: { cookie: sotrap } })).status, 404);
 });
 
-test('dépôt d’offre : réservé aux partenaires référencés en achats privés, pièces reprises du référencement', async () => {
+test('consultation : seuls les partenaires référencés et sélectionnés voient le dossier et soumissionnent ; pièces reprises du référencement', async () => {
   const c = await call('POST', '/api/procedures', { ref: 'AO-2026-050', objet: 'Mobilier de bureau', profil: 'prive' }, achats);
   ok(c, 201);
   pid = c.json.id;
@@ -146,8 +146,25 @@ test('dépôt d’offre : réservé aux partenaires référencés en achats priv
   ok(await call('POST', '/api/inscription/verifier', { jeton: r.json.lienVerification.split('=')[1] }));
   autre = await connecter('contact@autre.ci');
   const offre = { name: 'Mobilia SARL', iso: 'CI', devise: 'XOF', montant: 12000000, delai: 30, lots: [lot] };
-  refusé(await call('POST', `/api/procedures/${pid}/offers`, { ...offre, name: 'Autre SA' }, autre), 403, 'PARTNER_NOT_REFERENCED');
-  // marché public (p1) : pas de réservation, seul le contrôle des pièces s'applique
+  // achats privés : consultation restreinte ; ni Autre SA (non référencée) ni Mobilia (pas encore consultée) ne voient le dossier
+  const visibles = async (cookie) => (await call('GET', '/api/procedures', null, cookie)).json.procedures.map((p) => p.id);
+  assert.ok(!(await visibles(autre)).includes(pid));
+  assert.ok(!(await visibles(mobilia)).includes(pid));
+  refusé(await call('POST', `/api/procedures/${pid}/offers`, { ...offre, name: 'Autre SA' }, autre), 404);
+  refusé(await call('POST', `/api/procedures/${pid}/offers`, offre, mobilia), 404);
+  const idMobilia = (await call('GET', '/api/partenaires/moi', null, mobilia)).json.partenaire.id;
+  const idAutre = (await call('GET', '/api/partenaires/moi', null, autre)).json.partenaire.id;
+  // la sélection : parmi les seuls référencés ; pas d'appel d'offres « ouvert » en achats privés
+  const refs = (await call('GET', '/api/partenaires/references', null, achats)).json.partenaires.map((p) => p.id);
+  assert.ok(refs.includes(idMobilia) && !refs.includes(idAutre));
+  refusé(await call('GET', '/api/partenaires/references', null, mobilia), 403);
+  refusé(await patch(achats, { consultes: { mode: 'restreint', partenaires: [idAutre] } }, pid), 422, 'CONSULTATION_INVALID');
+  refusé(await patch(achats, { consultes: { mode: 'ouvert', partenaires: [] } }, pid), 422, 'CONSULTATION_INVALID');
+  ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: [idMobilia] } }, pid));
+  assert.ok((await visibles(mobilia)).includes(pid));
+  assert.ok((await getState(mobilia, pid)).notifs.some((n) => n.ev === 'consultation' && n.titre.includes('AO-2026-050')), 'prévenu dans son espace');
+  assert.ok(!(await visibles(autre)).includes(pid));
+  // marché public (p1) : appel d'offres ouvert par défaut, accessible à toute entreprise ; seul le contrôle des pièces s'applique
   const p1 = await getState(achats);
   ok(await patch(achats, { cdc: { ...p1.cdc, cdcPublie: true } }));
   refusé(await call('POST', '/api/procedures/p1/offers', { ...offre, name: 'Autre SA' }, autre), 422);
@@ -162,6 +179,15 @@ test('dépôt d’offre : réservé aux partenaires référencés en achats priv
   const pieces = dep.json.offer.pieces.map((x) => [x.doc, !!x.referencement]).sort();
   assert.deepEqual(pieces, [['caution', false], ['cnps', true], ['fiscal', true], ['registre', true]]);
   assert.equal((await getState(mobilia, pid)).monPartenaire.statut, 'reference');
+  // un partenaire qui a déposé une offre reste consulté
+  refusé(await patch(achats, { consultes: { mode: 'restreint', partenaires: [] } }, pid), 422, 'CONSULTATION_INVALID');
+  // marché public : la consultation peut aussi être restreinte ; Autre SA ne voit plus p1
+  const p1c = await getState(achats);
+  ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: [idMobilia] } }));
+  assert.ok(!(await visibles(autre)).includes('p1'));
+  ok(await patch(achats, { consultes: { mode: 'ouvert', partenaires: [idMobilia] } }));
+  assert.ok((await visibles(autre)).includes('p1'));
+  assert.ok(p1c);
 });
 
 test('suspension, réactivation, exclusion : motivées, transitions contrôlées', async () => {

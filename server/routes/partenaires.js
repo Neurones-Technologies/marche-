@@ -53,6 +53,13 @@ r.get('/moi', (req, res) => {
   res.json({ partenaire: p ? vue(p) : null });
 });
 
+/** Partenaires référencés, pour choisir ceux qu'on consulte sur un appel d'offres (rédacteur du dossier ou achats). */
+r.get('/references', (req, res) => {
+  if (!gere(req) && !req.can('cdc.edit') && !req.can('cdc.publish')) return err(res, 403, 'FORBIDDEN', 'Habilitation insuffisante.');
+  res.json({ partenaires: partenairesAll().filter((p) => p.statut === 'reference').map((p) => ({ id: p.id, raisonSociale: p.raisonSociale, pays: p.pays,
+    domaines: p.domaines || [], activite: (p.reponses || {}).activite || '', referenceLe: p.referenceLe, evaluation: p.evaluation || null })) });
+});
+
 /* Routes sur une fiche : son titulaire ou un acheteur habilité. */
 r.use('/:id', (req, res, next) => {
   const p = partenaireGet(req.params.id);

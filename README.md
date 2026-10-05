@@ -96,11 +96,17 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
   Une commande émise ne se modifie que par avenant motivé, validé et émis sous un numéro dérivé (BC-2026-0001-A1),
   sans supprimer de ligne ni descendre sous les quantités reçues ; les versions antérieures sont conservées.
   Export CSV des commandes émises pour la comptabilité. La facture et le paiement restent dans l'ERP.
-- **Référencement des partenaires** : un prestataire crée le compte de son entreprise sur le portail des partenaires (`/portail-partenaires`, hors de la page de connexion)
-  (limitation par adresse IP, champ piège, pas d'énumération des comptes, compte inactif jusqu'à la vérification du
-  courriel), dépose ses pièces administratives et soumet son dossier au parcours de référencement de l'organisation.
-  Une pièce validée et en cours de validité tient lieu de pièce du dossier à chaque dépôt d'offre ; en achats privés,
-  le dépôt est réservé aux partenaires référencés. Suspension et exclusion motivées.
+- **Référencement des partenaires** : l'organisation définit son formulaire de référencement (Paramètres → 10 :
+  questions, et documents obligatoires ou non, à date de validité exigée ou non). Un prestataire le remplit sur le
+  portail des partenaires (`/portail-partenaires`, hors de la page de connexion), en quatre étapes : entreprise,
+  questionnaire, documents (déposés dans un brouillon anonyme), compte. À la vérification de son courriel, son compte
+  s'active et son dossier part en instruction (parcours de référencement). Protections : limitation par adresse IP,
+  champ piège, pas d'énumération des comptes. Suspension et exclusion motivées. Une pièce validée et en cours de
+  validité tient lieu de pièce du dossier à chaque dépôt d'offre.
+- **Partenaires consultés** (cahier des charges → 8) : en achats privés, seuls les partenaires référencés que l'acheteur
+  sélectionne voient le dossier publié et déposent une offre ; ils sont prévenus dans leur espace. Un acheteur public
+  choisit l'appel d'offres ouvert (toute entreprise, obligation légale) ou la consultation restreinte. Un partenaire
+  non référencé ne peut pas être sélectionné ; un partenaire qui a déposé une offre ne peut plus être retiré.
 - **Besoins** : un service exprime un besoin, qui suit le circuit de validation de l'organisation (niveaux selon le
   budget, le demandeur ne valide jamais son propre besoin, rejet motivé) ; validé, il devient une procédure pré-remplie
   (objet, budget, type de procédure pressenti selon des seuils provisoires du profil), que le demandeur suit en lecture.

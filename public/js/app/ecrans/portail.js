@@ -153,8 +153,6 @@ function vPortail(m){
   if(!Number(d.delai)) errs.push("Délai d'exécution non renseigné.");
   if(!d.lots.length) errs.push('Aucun lot sélectionné.');
   req.forEach(function(x){ if(!d.docs[x.id] && !couvertes[x.id]) errs.push('Pièce manquante : '+x.label+'.'); });
-  if(CADRE().depotReserveReferences && !(mp && mp.statut==='reference'))
-    errs.push('Dépôt réservé aux partenaires référencés : complétez et soumettez votre dossier dans « Mon référencement ».');
   if(Number(d.delai) > c.delaiMax) warns.push('Délai proposé ('+d.delai+' j) supérieur au plafond du cahier des charges ('+c.delaiMax+' j).');
   if(Number(d.garantie) && Number(d.garantie) < c.garantieMin) warns.push('Garantie proposée ('+d.garantie+' mois) inférieure au minimum exigé ('+c.garantieMin+' mois).');
   if(Number(d.refsCount) && Number(d.refsCount) < 3) warns.push('Références déclarées : '+d.refsCount+' pour 3 exigées.');

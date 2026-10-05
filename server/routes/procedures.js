@@ -4,14 +4,24 @@ const express = require('express');
 const { db, store, proceduresAll, procedureGet, procedureCreate, auditAppend } = require('../db');
 const { requireAuth, needPerm, whoLabel } = require('../auth');
 const P = require('../../public/js/profils.js');
+const Co = require('../consultation');
+const { partenaireDe } = require('../db');
 
 const r = express.Router();
 r.use(requireAuth);
 
 /** Un compte sans accès aux offres (soumissionnaire, demandeur) ne voit que les procédures publiées et non archivées. */
 const voitTout = (req) => req.can('offres.read') || req.can('cdc.edit');
+// un prestataire ne voit que les dossiers publiés qui lui sont ouverts : consulté (et référencé), appel d'offres ouvert
+// d'un acheteur public, ou procédure où il a déjà déposé une offre
+function ouverteA(req, p) {
+  if (!req.can('portail.use')) return true;
+  const st = store(p.id), part = partenaireDe(req.user.id);
+  if (!Co.refusDepot(Co.consultation((k) => st.get(k)), part)) return true;
+  return !!part && st.offers().some((o) => o.partenaire === part.id);
+}
 // … et le demandeur suit en lecture la procédure née de son besoin
-const visible = (req, p) => voitTout(req) || (p.publie && !p.archive) || (p.demandeur && p.demandeur === req.user.id);
+const visible = (req, p) => voitTout(req) || (p.publie && !p.archive && ouverteA(req, p)) || (p.demandeur && p.demandeur === req.user.id);
 
 r.get('/', (req, res) => res.json({ procedures: proceduresAll().filter((p) => visible(req, p)) }));
 

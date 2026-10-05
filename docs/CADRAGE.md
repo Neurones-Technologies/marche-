@@ -343,6 +343,12 @@ avec des statuts ; dépôt réservé aux partenaires référencés en achats pri
   (l'offre garde la trace de la pièce de référencement reprise) ; règle `depotReserveReferences` du profil : vraie par
   défaut en achats privés, imposée fausse en marché public. Les instances existantes reçoivent une fiche « candidat »
   par compte soumissionnaire.
+- **05/10/2026, formulaire et consultation** : le formulaire de référencement est défini par l'organisation (clé
+  `formulaireReferencement` : questions typées et documents, obligatoires ou non, date de validité exigée ou non),
+  distinct des pièces d'une offre (`docDefs`). Le portail des partenaires est ce formulaire complet ; le dossier part
+  en instruction à la vérification du courriel. La règle `depotReserveReferences` est remplacée par la consultation
+  (clé de procédure `consultes`) : restreinte aux partenaires référencés sélectionnés, ou, pour un acheteur public
+  seulement, appel d'offres ouvert à toute entreprise. Un prestataire ne voit que les dossiers qui lui sont ouverts.
 - Tests : 72 au total, dont 6 sur le référencement ; parcours complet dans Chrome (inscription, lien de vérification,
   dépôt des pièces par le sélecteur de fichiers, instruction par les achats).
 - **Limite** : les courriels sont simulés. Hors production, le lien de vérification est affiché pour la démonstration ;

@@ -275,10 +275,11 @@ r.post('/offers', (req, res) => {
   if (!Number.isFinite(montant) || montant <= 0) errs.push('Montant invalide.');
   if (!lots.length) errs.push('Au moins un lot est requis.');
   if (errs.length) return res.status(422).json({ error: errs.join(' ') });
-  // profil qui réserve le dépôt aux partenaires référencés (achats privés) : jamais en marché public
+  // consultation restreinte : seuls les partenaires référencés et sélectionnés déposent ; appel d'offres ouvert d'un
+  // acheteur public : toute entreprise inscrite
   const partenaire = partenaireDe(req.user.id);
-  if (R.cadre({ org, cdc, cadre: req.store.get('cadre') }).depotReserveReferences && !(partenaire && partenaire.statut === 'reference'))
-    return res.status(403).json({ error: 'Le dépôt d’offre est réservé aux partenaires référencés : complétez et soumettez votre dossier de référencement.', code: 'PARTNER_NOT_REFERENCED' });
+  const refus = require('../consultation').refusDepot(require('../consultation').consultation((k) => req.store.get(k)), partenaire);
+  if (refus) return res.status(403).json(refus);
 
   const docDefs = req.store.get('docDefs');
   const pending = db.prepare('SELECT * FROM files WHERE owner=? AND procedure_id=? AND offer_id IS NULL').all(req.user.id, req.pid);

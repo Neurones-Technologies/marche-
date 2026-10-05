@@ -24,6 +24,7 @@ const WRITE_PERMS = {
   org: ['params.edit'], seuils: ['params.edit'], docDefs: ['params.edit'],
   mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'], circuitReferencement: ['params.edit'], formulaireReferencement: ['params.edit'], circuitCommande: ['params.edit'], evaluationPartenaires: ['params.edit'],
   offers: ['params.edit'],
+  consultes: ['cdc.edit', 'cdc.publish'],
   roles: ['roles.edit'], users: ['roles.edit'], // délégations et affectations : routes /api/suppleances uniquement
   notifRules: ['notif.manage'],
   qa: ['qa.answer', 'portail.use'],
@@ -380,6 +381,11 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (!(Number(value.plafondRetardJours) >= 1 && Number(value.plafondRetardJours) <= 365)) return refus(422, 'EVALUATION_INVALID', 'Retard plafond entre 1 et 365 jours.');
       break;
     }
+    case 'consultes': {
+      const e = require('./consultation').verifier(value, cur, next, (id) => ST.offers().some((o) => o.partenaire === id));
+      if (e) return refus(422, 'CONSULTATION_INVALID', e);
+      break;
+    }
     case 'formulaireReferencement': {
       const e = require('./formulaire').verifierDefinition(value);
       if (e) return refus(422, 'FORM_INVALID', e);
@@ -444,6 +450,22 @@ function effectsOf(changes, req) {
   if (hasNewRejection(changes)) {
     const r = changes.rejets[changes.rejets.length - 1];
     audit.push(`Attribution rejetée au niveau « ${r.role} » — motif : ${r.motif} — retour à l’évaluation`);
+  }
+  // partenaires consultés : prévenus (cloche) quand le dossier publié leur devient accessible
+  {
+    const Co = require('./consultation');
+    const avantPub = !!(stored('cdc') || {}).cdcPublie, apresPub = !!(next('cdc') || {}).cdcPublie;
+    const c = Co.consultation(next), avant = Co.consultation((k) => stored(k));
+    if (apresPub && c.mode === 'restreint') {
+      const nouveaux = avantPub ? c.partenaires.filter((id) => !avant.partenaires.includes(id) || avant.mode !== 'restreint') : c.partenaires;
+      if (nouveaux.length) Co.prevenir(nouveaux, next('cdc'));
+    }
+    if ('consultes' in changes && !same(changes.consultes, stored('consultes'))) {
+      const noms = (ids) => ids.map((id) => (require('./db').partenaireGet(id) || { raisonSociale: id }).raisonSociale);
+      const ajoutes = c.partenaires.filter((id) => !avant.partenaires.includes(id)), retires = avant.partenaires.filter((id) => !c.partenaires.includes(id));
+      audit.push('Consultation : ' + (c.mode === 'ouvert' ? 'appel d’offres ouvert à toute entreprise' : 'restreinte aux partenaires sélectionnés')
+        + (ajoutes.length ? ' — ajoutés : ' + noms(ajoutes).join(', ') : '') + (retires.length ? ' — retirés : ' + noms(retires).join(', ') : ''));
+    }
   }
   if (changes.depClosed === true && !stored('depClosed')) {
     const rates = { ...((next('org') || {}).rates || {}) };

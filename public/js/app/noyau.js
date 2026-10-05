@@ -103,7 +103,7 @@ var UI = { q:'', sort:'nom' };
 /* Clés partagées avec le serveur ; view / offerIndex / draft restent propres à chaque session. */
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','recours','standstill','contractSigned','infructueux',
-  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','formulaireReferencement','circuitCommande','evaluationPartenaires'];
+  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','formulaireReferencement','circuitCommande','evaluationPartenaires','consultes'];
 var SERVER_ONLY = ['delegations','affectations','audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres','courriels'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */

@@ -163,9 +163,11 @@ function vCDC(m){
   });
   add(add(k7,'div','panel-foot'),'span','muted',"Le dossier d'un soumissionnaire étranger n'est pas « allégé » : il est différent. Exiger une attestation CNPS d'une entreprise allemande n'a pas de sens ; exiger une contre-garantie bancaire locale et une traduction certifiée en a un.");
 
+  vCdcConsultation(m);
+
   /* Aperçu DAO */
   var k8=add(m,'div','card'); k8.style.marginTop='18px';
-  var ph8=add(k8,'div','panel-head'); add(ph8,'span',null,'8 · Génération du dossier d\u2019appel d\u2019offres');
+  var ph8=add(k8,'div','panel-head'); add(ph8,'span',null,'9 · Génération du dossier d\u2019appel d\u2019offres');
   var gob=add(ph8,'button','btn btn-primary btn-sm','Générer le dossier complet →');
   gob.addEventListener('click',function(){ logit('Dossier d\u2019appel d\u2019offres généré'); go('dao'); }); gob.setAttribute('data-consult','');
   var prb=boutonIcone(ph8,'printer','Imprimer l\u2019extrait',null,'cdc-imprimer');
@@ -189,4 +191,94 @@ function vCDC(m){
   add(pv,'h4',null,'Pièces exigées');
   var u3=add(pv,'ul');
   DOCS().forEach(function(d){ add(u3,'li',null, d.label+' — '+(d.scope==='tous'?'tous soumissionnaires':(d.scope==='local'?'soumissionnaires locaux':'soumissionnaires hors UEMOA'))); });
+}
+
+/* 8 · Partenaires consultés. Achats privés : seuls les partenaires référencés sélectionnés voient le dossier publié et
+   déposent une offre. Acheteur public : appel d'offres ouvert à toute entreprise (obligation légale), ou consultation
+   restreinte aux partenaires sélectionnés. La sélection se fait parmi les seuls partenaires référencés. */
+UI.references = null;
+function vCdcConsultation(m){
+  var co=state.consultes||{}, pub=!!MPProfils.profil(R.profilId(RCTX())).public;
+  var mode = pub && co.mode!=='restreint' ? 'ouvert' : 'restreint', ids=co.partenaires||[];
+  var peut=can('cdc.edit')||can('cdc.publish');
+  var ecrire=function(v, message){ state.consultes=v; logit(message); save(); render(); };
+  var k=add(m,'div','card'); k.style.marginTop='18px';
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,'8 · Partenaires consultés');
+  add(ph,'span','chip '+(mode==='ouvert'?'c-violet':'c-teal'), mode==='ouvert' ? 'Ouvert à toute entreprise' : ids.length+' partenaire'+(ids.length>1?'s':'')+' consulté'+(ids.length>1?'s':''));
+  var b=add(k,'div','pad');
+  if(pub){
+    var seg=add(b,'div','consult-modes');
+    [['ouvert','Appel d’offres ouvert','Toute entreprise inscrite sur le portail, référencée ou non, voit le dossier publié et peut déposer une offre.'],
+     ['restreint','Consultation restreinte','Seuls les partenaires référencés que vous sélectionnez voient le dossier et déposent une offre.']].forEach(function(x){
+      var o=add(seg,'button','consult-mode'+(mode===x[0]?' on':'')); o.type='button'; fk(o,'consult-'+x[0]);
+      o.setAttribute('aria-pressed',mode===x[0]?'true':'false'); o.disabled=!peut;
+      add(o,'strong',null,x[1]); add(o,'span',null,x[2]);
+      o.addEventListener('click',function(){ if(mode!==x[0]) ecrire({ mode:x[0], partenaires:ids }, 'Consultation : '+x[1].toLowerCase()); });
+    });
+  } else add(b,'p','muted','Achats privés : seuls les partenaires référencés que vous sélectionnez voient le dossier publié et peuvent déposer une offre. Ils sont prévenus dans leur espace dès la publication.');
+  if(mode==='ouvert') return;
+  if(!UI.references){
+    add(b,'p','muted','Chargement des partenaires référencés…');
+    if(!UI.referencesEnCours){
+      UI.referencesEnCours=true;
+      MP.api('GET','/api/partenaires/references').then(function(r){ UI.references=r.partenaires; }).catch(function(){ UI.references=[]; })
+        .then(function(){ UI.referencesEnCours=false; render(); });
+    }
+    return;
+  }
+  var parId={}; UI.references.forEach(function(p){ parId[p.id]=p; });
+  var lignes=ids.map(function(id){ return parId[id] || { id:id, raisonSociale:id, pays:'', domaines:[], horsListe:true }; });
+  tableau(b,{ cle:'consultes', lignes:lignes,
+    vide:'Aucun partenaire consulté : sélectionnez les partenaires référencés invités à soumissionner.',
+    colonnes:[
+      {lab:'Partenaire', rendu:function(p,td){ add(td,'strong',null,p.raisonSociale); add(td,'div','muted',p.id+(p.pays?' · '+p.pays:'')); }},
+      {lab:'Activité', val:function(p){ return p.activite || (p.domaines||[]).join(', ') || '—'; }},
+      {lab:'Note', num:true, rendu:function(p,td){ if(p.evaluation && p.evaluation.nb) chipCellule(td,p.evaluation.moyenne+'/100',p.evaluation.alerte?'c-red':'c-grey'); else td.textContent='—'; }},
+      {lab:'Statut', rendu:function(p,td){ chipCellule(td, p.horsListe?'Plus référencé':'Référencé', p.horsListe?'c-amber':'c-green'); }}
+    ],
+    recherche:function(p){ return [p.raisonSociale,p.id,p.pays,p.activite,(p.domaines||[]).join(' ')].join(' '); },
+    nouveau: peut ? { lab:'Partenaires', action:function(){ choisirPartenaires(ids, function(ajout){
+      ecrire({ mode:'restreint', partenaires:ids.concat(ajout) }, 'Partenaires consultés ajoutés : '+ajout.length); }); } } : null,
+    actions: peut ? function(p,td){
+      boutonIcone(td,'x','Retirer '+p.raisonSociale,function(){
+        ask('Le partenaire ne verra plus le dossier. Un partenaire qui a déjà déposé une offre ne peut pas être retiré.',function(){
+          ecrire({ mode:'restreint', partenaires:ids.filter(function(x){ return x!==p.id; }) }, 'Partenaire retiré de la consultation : '+p.raisonSociale);
+        },'Retirer '+p.raisonSociale+' de la consultation ?','Retirer');
+      },'consult-ret-'+p.id);
+    } : null
+  });
+  add(add(k,'div','panel-foot'),'span','muted','Seuls les partenaires référencés peuvent être consultés. '+(state.cdc.cdcPublie?'Un partenaire ajouté maintenant est prévenu aussitôt dans son espace.':'Les partenaires sélectionnés sont prévenus dans leur espace à la publication du dossier.'));
+}
+/* Fenêtre de choix : partenaires référencés pas encore consultés, avec recherche. */
+function choisirPartenaires(deja, valider){
+  var choisis={}, q='';
+  ouvrirFenetre('Consulter des partenaires référencés',function(corps,pied){
+    var dispo=(UI.references||[]).filter(function(p){ return deja.indexOf(p.id)<0; });
+    if(!dispo.length){ add(corps,'p','muted', (UI.references||[]).length ? 'Tous les partenaires référencés sont déjà consultés.' : 'Aucun partenaire référencé : les prestataires déposent leur dossier sur le portail des partenaires, puis le service des achats les référence.'); }
+    else {
+      var rq=add(corps,'input','dt-recherche'); rq.type='search'; rq.placeholder='Rechercher un partenaire, une activité…'; rq.value=q; fk(rq,'consult-q');
+      rq.setAttribute('aria-label','Rechercher un partenaire');
+      var liste=add(corps,'div','consult-liste');
+      var dessiner=function(){
+        liste.textContent='';
+        var t=q.trim().toLowerCase();
+        dispo.filter(function(p){ return !t || [p.raisonSociale,p.id,p.pays,p.activite,(p.domaines||[]).join(' ')].join(' ').toLowerCase().indexOf(t)>=0; }).forEach(function(p){
+          var l=add(liste,'label','consult-choix'+(choisis[p.id]?' on':''));
+          var c=add(l,'input'); c.type='checkbox'; c.checked=!!choisis[p.id];
+          c.addEventListener('change',function(){ if(c.checked) choisis[p.id]=true; else delete choisis[p.id]; l.classList.toggle('on',c.checked); maj(); });
+          var d=add(l,'div'); add(d,'strong',null,p.raisonSociale);
+          add(d,'span','muted',[p.id,p.pays,p.activite||(p.domaines||[]).join(', ')].filter(Boolean).join(' · '));
+          if(p.evaluation && p.evaluation.nb) add(l,'span','chip '+(p.evaluation.alerte?'c-red':'c-grey'),p.evaluation.moyenne+'/100');
+        });
+        if(!liste.childNodes.length) add(liste,'p','muted','Aucun partenaire ne correspond à la recherche.');
+      };
+      rq.addEventListener('input',function(){ q=rq.value; dessiner(); });
+      dessiner();
+    }
+    add(pied,'button','btn btn-ghost','Annuler').addEventListener('click',fermerFenetre);
+    var go=add(pied,'button','btn btn-primary','Consulter'); fk(go,'consult-ok');
+    var maj=function(){ var n=Object.keys(choisis).length; go.textContent=n?'Consulter '+n+' partenaire'+(n>1?'s':''):'Consulter'; go.disabled=!n; };
+    maj();
+    go.addEventListener('click',function(){ var ajout=Object.keys(choisis); fermerFenetre(); valider(ajout); });
+  },{ large:true });
 }

@@ -20,6 +20,7 @@ test('préparation : procédure privée attribuée à SOTRAP (partenaire référ
   const s0 = await getState(admin, pid);
   ok(await patch(admin, { org: { ...s0.org, reglages: { niveauxApprobationMin: 1 } }, approvals: s0.approvals.slice(0, 1) }, pid));
   ok(await patch(achats, { cdc: { ...s0.cdc, cdcPublie: true } }, pid));
+  ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, pid)); // SOTRAP consultée
   for (const doc of ['registre', 'fiscal', 'cnps', 'caution']) ok(await upload(doc, doc + '.pdf', PDF, sotrap, pid), 201);
   montant = 24000000;
   ok(await call('POST', `/api/procedures/${pid}/offers`, { name: 'SOTRAP Ingénierie SA', iso: 'CI', devise: 'XOF', montant, delai: 45, lots: [s0.cdc.lots[0].id] }, sotrap), 201);

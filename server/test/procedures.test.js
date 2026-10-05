@@ -60,6 +60,9 @@ test('soumissionnaire : il ne voit que les procédures publiées, et dépose dan
   refusé(await upload('registre', 'rccm.pdf', PDF, soum, 'p2'), 404);
   const p2 = await getState(achats, 'p2');
   ok(await patch(achats, { cdc: { ...p2.cdc, cdcPublie: true } }, 'p2'));
+  // achats privés : consultation restreinte ; SOTRAP (PRT-0001, référencée) est consultée
+  assert.deepEqual((await call('GET', '/api/procedures', null, soum)).json.procedures.map((p) => p.id), ['p1']);
+  ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, 'p2'));
   assert.deepEqual((await call('GET', '/api/procedures', null, soum)).json.procedures.map((p) => p.id), ['p1', 'p2']);
   for (const doc of ['registre', 'fiscal', 'caution']) ok(await upload(doc, doc + '.pdf', PDF, soum, 'p2'), 201);
   // le brouillon de pièces est propre à la procédure
