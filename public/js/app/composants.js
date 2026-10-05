@@ -34,6 +34,9 @@ var ICONS = {
   folder:'M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z',
   badge:'M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z|M9 12h6M9 15h4',
   cart:'M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 8H6|M9 20h.01M17 20h.01',
+  chevL:'m15 6-6 6 6 6',
+  chevR:'m9 6 6 6-6 6',
+  plus:'M12 5v14M5 12h14',
   clipboard:'M9 4h6v3H9z|M9 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-3|M9 12h6M9 16h4'
 };
 function icon(parent, name){
@@ -190,6 +193,82 @@ function cadreProcedureBas(m){
     bo.addEventListener('click',function(){ go(v); });
   });
 }
+
+/* ============ Tableau de données ============
+   Libellés de colonnes, recherche, filtres, bouton « Nouveau », pagination (10 lignes par page par défaut, icônes
+   précédent / suivant). L'état (page, recherche, filtres, taille de page) est gardé par clé dans UI.tableaux : il
+   survit aux rendus. La recherche et les filtres redessinent le seul tableau, sans perdre la saisie.
+   o = { cle, titre?, lignes, colonnes:[{ lab, val(ligne) → texte | rendu(ligne, td), num? }],
+         recherche?(ligne) → texte cherché, filtres?:[{ lab, options:[[valeur, libellé]], test(ligne, valeur) }],
+         nouveau?:{ lab, action }, actions?(ligne, td), vide?, parPage? } */
+UI.tableaux = {};
+function tableau(parent, o){
+  var st = UI.tableaux[o.cle] = UI.tableaux[o.cle] || { page:0, q:'', f:{}, parPage:o.parPage||10 };
+  var carte=add(parent,'div','card dt');
+  var barre=add(carte,'div','dt-barre');
+  if(o.titre) add(barre,'strong','dt-titre',o.titre);
+  var outils=add(barre,'div','dt-outils');
+  if(o.recherche){
+    var rq=add(outils,'input','dt-recherche'); rq.type='search'; rq.placeholder='Rechercher…'; rq.value=st.q;
+    rq.setAttribute('aria-label','Rechercher dans le tableau'+(o.titre?' « '+o.titre+' »':'')); fk(rq,'dt-q-'+o.cle);
+    rq.addEventListener('input',function(){ st.q=rq.value; st.page=0; dessiner(); });
+  }
+  (o.filtres||[]).forEach(function(f,i){
+    var s=add(outils,'select'); s.setAttribute('aria-label',f.lab); fk(s,'dt-f'+i+'-'+o.cle);
+    add(s,'option',null,f.lab+' : tous').value='';
+    f.options.forEach(function(x){ add(s,'option',null,x[1]).value=x[0]; });
+    s.value=st.f[i]||'';
+    s.addEventListener('change',function(){ st.f[i]=s.value; st.page=0; dessiner(); });
+  });
+  if(o.nouveau){
+    var bn=add(outils,'button','btn btn-primary btn-sm'); icon(bn,'plus'); bn.appendChild(document.createTextNode(o.nouveau.lab)); fk(bn,'dt-nouveau-'+o.cle);
+    bn.addEventListener('click',o.nouveau.action);
+  }
+  var corps=add(carte,'div','dt-corps'), pied=add(carte,'div','dt-pied');
+  function dessiner(){
+    corps.textContent=''; pied.textContent='';
+    var t=st.q.trim().toLowerCase();
+    var vis=o.lignes.filter(function(l){
+      if(t && String(o.recherche(l)||'').toLowerCase().indexOf(t)<0) return false;
+      return (o.filtres||[]).every(function(f,i){ return !st.f[i] || f.test(l, st.f[i]); });
+    });
+    var pages=Math.max(1, Math.ceil(vis.length/st.parPage));
+    if(st.page>=pages) st.page=pages-1;
+    if(!vis.length){ add(corps,'p','muted dt-vide', o.lignes.length ? 'Aucune ligne ne correspond à la recherche ou aux filtres.' : (o.vide||'Aucune donnée.')); }
+    else {
+      var tbl=add(corps,'table','tbl dt-table');
+      var tr=add(add(tbl,'thead'),'tr');
+      o.colonnes.forEach(function(c){ var th=add(tr,'th',c.num?'num':null,c.lab); th.scope='col'; });
+      if(o.actions){ var tha=add(tr,'th','dt-act','Actions'); tha.scope='col'; }
+      var tb=add(tbl,'tbody');
+      vis.slice(st.page*st.parPage, (st.page+1)*st.parPage).forEach(function(l){
+        var r=add(tb,'tr');
+        o.colonnes.forEach(function(c){ var td=add(r,'td',c.num?'num':null); if(c.rendu) c.rendu(l,td); else td.textContent=c.val(l)==null?'':String(c.val(l)); });
+        if(o.actions){ var tda=add(r,'td','dt-act'); o.actions(l,tda); }
+      });
+    }
+    // pied : taille de page, position, précédent / suivant
+    var g=add(pied,'label','dt-taille'); g.appendChild(document.createTextNode('Lignes par page '));
+    var sp=add(g,'select'); fk(sp,'dt-pp-'+o.cle);
+    [10,25,50].forEach(function(n){ add(sp,'option',null,String(n)).value=String(n); });
+    sp.value=String(st.parPage);
+    sp.addEventListener('change',function(){ st.parPage=Number(sp.value); st.page=0; dessiner(); });
+    var nav=add(pied,'div','dt-pages');
+    var deb=vis.length ? st.page*st.parPage+1 : 0, fin=Math.min(vis.length,(st.page+1)*st.parPage);
+    add(nav,'span','muted',deb+'–'+fin+' sur '+vis.length);
+    var bp=add(nav,'button','icon-btn'); icon(bp,'chevL'); bp.setAttribute('aria-label','Page précédente'); bp.disabled=st.page===0; fk(bp,'dt-prec-'+o.cle);
+    bp.addEventListener('click',function(){ st.page--; dessiner(); });
+    add(nav,'span','dt-num','Page '+(st.page+1)+' / '+pages);
+    var bs=add(nav,'button','icon-btn'); icon(bs,'chevR'); bs.setAttribute('aria-label','Page suivante'); bs.disabled=st.page>=pages-1; fk(bs,'dt-suiv-'+o.cle);
+    bs.addEventListener('click',function(){ st.page++; dessiner(); });
+  }
+  dessiner();
+  return carte;
+}
+/* Pastille de statut dans une cellule. */
+function chipCellule(td, lab, cls){ add(td,'span','chip '+(cls||'c-grey'),lab); }
+/* Bouton d'action dans une cellule. */
+function boutonCellule(td, lab, action, fkey, primaire){ var b=add(td,'button','btn btn-sm '+(primaire?'btn-primary':'btn-ghost'),lab); if(fkey) fk(b,fkey); b.addEventListener('click',action); return b; }
 
 /* Icône d'un champ extrait, d'après son libellé. */
 function fieldIcon(k){

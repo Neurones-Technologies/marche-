@@ -7,37 +7,42 @@ var STATUTS_BESOIN = {
   brouillon: ['Brouillon','c-grey'], soumis: ['En validation','c-amber'], valide: ['Validé','c-teal'],
   rejete: ['Rejeté','c-red'], transforme: ['Procédure créée','c-green']
 };
-UI.besoin = null;
+UI.besoin = null; UI.besoinNouveau = false;
 
 function vBesoins(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Besoins');
 
   var grille=add(m,'div'); grille.style.cssText='display:grid;grid-template-columns:minmax(0,1fr);gap:18px';
-  var liste=add(grille,'div','card'); add(liste,'div','panel-head','Besoins');
-  var corpsListe=add(liste,'div','pad'); add(corpsListe,'p','muted','Chargement…');
-  var detail=add(grille,'div');
+  var zoneListe=add(grille,'div'); add(zoneListe,'p','muted','Chargement…');
   var formulaire=add(grille,'div');
+  var detail=add(grille,'div');
 
   function charger(){
     MP.api('GET','/api/besoins').then(function(r){
-      corpsListe.textContent=''; detail.textContent=''; formulaire.textContent='';
-      var liste_=r.besoins||[];
-      if(!liste_.length) vide(corpsListe,'📋','Aucun besoin', can('besoin.create') ? 'Exprimez votre premier besoin ci-dessous.' : 'Aucun besoin n’a encore été exprimé.');
-      liste_.slice().reverse().forEach(function(b){
-        var row=add(corpsListe,'div','docline');
-        var lf=add(row,'div'); lf.style.flex='1 1 260px';
-        var t=add(lf,'div'); add(t,'strong',null,b.id+' — '+b.objet);
-        add(lf,'div','muted',[b.parNom, b.service, xof(b.budget), b.typeLab].filter(Boolean).join(' · '));
-        var st=STATUTS_BESOIN[b.statut]||[b.statut,'c-grey']; add(row,'span','chip '+st[1],st[0]);
-        var bo=add(row,'button','btn btn-ghost btn-sm', UI.besoin===b.id ? 'Affiché' : 'Ouvrir'); fk(bo,'bes-open-'+b.id);
-        bo.disabled = UI.besoin===b.id;
-        bo.addEventListener('click',function(){ UI.besoin=b.id; charger(); });
+      zoneListe.textContent=''; detail.textContent=''; formulaire.textContent='';
+      var liste_=(r.besoins||[]).slice().reverse();
+      tableau(zoneListe,{ cle:'besoins', titre:'Besoins', lignes:liste_,
+        vide: can('besoin.create') ? 'Aucun besoin : utilisez « Nouveau besoin ».' : 'Aucun besoin n’a encore été exprimé.',
+        colonnes:[
+          {lab:'N°', val:function(b){ return b.id; }},
+          {lab:'Objet', val:function(b){ return b.objet; }},
+          {lab:'Demandeur', val:function(b){ return [b.parNom, b.service].filter(Boolean).join(' — '); }},
+          {lab:'Budget estimé', num:true, val:function(b){ return xof(b.budget); }},
+          {lab:'Type pressenti', val:function(b){ return b.typeLab || '—'; }},
+          {lab:'Statut', rendu:function(b,td){ var st=STATUTS_BESOIN[b.statut]||[b.statut,'c-grey']; chipCellule(td,st[0],st[1]); }}
+        ],
+        recherche:function(b){ return [b.id, b.objet, b.parNom, b.service].join(' '); },
+        filtres:[{ lab:'Statut', options:Object.keys(STATUTS_BESOIN).map(function(k){ return [k, STATUTS_BESOIN[k][0]]; }), test:function(b,v){ return b.statut===v; } }],
+        nouveau: can('besoin.create') ? { lab:'Nouveau besoin', action:function(){ UI.besoinNouveau=true; UI.besoin=null; charger(); } } : null,
+        actions:function(b,td){
+          boutonCellule(td, UI.besoin===b.id ? 'Affiché' : 'Ouvrir', function(){ UI.besoin=b.id; UI.besoinNouveau=false; charger(); }, 'bes-open-'+b.id).disabled = UI.besoin===b.id;
+        }
       });
       var cur=liste_.filter(function(b){ return b.id===UI.besoin; })[0];
       if(cur) fiche(detail,cur,r.regles);
-      if(can('besoin.create')) creation(formulaire,r.regles);
-    }).catch(function(e){ corpsListe.textContent=''; add(corpsListe,'p','muted',e.message); });
+      if(can('besoin.create') && UI.besoinNouveau){ creation(formulaire,r.regles); formulaire.scrollIntoView({block:'nearest'}); }
+    }).catch(function(e){ zoneListe.textContent=''; add(zoneListe,'p','muted',e.message); });
   }
   function agir(method, path, body, message){
     return MP.api(method,'/api/besoins'+path,body||{}).then(function(r){ if(message) toast(message); charger(); return r; })
@@ -81,10 +86,12 @@ function vBesoins(m){
     var lire=champs(b,{},true,regles);
     var foot=add(k,'div','panel-foot');
     add(foot,'span','muted','Le besoin est d’abord enregistré en brouillon ; vous le soumettez ensuite à validation.');
+    var an=add(foot,'button','btn btn-ghost','Annuler'); fk(an,'bes-annuler');
+    an.addEventListener('click',function(){ UI.besoinNouveau=false; charger(); });
     var go_=add(foot,'button','btn btn-primary','Enregistrer le brouillon'); fk(go_,'bes-creer');
     go_.addEventListener('click',function(){
       go_.disabled=true;
-      MP.api('POST','/api/besoins',lire()).then(function(r){ toast('Besoin '+r.besoin.id+' enregistré.'); UI.besoin=r.besoin.id; charger(); })
+      MP.api('POST','/api/besoins',lire()).then(function(r){ toast('Besoin '+r.besoin.id+' enregistré.'); UI.besoin=r.besoin.id; UI.besoinNouveau=false; charger(); })
         .catch(function(e){ toast(e.message); go_.disabled=false; });
     });
   }

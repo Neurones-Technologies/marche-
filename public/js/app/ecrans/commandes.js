@@ -9,7 +9,7 @@ var STATUTS_COMMANDE = {
   validee: ['Validée, à émettre','c-teal'], emise: ['Émise','c-blue'], en_reception: ['Livraison partielle','c-amber'],
   receptionnee: ['Réception provisoire','c-teal'], cloturee: ['Réception définitive','c-green'], annulee: ['Annulée','c-grey']
 };
-UI.commande = null;
+UI.commande = null; UI.commandeNouvelle = false;
 
 function montantDevise(n, devise){ return sep(Math.round(Number(n)||0))+' '+(devise||'XOF'); }
 
@@ -33,21 +33,27 @@ function vCommandes(m){
   }
 
   function dessiner(list, eligibles){
-    var k=add(zone,'div','card'); add(k,'div','panel-head','Commandes');
-    var b=add(k,'div','pad');
-    if(!list.length) vide(b,'🧾','Aucune commande', can('commande.manage') ? 'Établissez une commande à partir d’une procédure attribuée.' : 'Aucune commande ne vous concerne pour le moment.');
-    list.slice().reverse().forEach(function(c){
-      var row=add(b,'div','docline');
-      var lf=add(row,'div'); lf.style.flex='1 1 260px';
-      add(lf,'strong',null,(c.numero||'Brouillon')+' — '+c.titulaire.nom);
-      add(lf,'div','muted',[c.procedure.ref, montantDevise(c.total,c.devise), 'livraison prévue le '+c.dateLivraison].join(' · '));
-      var st=STATUTS_COMMANDE[c.statut]||[c.statut,'c-grey']; add(row,'span','chip '+st[1],st[0]);
-      var bo=add(row,'button','btn btn-ghost btn-sm', UI.commande===c.id?'Affichée':'Ouvrir'); fk(bo,'cmd-open-'+c.id);
-      bo.disabled=UI.commande===c.id;
-      bo.addEventListener('click',function(){ UI.commande=c.id; zone.textContent=''; dessiner(list,eligibles); });
+    tableau(zone,{ cle:'commandes', titre:'Commandes', lignes:list.slice().reverse(),
+      vide: can('commande.manage') ? 'Aucune commande : utilisez « Nouvelle commande » à partir d’une procédure attribuée.' : 'Aucune commande ne vous concerne pour le moment.',
+      colonnes:[
+        {lab:'N°', val:function(c){ return c.numero || 'Brouillon'; }},
+        {lab:'Titulaire', val:function(c){ return c.titulaire.nom; }},
+        {lab:'Procédure', val:function(c){ return c.procedure.ref; }},
+        {lab:'Montant', num:true, val:function(c){ return montantDevise(c.total,c.devise); }},
+        {lab:'Livraison prévue', val:function(c){ return c.dateLivraison.split('-').reverse().join('/'); }},
+        {lab:'Statut', rendu:function(c,td){ var st=STATUTS_COMMANDE[c.statut]||[c.statut,'c-grey']; chipCellule(td,st[0],st[1]); }}
+      ],
+      recherche:function(c){ return [c.numero, c.titulaire.nom, c.procedure.ref, c.procedure.objet].join(' '); },
+      filtres:[{ lab:'Statut', options:Object.keys(STATUTS_COMMANDE).map(function(k){ return [k, STATUTS_COMMANDE[k][0]]; }), test:function(c,v){ return c.statut===v; } }],
+      nouveau: can('commande.manage') ? { lab:'Nouvelle commande', action:function(){ UI.commandeNouvelle=true; zone.textContent=''; dessiner(list,eligibles); } } : null,
+      actions:function(c,td){ boutonCellule(td, UI.commande===c.id?'Affichée':'Ouvrir', function(){ UI.commande=c.id; UI.commandeNouvelle=false; zone.textContent=''; dessiner(list,eligibles); }, 'cmd-open-'+c.id).disabled=UI.commande===c.id; }
     });
-    if(can('commande.manage')){
+    if(can('commande.manage') && UI.commandeNouvelle){
+      var k=add(zone,'div','card'); k.style.marginTop='18px';
+      add(k,'div','panel-head','Nouvelle commande');
       var f=add(k,'div','panel-foot');
+      var an=add(f,'button','btn btn-ghost btn-sm','Annuler'); fk(an,'cmd-annuler');
+      an.addEventListener('click',function(){ UI.commandeNouvelle=false; zone.textContent=''; dessiner(list,eligibles); });
       eligibles=eligibles.filter(function(e){ return e.restant>0; }); // montant déjà entièrement engagé : rien à commander
       if(!eligibles.length) add(f,'span','muted','Aucune procédure ne permet encore d’établir une commande : attribution prononcée et, en marché public, marché signé.');
       else {
@@ -55,7 +61,7 @@ function vCommandes(m){
         eligibles.forEach(function(e){ var o=add(sel,'option',null,e.ref+' — '+e.titulaire+' — reste '+montantDevise(e.restant,e.devise)); o.value=e.procedure; });
         var bn=add(f,'button','btn btn-primary btn-sm','Établir une commande'); fk(bn,'cmd-new');
         bn.addEventListener('click',function(){
-          MP.api('POST','/api/commandes',{procedure:sel.value}).then(function(r){ UI.commande=r.commande.id; toast('Brouillon de commande établi.'); charger(); })
+          MP.api('POST','/api/commandes',{procedure:sel.value}).then(function(r){ UI.commande=r.commande.id; UI.commandeNouvelle=false; toast('Brouillon de commande établi.'); charger(); })
             .catch(function(e){ toast(e.message); });
         });
       }

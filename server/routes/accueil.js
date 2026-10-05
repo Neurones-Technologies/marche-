@@ -5,7 +5,7 @@
    - GET /api/registre : toutes les procédures visibles, passées et en cours, avec leur phase, le titulaire et le
      montant attribués, le besoin d'origine et les commandes passées. */
 const express = require('express');
-const { db, store, proceduresAll, besoinsAll, commandesAll, partenairesAll, partenaireDe } = require('../db');
+const { db, store, proceduresAll, besoinsAll, commandesAll, partenairesAll, partenaireDe, auditList } = require('../db');
 const { requireAuth } = require('../auth');
 const C = require('../../public/js/circuits.js');
 const R = require('../../public/js/regles.js');
@@ -150,7 +150,9 @@ r.get('/accueil', requireAuth, (req, res) => {
       if (['candidat', 'rejete'].includes(p.statut)) tache('Référencement', p.statut === 'rejete' ? 'Corriger mon dossier de référencement' : 'Compléter et soumettre mon dossier de référencement', p.rejet ? 'Motif : ' + p.rejet.motif : 'Fiche et pièces administratives', { vue: 'referencement' });
     }
   }
-  res.json({ chiffres, taches });
+  // activité récente : les dernières entrées du journal, pour ceux qui y ont accès
+  const activite = can('audit.read') ? auditList(8) : [];
+  res.json({ chiffres, taches, activite });
 });
 
 module.exports = r;

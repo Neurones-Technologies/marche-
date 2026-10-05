@@ -46,13 +46,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ic { width: var(--icon); height: var(--icon); flex: 0 0 auto; }
 
 /* ── Champs de saisie ── */
+/* Champs soulignés : un trait sous le champ, sans cadre ; le trait s'épaissit et prend l'accent à la saisie. */
 input, select, textarea {
-  font: inherit; font-size: var(--fs-body); color: var(--color-text); background: var(--color-surface);
-  border: var(--border-w) solid var(--color-border-field); border-radius: var(--radius-sm);
-  min-height: var(--control-h); padding: var(--space-1) var(--space-3);
+  font: inherit; font-size: var(--fs-body); color: var(--color-text); background: transparent;
+  border: none; border-bottom: var(--border-w) solid var(--color-border-field); border-radius: 0;
+  min-height: var(--control-h); padding: var(--space-1) var(--space-1);
 }
-textarea { padding: var(--space-2) var(--space-3); line-height: var(--lh-body); }
-input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2); background: var(--color-bg); border-color: var(--color-border-strong); }
+input[type=checkbox], input[type=radio] { min-height: 0; }
+input[type=color] { border: var(--border-w) solid var(--color-border-field); border-radius: var(--radius-sm); padding: var(--space-half); }
+textarea { padding: var(--space-2) var(--space-1); line-height: var(--lh-body); }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none; border-bottom: var(--focus-w) solid var(--color-accent); box-shadow: 0 var(--border-w) 0 0 var(--color-accent);
+}
+input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2); border-bottom-style: dotted; border-color: var(--color-border-strong); }
 ::placeholder { color: var(--color-text-2); }
 
 /* ── Structure ── */
@@ -70,6 +76,51 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 .navs { display: flex; flex-direction: column; gap: var(--space-half); overflow-y: auto; flex: 1 1 auto; }
 .navgrp { padding: var(--space-4) var(--space-3) var(--space-1); color: var(--color-side-muted); font-size: var(--fs-tiny); }
 /* Procédure courante, en tête du menu : suit les couleurs de la barre latérale (sombre dans « institutionnel »). */
+/* Tableau de bord : indicateurs, grille principale, barres (une série, couleur --color-chart). */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--col-min) * .6)), 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
+.kpi { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4); text-align: left; font: inherit; color: inherit; border: var(--border-w) solid var(--color-border); }
+button.kpi { cursor: pointer; }
+button.kpi:hover { border-color: var(--color-accent); }
+.kpi-tete { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.kpi-lab { font-size: var(--fs-small); color: var(--color-text-2); }
+.kpi-ic { display: inline-flex; padding: var(--space-1); border-radius: var(--radius-sm); background: var(--color-accent-soft); color: var(--color-accent); }
+.kpi-val { font-size: var(--fs-display); font-weight: var(--fw-strong); line-height: var(--lh-tight); font-variant-numeric: tabular-nums; }
+.kpi-sous { font-size: var(--fs-small); color: var(--color-text-2); }
+.kpi-alerte .kpi-sous { color: var(--color-blocked); font-weight: var(--fw-strong); }
+.kpi-alerte .kpi-ic { background: var(--color-blocked-bg); color: var(--color-blocked); }
+.tdb-grille { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+@media (max-width: 980px) { .tdb-grille { grid-template-columns: minmax(0, 1fr); } }
+.barres { display: flex; flex-direction: column; gap: var(--space-3); }
+.barre { display: grid; grid-template-columns: minmax(0, 9fr) minmax(0, 8fr) auto; align-items: center; gap: var(--space-2); font-size: var(--fs-small); }
+.barre-lab { color: var(--color-text-2); }
+.barre-piste { display: block; height: 12px; }
+.barre-trait { display: block; height: 100%; background: var(--color-chart); border-radius: 0 4px 4px 0; }
+.barre-val { color: var(--color-text); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+
+/* Tableau de données : barre (titre, recherche, filtres, « Nouveau »), tableau, pied (taille de page, pagination). */
+.dt { padding: 0; overflow: hidden; }
+.dt-barre { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-3) var(--space-4); border-bottom: var(--border-w) solid var(--color-border); }
+.dt-titre { font-size: var(--fs-body); }
+.dt-outils { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-left: auto; }
+.dt-outils .btn { display: inline-flex; align-items: center; gap: var(--space-1); }
+.dt-recherche { min-width: 0; width: calc(var(--col-min) * .9); max-width: 100%; }
+.dt-corps { overflow-x: auto; }
+.dt-table { width: 100%; border-collapse: collapse; }
+.dt-table th { text-align: left; font-size: var(--fs-small); font-weight: var(--fw-strong); color: var(--color-text-2); background: var(--color-surface-2); white-space: nowrap; }
+.dt-table td { border-top: var(--border-w) solid var(--color-border); vertical-align: middle; }
+.dt-table th, .dt-table td { padding: var(--space-2) var(--space-3); }
+.dt-table th:first-child, .dt-table td:first-child { padding-left: var(--space-4); }
+.dt-table td select { max-width: calc(var(--col-min) * .8); }
+.dt-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dt-table tbody tr:hover { background: var(--color-bg); }
+.dt-table .dt-act { text-align: right; white-space: nowrap; padding-right: var(--space-4); }
+.dt-act .btn + .btn { margin-left: var(--space-1); }
+.dt-vide { padding: var(--space-5) var(--space-4); }
+.dt-pied { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) var(--space-4); border-top: var(--border-w) solid var(--color-border); font-size: var(--fs-small); color: var(--color-text-2); }
+.dt-taille select { min-height: var(--control-h-sm); margin-left: var(--space-1); }
+.dt-pages { display: flex; align-items: center; gap: var(--space-2); }
+.dt-num { color: var(--color-text); }
+
 /* Cadre des écrans d'une procédure : en-tête, frise des étapes (.flow), sous-onglets, pied. */
 .proc-head { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; margin-bottom: var(--space-4); }
 .proc-head select { max-width: 100%; flex: 0 1 320px; }
@@ -108,6 +159,8 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
   min-height: var(--topbar-h); padding: var(--space-2) var(--space-8); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
 }
 .topbar > div:last-child { display: flex; align-items: center; gap: var(--space-3); }
+.topbar-titre { flex: 1 1 auto; min-width: 0; }
+.topbar-titre h1 { font-size: var(--fs-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .btn.burger { display: none; }
 main { padding: var(--space-8); max-width: var(--content-max); width: 100%; }
 

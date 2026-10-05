@@ -20,6 +20,23 @@ function renderHeader(){
   add(t,'b',null,org.nom||'');
   t.appendChild(document.createTextNode([org.ville, org.pays].filter(Boolean).join(' · ')));
 }
+/* Le titre de l'écran (h1 de son en-tête) monte dans la barre du haut pour laisser la place au contenu ; sans
+   titre d'en-tête, celui du menu. L'en-tête ne garde que ses actions (boutons), ou disparaît s'il est vide. */
+function placerTitre(m){
+  var tt=document.getElementById('top-titre'); tt.textContent='';
+  var h=m.querySelector('.head h1'), texte;
+  if(h){
+    texte=h.textContent;
+    var head=h.closest('.head'), bloc=h.parentNode;
+    h.remove();
+    if(bloc!==head && !bloc.textContent.trim() && !bloc.querySelector('button,select,input,a')) bloc.remove();
+    if(head && !head.textContent.trim() && !head.querySelector('button,select,input,a')) head.remove();
+  } else {
+    var def=VIEWS.filter(function(v){ return v.id===state.view; })[0];
+    texte=def ? def.label : 'Marché+';
+  }
+  add(tt,'h1',null,texte);
+}
 function render(){
   var ae=document.activeElement;
   var prevFk = ae && ae.getAttribute ? ae.getAttribute('data-fk') : null;
@@ -51,6 +68,7 @@ function render(){
     (ROUTER[state.view]||vDashboard)(m);
   }
 
+  placerTitre(m);
   if(prevFk){
     var t=document.querySelector('[data-fk="'+prevFk+'"]');
     if(t){

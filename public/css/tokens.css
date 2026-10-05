@@ -89,6 +89,7 @@
   --color-text-3: #A8A097;
 
   --color-accent: #1F5F8B;           /* boutons principaux, étape en cours */
+  --color-chart: #1D6FB8;            /* marques de graphique (série unique) */
   --color-accent-hover: #184C70;
   --color-accent-soft: #E6F0F7;
   --color-accent-ring: #D7E7F2;
@@ -137,6 +138,7 @@
   --color-text-3: #A3ADB9;
 
   --color-accent: #1C4E80;
+  --color-chart: #1F5FA8;
   --color-accent-hover: #163E66;
   --color-accent-soft: #E3ECF6;
   --color-accent-ring: #D5E2F0;
@@ -185,6 +187,7 @@
   --color-text-3: #A6ADC4;
 
   --color-accent: #4F46E5;
+  --color-chart: #4F46E5;
   --color-accent-hover: #4338CA;
   --color-accent-soft: #E0E7FF;
   --color-accent-ring: #E0E7FF;

@@ -11,7 +11,7 @@ var ETATS_PIECE = {
   manquante: ['Manquante','c-red'], a_verifier: ['À vérifier','c-amber'], valide: ['Validée','c-green'],
   refuse: ['Refusée','c-red'], expiree: ['Expirée','c-red']
 };
-UI.partenaire = null; UI.filtrePartenaires = '';
+UI.partenaire = null;
 
 function chipStatutPartenaire(parent, s){ var x=STATUTS_PARTENAIRE[s]||[s,'c-grey']; return add(parent,'span','chip '+x[1],x[0]); }
 
@@ -180,30 +180,19 @@ function vPartenaires(m){
       .catch(function(e){ toast(e.message); charger(); });
   }
   function dessiner(list){
-    var k=add(zone,'div','card');
-    var ph=add(k,'div','panel-head'); add(ph,'span',null,'Fiches');
-    var sel=add(ph,'select'); sel.setAttribute('aria-label','Filtrer par statut'); fk(sel,'prt-filtre');
-    add(sel,'option',null,'Tous les statuts ('+list.length+')').value='';
-    Object.keys(STATUTS_PARTENAIRE).forEach(function(s){
-      var n=list.filter(function(p){ return p.statut===s; }).length;
-      var o=add(sel,'option',null,STATUTS_PARTENAIRE[s][0]+' ('+n+')'); o.value=s;
-    });
-    sel.value=UI.filtrePartenaires;
-    sel.addEventListener('change',function(){ UI.filtrePartenaires=sel.value; zone.textContent=''; dessiner(list); });
-    var b=add(k,'div','pad');
-    var vis=list.filter(function(p){ return !UI.filtrePartenaires || p.statut===UI.filtrePartenaires; });
-    if(!vis.length) vide(b,'🏢','Aucune fiche','Aucun partenaire pour ce filtre.');
-    vis.forEach(function(p){
-      var row=add(b,'div','docline');
-      var lf=add(row,'div'); lf.style.flex='1 1 260px';
-      add(lf,'strong',null,p.id+' — '+p.raisonSociale);
-      var alerte=p.exigees.filter(function(e){ return e.etat==='expiree'||e.etat==='a_verifier'; }).length;
-      add(lf,'div','muted',[p.pays, p.immatriculation, (p.domaines||[]).join(', '), alerte ? alerte+' pièce(s) à examiner' : ''].filter(Boolean).join(' · '));
-      if(p.evaluation && p.evaluation.nb) add(row,'span','chip '+(p.evaluation.alerte?'c-red':'c-grey'),'Note '+p.evaluation.moyenne+'/100'+(p.evaluation.alerte?' · alerte':''));
-      chipStatutPartenaire(row,p.statut);
-      var bo=add(row,'button','btn btn-ghost btn-sm', UI.partenaire===p.id?'Affiché':'Ouvrir'); fk(bo,'prt-open-'+p.id);
-      bo.disabled=UI.partenaire===p.id;
-      bo.addEventListener('click',function(){ UI.partenaire=p.id; zone.textContent=''; dessiner(list); });
+    tableau(zone,{ cle:'partenaires', titre:'Partenaires', lignes:list, vide:'Aucun partenaire : les prestataires s’inscrivent depuis l’écran de connexion.',
+      colonnes:[
+        {lab:'N°', val:function(p){ return p.id; }},
+        {lab:'Raison sociale', val:function(p){ return p.raisonSociale; }},
+        {lab:'Pays', val:function(p){ return p.pays || '—'; }},
+        {lab:'Domaines', val:function(p){ return (p.domaines||[]).join(', ') || '—'; }},
+        {lab:'Pièces à examiner', num:true, val:function(p){ return p.exigees.filter(function(e){ return e.etat==='expiree'||e.etat==='a_verifier'; }).length || '—'; }},
+        {lab:'Note', num:true, rendu:function(p,td){ if(p.evaluation && p.evaluation.nb) chipCellule(td, p.evaluation.moyenne+'/100', p.evaluation.alerte?'c-red':'c-grey'); else td.textContent='—'; }},
+        {lab:'Statut', rendu:function(p,td){ chipStatutPartenaire(td,p.statut); }}
+      ],
+      recherche:function(p){ return [p.id, p.raisonSociale, p.pays, p.immatriculation, (p.domaines||[]).join(' ')].join(' '); },
+      filtres:[{ lab:'Statut', options:Object.keys(STATUTS_PARTENAIRE).map(function(k){ return [k, STATUTS_PARTENAIRE[k][0]]; }), test:function(p,v){ return p.statut===v; } }],
+      actions:function(p,td){ boutonCellule(td, UI.partenaire===p.id?'Affiché':'Ouvrir', function(){ UI.partenaire=p.id; zone.textContent=''; dessiner(list); }, 'prt-open-'+p.id).disabled=UI.partenaire===p.id; }
     });
     var cur=list.filter(function(p){ return p.id===UI.partenaire; })[0];
     if(cur) fiche(cur);

@@ -22,6 +22,15 @@ Avant eux, `profils.js`, `regles.js` (partagés avec le serveur) et `api.js` (co
   Le découpage du 02/10/2026 a été vérifié sans collision.
 - Chaque fichier commence par `"use strict";`.
 
+## Conventions d'affichage
+
+- Le titre d'un écran est le `h1` de son en-tête (`.head`) : le rendu le monte dans la barre du haut. Pas de
+  sous-titre ni de ligne au-dessus du titre.
+- Une liste est un **tableau** : `tableau(parent, {...})` (`composants.js`) donne les libellés de colonnes, la
+  recherche, les filtres, le bouton « Nouveau » et la pagination (10 lignes par défaut). Un formulaire de création
+  ne s'affiche qu'après « Nouveau », avec un bouton « Annuler ».
+- Les champs de saisie sont soulignés (un trait, sans cadre) : style global de `app.css`, rien à faire par écran.
+
 ## Ajouter un écran
 
 1. Créer `ecrans/mon-ecran.js` avec `function vMonEcran(m){ … }`.

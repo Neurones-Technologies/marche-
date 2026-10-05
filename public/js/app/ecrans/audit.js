@@ -15,14 +15,12 @@ function vAudit(m){
       vres.textContent=r.ok ? 'Intact — '+r.entries+' entrée(s) chaînée(s), empreinte '+r.head.slice(0,12)+'…' : 'ALTÉRÉ à l’entrée n° '+r.brokenAt;
     }).catch(function(e){ vres.className='chip c-red'; vres.textContent=e.message; }).then(function(){ vbtn.disabled=false; });
   });
-  var card=add(m,'div','card');
-  add(card,'div','panel-head','Journal — '+state.audit.length+' entrée(s)');
-  var b=add(card,'div','pad');
-  if(!state.audit.length) add(b,'p','muted','Aucune action enregistrée. Modifiez le cahier des charges, confirmez un champ ou ajustez un score pour alimenter le journal.');
-  state.audit.forEach(function(e){
-    var row=add(b,'div','log');
-    add(row,'time',null,e.t);
-    var d=add(row,'div'); d.style.flex='1 1 240px';
-    add(d,'div',null,e.a); add(d,'div','muted',e.who);
+  tableau(m,{ cle:'audit', titre:'Journal', lignes:state.audit, vide:'Aucune action enregistrée.',
+    colonnes:[
+      {lab:'Date', val:function(e){ return e.t; }},
+      {lab:'Action', val:function(e){ return e.a; }},
+      {lab:'Auteur', val:function(e){ return e.who; }}
+    ],
+    recherche:function(e){ return e.t+' '+e.a+' '+e.who; }
   });
 }
