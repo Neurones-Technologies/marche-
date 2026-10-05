@@ -30,6 +30,11 @@ Avant eux, `profils.js`, `regles.js` (partagés avec le serveur) et `api.js` (co
   recherche, les filtres, le bouton « Nouveau » et la pagination (10 lignes par défaut). Un formulaire de création
   ne s'affiche qu'après « Nouveau », avec un bouton « Annuler ».
 - Les champs de saisie sont soulignés (un trait, sans cadre) : style global de `app.css`, rien à faire par écran.
+- Imprimer, exporter et les autres actions secondaires sont des **boutons-icônes** : `boutonIcone(parent, icône,
+  libellé, action, fk)`. Le libellé sert d’infobulle et de nom pour les lecteurs d’écran.
+- Un écran d’au moins quatre sections (cartes posées directement dans le contenu, qui commencent par un
+  `.panel-head`) reçoit automatiquement un sommaire collé et des sections repliables (`organiserSections`, appelé
+  par le rendu). Numéroter les titres « N · Titre » pour que le sommaire affiche la pastille N.
 
 ## Ajouter un écran
 

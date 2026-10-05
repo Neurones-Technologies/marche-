@@ -168,7 +168,7 @@ function vCDC(m){
   var ph8=add(k8,'div','panel-head'); add(ph8,'span',null,'8 · Génération du dossier d\u2019appel d\u2019offres');
   var gob=add(ph8,'button','btn btn-primary btn-sm','Générer le dossier complet →');
   gob.addEventListener('click',function(){ logit('Dossier d\u2019appel d\u2019offres généré'); go('dao'); });
-  var prb=add(ph8,'button','btn btn-ghost btn-sm','Imprimer l\u2019extrait');
+  var prb=boutonIcone(ph8,'printer','Imprimer l\u2019extrait',null,'cdc-imprimer');
   prb.addEventListener('click',function(){ imprimer(); });
   var b8=add(k8,'div','pad'); var pv=add(b8,'div','pv');
   add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — '+REF()).style.cssText='font-weight:700;font-size:15px;color:var(--ink)';

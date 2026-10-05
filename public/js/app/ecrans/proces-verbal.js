@@ -7,7 +7,7 @@ function vPV(m){
   var rows=ranking(), win=rows[0], c=state.cdc;
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,"Procès-verbal d'attribution");
-  add(h,'button','btn btn-ghost btn-sm','Imprimer / exporter').addEventListener('click',function(){ imprimer(); });
+  boutonIcone(h,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'pv-imprimer');
 
   var card=add(m,'div','card pad'); var pv=add(card,'div','pv');
   add(pv,'div',null,'PROCÈS-VERBAL D\u2019ANALYSE ET D\u2019ATTRIBUTION').style.cssText='font-weight:700;font-size:15px;color:var(--ink)';

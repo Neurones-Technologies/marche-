@@ -148,7 +148,7 @@ function vParams(m){
   vParamsCircuitOrg(m,'circuitCommande','11 · Circuit de validation des bons de commande','Une commande suit ce circuit avant émission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (en XOF). Celui qui établit la commande ne la valide pas.');
   vParamsEvaluation(m);
   var kc=add(m,'div','card'); kc.style.marginTop='18px';
-  add(kc,'div','panel-head','12 · Numérotation des bons de commande');
+  add(kc,'div','panel-head','13 · Numérotation des bons de commande');
   var fc=add(add(kc,'div','pad'),'div','frm');
   champ(fc,'Préfixe des numéros',o.prefixeCommande||'BC',function(v){ o.prefixeCommande=String(v).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)||'BC'; logit('Préfixe des bons de commande : '+o.prefixeCommande); });
   add(add(kc,'div','panel-foot'),'span','muted','Numéros continus et sans trou, attribués par le serveur à l\u2019émission : '+(o.prefixeCommande||'BC')+'-'+new Date().getFullYear()+'-0001, puis 0002…');
@@ -250,7 +250,7 @@ function vParamsCircuitOrg(m, cle, titre, note){
 function vParamsEvaluation(m){
   var e=state.evaluationPartenaires=state.evaluationPartenaires||{criteres:{delais:30,conformite:30,completude:20,qualite:20},seuilAlerte:60,plafondRetardJours:30};
   var k=add(m,'div','card'); k.style.marginTop='18px';
-  var ph=add(k,'div','panel-head'); add(ph,'span',null,'13 · Évaluation des partenaires');
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,'12 · Évaluation des partenaires');
   var somme=['delais','conformite','completude','qualite'].reduce(function(t,x){ return t+Number(e.criteres[x]||0); },0);
   add(ph,'span','chip '+(somme===100?'c-green':'c-red'),'Total des poids : '+somme);
   var f=add(add(k,'div','pad'),'div','frm');

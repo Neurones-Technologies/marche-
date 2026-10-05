@@ -57,7 +57,9 @@ function render(){
   if(vueDeProcedure(state.view) && avecCadreProcedure()){
     // écran de procédure : en-tête, frise des étapes, sous-onglets, puis l'écran, puis précédente / suivante
     UI.derniereVueProc=state.view;
-    (ROUTER[state.view]||vDashboard)(cadreProcedureHaut(m));
+    var corps=cadreProcedureHaut(m);
+    (ROUTER[state.view]||vDashboard)(corps);
+    organiserSections(corps, state.view);
     cadreProcedureBas(m);
   } else {
     var cur=MP.current();
@@ -66,6 +68,7 @@ function render(){
       na.appendChild(document.createTextNode('Elle se consulte mais ne se modifie plus.'));
     }
     (ROUTER[state.view]||vDashboard)(m);
+    organiserSections(m, state.view);
   }
 
   placerTitre(m);

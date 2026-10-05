@@ -17,7 +17,8 @@ function vCommandes(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Commandes et réceptions');
   if(can('commande.manage')){
-    var ex=add(h,'a','btn btn-ghost btn-sm','Exporter pour la comptabilité (CSV)'); ex.href='/api/commandes/export.csv'; ex.setAttribute('download','commandes.csv');
+    var ex=add(h,'a','icon-btn icon-action'); icon(ex,'download'); ex.href='/api/commandes/export.csv'; ex.setAttribute('download','commandes.csv');
+    ex.title='Exporter les commandes émises pour la comptabilité (CSV)'; ex.setAttribute('aria-label',ex.title); fk(ex,'cmd-export');
   }
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
 
@@ -167,8 +168,7 @@ function vCommandes(m){
     if(c.empreinte) add(k,'div','bc-empreinte','Empreinte SHA-256 du document émis : '+c.empreinte);
     emis.forEach(function(a){ add(k,'div','bc-empreinte','Empreinte SHA-256 de l’avenant '+a.numero+' : '+a.empreinte); });
     var pr=add(k,'div','no-print'); pr.style.marginTop='12px';
-    var bp=add(pr,'button','btn btn-ghost btn-sm','Imprimer ou enregistrer en PDF'); fk(bp,'cmd-print');
-    bp.addEventListener('click',function(){ window.print(); });
+    boutonIcone(pr,'printer','Imprimer ou enregistrer en PDF',function(){ window.print(); },'cmd-print');
   }
 
   function circuitCommande(c){

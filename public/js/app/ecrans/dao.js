@@ -390,7 +390,7 @@ function vDAO(m){
   var c=state.cdc, P=buildDAO(), V=daoVolume(P);
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,"Dossier d'appel d'offres généré");
-  add(h,'button','btn btn-ghost btn-sm','Imprimer / exporter').addEventListener('click',function(){ imprimer(); });
+  boutonIcone(h,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'dao-imprimer');
 
   /* Composition */
   var comp=add(m,'div','card');

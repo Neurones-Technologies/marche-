@@ -34,6 +34,10 @@ var ICONS = {
   folder:'M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z',
   badge:'M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z|M9 12h6M9 15h4',
   cart:'M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 8H6|M9 20h.01M17 20h.01',
+  printer:'M7 9V3h10v6|M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2|M7 14h10v7H7z',
+  download:'M12 4v11M7 10l5 5 5-5|M4 19h16',
+  chevD:'m6 9 6 6 6-6',
+  arrowUp:'M12 19V5M6 11l6-6 6 6',
   chevL:'m15 6-6 6 6 6',
   chevR:'m9 6 6 6-6 6',
   plus:'M12 5v14M5 12h14',
@@ -264,6 +268,87 @@ function tableau(parent, o){
   }
   dessiner();
   return carte;
+}
+/* ============ Écrans longs : sommaire collé, sections repliables ============
+   Un écran qui compte au moins quatre sections (cartes à en-tête, posées directement dans le contenu) reçoit un
+   sommaire qui reste visible pendant le défilement, suit la section affichée, et mène à chacune d'un clic. Chaque
+   section se replie depuis son en-tête ; par défaut seule la première est ouverte. L'état est gardé par écran
+   dans UI.replis, pour survivre aux rendus. */
+UI.replis = {};
+function titreSection(head){
+  var t=head.firstChild && head.firstChild.nodeType===1 ? head.firstChild.textContent : head.textContent;
+  return String(t||'').trim();
+}
+function organiserSections(conteneur, cle){
+  var cartes=[].slice.call(conteneur.children).filter(function(e){ return e.classList.contains('card') && e.firstElementChild && e.firstElementChild.classList.contains('panel-head'); });
+  SUIVI_SECTIONS=null;
+  if(cartes.length<4) return;
+  var etat = UI.replis[cle] = UI.replis[cle] || {};
+  var sections=cartes.map(function(c,i){
+    var head=c.firstElementChild, titre=titreSection(head);
+    if(!(titre in etat)) etat[titre] = i>0; // première section ouverte, les autres repliées
+    c.classList.add('sec-carte'); c.id='sec-'+i;
+    var bt=document.createElement('button'); bt.type='button'; bt.className='sec-bascule'; icon(bt,'chevD');
+    head.appendChild(bt);
+    function appliquer(){
+      c.classList.toggle('replie', !!etat[titre]);
+      bt.setAttribute('aria-expanded', etat[titre] ? 'false' : 'true');
+      bt.setAttribute('aria-label', (etat[titre] ? 'Déplier' : 'Replier')+' la section « '+titre.replace(/^\d+\s*·\s*/,'')+' »');
+    }
+    bt.addEventListener('click',function(){ etat[titre]=!etat[titre]; appliquer(); });
+    appliquer();
+    return { carte:c, titre:titre, ouvrir:function(){ etat[titre]=false; appliquer(); } };
+  });
+
+  conteneur.classList.add('avec-sommaire');
+  var aside=add(conteneur,'aside','sec-sommaire'); aside.setAttribute('aria-label','Sommaire de la page');
+  var boite=add(aside,'div','sec-boite');
+  add(boite,'div','sec-titre','Sommaire');
+  var ol=add(boite,'ol','sec-liste'), liens=[];
+  sections.forEach(function(s,i){
+    var li=add(ol,'li');
+    var a=add(li,'button','sec-lien'); a.type='button'; fk(a,'sommaire-'+i);
+    var m=s.titre.match(/^(\d+)\s*·\s*(.*)$/);
+    add(a,'span','sec-num', m ? m[1] : String(i+1));
+    add(a,'span','sec-lib', m ? m[2] : s.titre);
+    a.addEventListener('click',function(){ s.ouvrir(); SUIVI_VERROU=Date.now()+1200; s.carte.scrollIntoView({behavior:'smooth', block:'start'}); actif(i); });
+    liens.push(a);
+  });
+  var tous=add(boite,'div','sec-tous');
+  var bd=add(tous,'button','sec-mini','Tout déplier'); bd.type='button'; fk(bd,'sommaire-deplier');
+  var br=add(tous,'button','sec-mini','Tout replier'); br.type='button'; fk(br,'sommaire-replier');
+  bd.addEventListener('click',function(){ sections.forEach(function(s){ etat[s.titre]=false; }); render(); });
+  br.addEventListener('click',function(){ sections.forEach(function(s){ etat[s.titre]=true; }); render(); });
+
+  function actif(i){ liens.forEach(function(a,j){ a.classList.toggle('on', i===j); if(i===j) a.setAttribute('aria-current','true'); else a.removeAttribute('aria-current'); }); }
+  actif(0);
+  // suit la section affichée : la dernière dont le haut a franchi le haut de l'écran (sous la barre du haut)
+  SUIVI_SECTIONS = function(){
+    if(Date.now()<SUIVI_VERROU) return; // défilement provoqué par un clic du sommaire : la section cliquée reste active
+    var seuil=110, i=0;
+    sections.forEach(function(s,j){ if(s.carte.getBoundingClientRect().top<=seuil) i=j; });
+    if(window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-4) i=sections.length-1; // bas de page atteint
+    actif(i);
+  };
+}
+var SUIVI_SECTIONS=null, SUIVI_VERROU=0;
+window.addEventListener('scroll',function(){ if(SUIVI_SECTIONS) requestAnimationFrame(SUIVI_SECTIONS); },{passive:true});
+
+/* Bouton « haut de page », flottant, visible dès qu'on a défilé. */
+(function(){
+  var b=document.createElement('button'); b.type='button'; b.className='haut-page'; b.id='haut-page';
+  b.setAttribute('aria-label','Revenir en haut de la page'); b.title='Haut de page'; icon(b,'arrowUp');
+  b.addEventListener('click',function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+  document.addEventListener('DOMContentLoaded',function(){ document.body.appendChild(b); });
+  window.addEventListener('scroll',function(){ b.classList.toggle('on', window.scrollY>480); },{passive:true});
+})();
+
+/* Bouton-icône (imprimer, exporter…) : libellé au survol (title) et pour les lecteurs d'écran (aria-label). */
+function boutonIcone(parent, ic, libelle, action, fkey){
+  var b=add(parent,'button','icon-btn icon-action'); icon(b,ic); b.type='button';
+  b.title=libelle; b.setAttribute('aria-label',libelle); if(fkey) fk(b,fkey);
+  if(action) b.addEventListener('click',action);
+  return b;
 }
 /* Pastille de statut dans une cellule. */
 function chipCellule(td, lab, cls){ add(td,'span','chip '+(cls||'c-grey'),lab); }

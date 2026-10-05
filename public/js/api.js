@@ -75,7 +75,9 @@
       return loadProcs().then(function () {
         $('login').hidden = true;
         $('usr').hidden = false;
-        $('usr-name').textContent = m.user.nom + ' · ' + m.user.roleLab;
+        var un = $('usr-name'); un.textContent = '';
+        var n1 = document.createElement('span'); n1.className = 'usr-nom'; n1.textContent = m.user.nom; un.appendChild(n1);
+        var n2 = document.createElement('span'); n2.className = 'usr-role'; n2.textContent = m.user.roleLab; un.appendChild(n2);
         $('usr-av').textContent = m.user.nom.replace(/[^A-Za-zÀ-ÿ ]/g, ' ').split(/\s+/).filter(Boolean).map(function (x) { return x[0]; }).join('').slice(0, 2).toUpperCase();
         return switchTo(choose(), { fromLogin: fromLogin === true }).then(function () {
           if (!pollTimer) pollTimer = setInterval(function () { window.MarchePlus.poll(); }, 8000);

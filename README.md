@@ -45,6 +45,10 @@ Organisation de l'interface (menu) :
   et le changement de procédure en en-tête.
 - **Administration** : comptes, rôles, paramètres, alertes.
 
+Les écrans longs (cahier des charges, paramètres…) ont un sommaire qui reste visible à droite et suit la section
+affichée, et des sections repliables (seule la première est ouverte au départ). Un bouton « haut de page »
+apparaît dès qu’on a défilé.
+
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 
 - **Évaluation des partenaires** : à la réception définitive, chaque commande reçoit une note sur 100 (délais,
