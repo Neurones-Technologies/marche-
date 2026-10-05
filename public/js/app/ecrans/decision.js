@@ -1,5 +1,6 @@
 /* Marché+ — Écran Décision et circuit d’approbation.
-   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
+   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
+   Le circuit d'approbation est un tableau : on approuve ou rejette depuis la ligne du niveau attendu. */
 "use strict";
 
 function vDecision(m){
@@ -21,52 +22,50 @@ function vDecision(m){
     wn.appendChild(document.createTextNode("Vérifier avant signature : retenue à la source de "+c.retenueNonResident+" % sur les prestations de source locale, régime douanier des équipements importés (à la charge de "+c.douaneACharge.toLowerCase()+"), validité de la contre-garantie bancaire auprès d'un établissement agréé, et modalités de représentation locale pendant la garantie de "+c.garantieMin+" mois minimum."));
   }
 
-  var wf=add(m,'div','card'); wf.style.marginTop='18px';
   var nReq=MPCircuits.nbRequises(state.approvals);
-  add(wf,'div','panel-head','Circuit d\u2019approbation — '+nReq+' niveau(x) requis sur '+state.approvals.length+' configuré(s)');
-  var b=add(wf,'div','pad');
   var fp=MPCircuits.prochaine(state.approvals);
-  state.approvals.forEach(function(a,i){
-    var row=add(b,'div','stepline');
-    var requis=MPCircuits.requise(a);
-    add(row,'div','stepnum '+(a.done?'done':(i===fp?'now':'')), a.done?'✓':String(i+1));
-    var d=add(row,'div'); d.style.flex='1 1 auto';
-    add(d,'strong',null,a.role); add(d,'div','muted',a.who);
-    var cond=[];
-    if(Number(a.seuil)>0) cond.push('à partir de '+xof(Number(a.seuil)));
-    if(a.roleId) cond.push('réservé au rôle « '+((state.roles[a.roleId]||{}).lab||a.roleId)+' »');
-    if(cond.length) add(d,'div','muted',cond.join(' · '));
-    if(a.done) add(row,'span','chip c-green','Approuvé'+(a.at?' le '+a.at:''));
-    else if(!requis) add(row,'span','chip c-grey','Non requis pour ce montant');
-    else if(i===fp){
-      var btn=add(row,'button','btn btn-primary btn-sm','Approuver');
-      fk(btn,'appr-'+i); guard('decision.approve',btn);
-      btn.addEventListener('click',function(){
-        ask('Cette approbation est horodatée, nominative et consignée à la piste d\u2019audit.', function(){
+  tableau(m,{ cle:'circuit', titre:'Circuit d’approbation — '+nReq+' niveau(x) requis sur '+state.approvals.length+' configuré(s)',
+    lignes:state.approvals.map(function(a,i){ return {a:a,i:i}; }),
+    colonnes:[
+      {lab:'Niveau', rendu:function(x,td){ add(td,'span','stepnum '+(x.a.done?'done':(x.i===fp?'now':'')), x.a.done?'✓':String(x.i+1)); }},
+      {lab:'Rôle', rendu:function(x,td){ add(td,'strong',null,x.a.role); add(td,'div','muted',x.a.who); }},
+      {lab:'Conditions', val:function(x){
+        var cond=[];
+        if(Number(x.a.seuil)>0) cond.push('à partir de '+xof(Number(x.a.seuil)));
+        if(x.a.roleId) cond.push('réservé au rôle « '+((state.roles[x.a.roleId]||{}).lab||x.a.roleId)+' »');
+        return cond.length ? cond.join(' · ') : '—';
+      }},
+      {lab:'Statut', rendu:function(x,td){
+        var a=x.a;
+        if(a.done) chipCellule(td,'Approuvé'+(a.at?' le '+a.at:''),'c-green');
+        else if(!MPCircuits.requise(a)) chipCellule(td,'Non requis pour ce montant','c-grey');
+        else chipCellule(td, x.i===fp ? 'À approuver' : 'En attente', x.i===fp ? 'c-amber' : 'c-grey');
+      }}
+    ],
+    actions:function(x,td){
+      var a=x.a, i=x.i;
+      if(a.done || !MPCircuits.requise(a) || i!==fp) return;
+      var btn=boutonCellule(td,'Approuver',function(){
+        ask('Cette approbation est horodatée, nominative et consignée à la piste d’audit.', function(){
           cibler('POST','/approbations/'+i).then(function(r){
-          if(!r) return;
-          logit('Approbation — '+a.role+' ('+a.who+')');
-          if(allApproved()){
-            logit('Attribution prononcée — '+win.o.name);
-            notify('attribution','Attribution prononcée',
-              "Le marché "+REF()+" est attribué à "+win.o.name+" ("+win.o.pays+") pour "+xof(montantXOF(win.o))+", délai "+win.o.delai+" jours. Notification aux soumissionnaires non retenus à préparer, sous réserve du délai de recours.");
-            save(); go('pv'); return;
-          }
-          var nxt=null; for(var z=0;z<state.approvals.length;z++) if(!state.approvals[z].done){ nxt=state.approvals[z]; break; }
-          if(nxt) notify('appro.attendue','Approbation attendue — '+nxt.role,
-            "Le niveau « "+a.role+" » a approuvé. Niveau suivant attendu : "+nxt.role+" ("+nxt.who+").");
-          save(); render();
+            if(!r) return;
+            logit('Approbation — '+a.role+' ('+a.who+')');
+            if(allApproved()){
+              logit('Attribution prononcée — '+win.o.name);
+              notify('attribution','Attribution prononcée',
+                "Le marché "+REF()+" est attribué à "+win.o.name+" ("+win.o.pays+") pour "+xof(montantXOF(win.o))+", délai "+win.o.delai+" jours. Notification aux soumissionnaires non retenus à préparer, sous réserve du délai de recours.");
+              save(); go('pv'); return;
+            }
+            var nxt=null; for(var z=0;z<state.approvals.length;z++) if(!state.approvals[z].done){ nxt=state.approvals[z]; break; }
+            if(nxt) notify('appro.attendue','Approbation attendue — '+nxt.role,
+              "Le niveau « "+a.role+" » a approuvé. Niveau suivant attendu : "+nxt.role+" ("+nxt.who+").");
+            save(); render();
           });
         }, 'Approuver au titre « '+a.role+' » ?', 'Approuver');
-      });
-      var rj=add(row,'button','btn btn-ghost btn-sm','Rejeter');
-      fk(rj,'rej-'+i); guard('decision.approve',rj);
-      if(a.roleId && me().role!==a.roleId){
-        var res='Niveau réservé au rôle « '+((state.roles[a.roleId]||{}).lab||a.roleId)+' ».';
-        [btn,rj].forEach(function(x){ x.disabled=true; x.title=res; });
-      }
-      rj.addEventListener('click',function(){
-        demander("Le rejet est motivé, nominatif et consigné à la piste d\u2019audit. La procédure revient à l\u2019évaluation et le circuit repart du premier niveau.", function(motif){
+      },'appr-'+i,true);
+      guard('decision.approve',btn);
+      var rj=boutonCellule(td,'Rejeter',function(){
+        demander("Le rejet est motivé, nominatif et consigné à la piste d’audit. La procédure revient à l’évaluation et le circuit repart du premier niveau.", function(motif){
           cibler('POST','/approbations/'+i+'/rejet',{motif:motif}).then(function(r){
             if(!r) return;
             logit('Attribution rejetée — '+a.role);
@@ -74,19 +73,31 @@ function vDecision(m){
               "Le niveau « "+a.role+" » a rejeté l'attribution de la procédure "+REF()+". Motif : "+motif+". L'évaluation est rouverte.");
             save(); go('evaluation');
           });
-        }, 'Rejeter l\u2019attribution au titre « '+a.role+' » ?', 'Rejeter', 'Motif du rejet');
-      });
-    } else add(row,'span','chip c-grey','En attente');
+        }, 'Rejeter l’attribution au titre « '+a.role+' » ?', 'Rejeter', 'Motif du rejet');
+      },'rej-'+i);
+      guard('decision.approve',rj);
+      if(a.roleId && me().role!==a.roleId){
+        var res='Niveau réservé au rôle « '+((state.roles[a.roleId]||{}).lab||a.roleId)+' ».';
+        [btn,rj].forEach(function(z){ z.disabled=true; z.title=res; });
+      }
+    }
   });
 
   if((state.rejets||[]).length){
-    var kr=add(m,'div','card'); kr.style.marginTop='18px';
-    add(kr,'div','panel-head','Rejets antérieurs de l\u2019attribution');
-    var br=add(kr,'div','pad');
-    state.rejets.forEach(function(x){
-      var row=add(br,'div','docline'); var lf=add(row,'div');
-      add(lf,'strong',null,x.role); add(lf,'div','muted',x.motif);
-      add(row,'span','chip c-grey',x.at);
+    tableau(m,{ cle:'rejets', titre:'Rejets antérieurs de l’attribution', lignes:state.rejets.map(function(x,i){ return {x:x,i:i}; }),
+      colonnes:[
+        {lab:'Niveau', rendu:function(r,td){ add(td,'strong',null,r.x.role); }},
+        {lab:'Motif', rendu:function(r,td){ add(td,'div','dt-extrait',r.x.motif); }},
+        {lab:'Date', val:function(r){ return r.x.at; }}
+      ],
+      recherche:function(r){ return r.x.role+' '+r.x.motif; },
+      actions:function(r,td){ boutonDetail(td,function(){
+        ouvrirFenetre('Rejet — '+r.x.role, function(c){
+          var x=(state.rejets||[])[r.i]; if(!x) return false;
+          grilleLecture(c,[['Niveau',x.role],['Date',x.at]]);
+          champLecture(c,'Motif',x.motif);
+        });
+      },'rejet-'+r.i); }
     });
   }
 

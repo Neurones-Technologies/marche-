@@ -54,13 +54,13 @@ function render(){
   var lbl=null;
   for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===state.view) lbl=VIEWS[i].label;
   document.title = (lbl? lbl+' — ' : '')+'Marché+';
-  var m=document.getElementById('main'); m.textContent=''; m.classList.remove('avec-sommaire','suivante-panneau'); // posées par organiserSections
+  var m=document.getElementById('main'); m.textContent=''; m.classList.remove('avec-sommaire'); // posée par organiserSections
   if(vueDeProcedure(state.view) && avecCadreProcedure()){
     // écran de procédure : en-tête, frise des étapes, sous-onglets, puis l'écran, puis précédente / suivante
     UI.derniereVueProc=state.view;
     var corps=cadreProcedureHaut(m);
     (ROUTER[state.view]||vDashboard)(corps);
-    organiserSections(corps, state.view, true);
+    organiserSections(corps, state.view);
     cadreProcedureBas(m);
   } else {
     var cur=MP.current();
@@ -73,6 +73,7 @@ function render(){
   }
 
   placerTitre(m);
+  dessinerFenetre(); // la fenêtre de détail ouverte suit l'état
   if(prevFk){
     var t=document.querySelector('[data-fk="'+prevFk+'"]');
     if(t){

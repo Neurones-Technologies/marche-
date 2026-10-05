@@ -1,6 +1,17 @@
 /* Marché+ — Écran Évaluation.
-   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
+   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
+   Le classement en tableau (une colonne par critère) ; la notation d'une offre se fait dans une fenêtre. */
 "use strict";
+
+/* Écarts avec le score proposé par l'IA qui attendent encore leur justification, pour une offre. */
+function ecartsNonJustifies(o){
+  return state.criteria.filter(function(cr){
+    return cr.kind==='qual' && Math.abs(curScore(o,cr.id)-aiScore(o,cr.id))>0.01 && !state.justif[o.id+'_'+cr.id];
+  }).length;
+}
+
+/* Notation bloquée tant que l'évaluateur n'a pas déclaré l'absence de conflit d'intérêts (voir coiBanner). */
+function coiRequise(){ var d=coiDe(state.me); return !(d && d.declare && !d.conflit); }
 
 function vEvaluation(m){
   if (!state.depClosed) return locked(m,"L'évaluation s'ouvre une fois le dépouillement clôturé.",'depouille','Aller au dépouillement');
@@ -31,23 +42,84 @@ function vEvaluation(m){
     banner.appendChild(document.createTextNode("Les offres sont comparées à leur contre-valeur en francs CFA, sans correction d'origine."));
   }
 
-  var coiBloque = can('eval.score') ? coiBanner(m) : false;
-  var g=add(m,'div','grid4');
-  ranking().forEach(function(r,idx){
+  if(can('eval.score')) coiBanner(m);
+
+  var colonnes=[
+    {lab:'Rang', rendu:function(r,td){ add(td,'span','rank'+(r.idx===0?' lead':''),String(r.idx+1)); }},
+    {lab:'Soumissionnaire', rendu:function(r,td){ add(td,'strong',null,r.o.name); var d=add(td,'div'); d.style.marginTop='4px'; originChip(d,r.o); }}
+  ];
+  state.criteria.forEach(function(cr){
+    colonnes.push({ lab:cr.label+' ('+cr.weight+' %)', num:true, court:true, rendu:function(r,td){
+      var v = cr.kind==='auto' ? (r.notes[cr.id]||0) : curScore(r.o,cr.id);
+      td.appendChild(document.createTextNode(cr.kind==='auto' ? v.toFixed(1) : v.toFixed(0)));
+      if(cr.kind==='qual') add(td,'span','ai','IA');
+    }});
+  });
+  colonnes.push({ lab:'Total', num:true, rendu:function(r,td){ add(td,'strong','total-v',r.total.toFixed(1)); var n=ecartsNonJustifies(r.o); if(n){ var d=add(td,'div'); chipCellule(d,n+' écart à justifier','c-red'); } }});
+
+  tableau(m,{ cle:'evaluation', titre:'Classement', lignes:ranking().map(function(r,idx){ r.idx=idx; return r; }),
+    colonnes:colonnes,
+    recherche:function(r){ return r.o.name+' '+r.o.pays; },
+    filtres:[{ lab:'Origine', options:[['uemoa','UEMOA'],['hors','Hors UEMOA']], test:function(r,v){ return v==='uemoa' ? isUemoa(r.o) : !isUemoa(r.o); } }],
+    actions:function(r,td){ boutonDetail(td,function(){ ouvrirNotation(r.o.id); },'eval-ouvrir-'+r.o.id, can('eval.score') && !state.evalDone ? 'Noter' : null); }
+  });
+
+  var ecartees=SEED_OFFERS.filter(excluded);
+  if(ecartees.length) tableau(m,{ cle:'eval-ecartees', titre:'Offres écartées de l’évaluation', lignes:ecartees,
+    colonnes:[
+      {lab:'Soumissionnaire', rendu:function(o,td){ add(td,'strong',null,o.name); }},
+      {lab:'Origine', rendu:function(o,td){ originChip(td,o); }},
+      {lab:'Motif', rendu:function(o,td){ var mis=missingDocs(o); add(td,'div','dt-extrait', mis.length ? mis.map(function(d){return d.label;}).join(' ; ') : 'Décision manuelle'); }}
+    ],
+    actions:function(o,td){ boutonCellule(td,'Conformité',function(){ go('conformite'); },'eval-conf-'+o.id); }
+  });
+
+  var miss=missingJustifs(), wt=weightTotal();
+  var foot=add(m,'div','card'); foot.style.marginTop='18px';
+  var fp=add(foot,'div','panel-foot'); fp.style.borderTop='none';
+  var msg=add(fp,'span',null, miss.length? miss.length+' justification(s) manquante(s) : '+miss.join(', ') : 'Toutes les modifications sont justifiées.');
+  msg.style.cssText='font-size:12.5px;color:'+(miss.length?'var(--red)':'var(--muted)');
+  var v=add(fp,'button','btn btn-dark btn-sm', state.evalDone?'Évaluation validée ✓':'Valider l’évaluation');
+  v.disabled=miss.length>0||state.evalDone||wt!==100; guard('eval.validate',v);
+  fk(v,'valid-eval');
+  v.addEventListener('click',function(){
+    ask('Le classement sera transmis au circuit d’approbation et les notes ne pourront plus être modifiées.', function(){
+      state.evalDone=true; logit('Évaluation validée — classement transmis au circuit d’approbation');
+      var rr=ranking();
+      notify('eval.validee','Évaluation validée',
+        "Le classement de la procédure "+REF()+" est arrêté. Premier : "+(rr[0]?rr[0].o.name+" ("+rr[0].total.toFixed(1)+"/100)":"—")+".");
+      notify('appro.attendue','Approbation attendue',
+        "Le circuit d'approbation de la procédure "+REF()+" est ouvert. Premier niveau attendu : "+(state.approvals[0]?state.approvals[0].role:'—')+".");
+      save(); go('decision');
+    }, 'Valider l’évaluation ?', 'Valider');
+  });
+  if(wt!==100){
+    var w=add(m,'div','warn'); w.style.marginTop='14px';
+    w.appendChild(document.createTextNode('Le total des pondérations est de '+wt+' % : ajustez la grille de critères avant de valider.'));
+  }
+}
+
+/* Fenêtre de notation d'une offre : critères, ajustement des scores proposés par l'IA, justification des écarts. */
+function ouvrirNotation(id){
+  ouvrirFenetre(function(){ var o=offreParId(id); return o ? 'Notation — '+o.name : 'Notation'; }, function(card){
+    var rows=ranking(), r=null, idx=0;
+    rows.forEach(function(x,i){ if(x.o.id===id){ r=x; idx=i; } });
+    if(!r) return false;
     var o=r.o;
-    var card=add(g,'div','card sup'+(idx===0?' lead':''));
-    var top=add(card,'div'); top.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px';
+    var coiBloque = can('eval.score') && coiRequise();
+
+    var top=add(card,'div','fen-chips');
     add(top,'span','rank'+(idx===0?' lead':''),'Rang '+(idx+1));
     originChip(top,o);
-    add(card,'div',null,o.name).style.cssText='font-size:15px;font-weight:700';
     var evo=(state.evaluationsOffres||{})[o.id];
-    if(evo){ var ce=add(card,'span','chip '+(evo.alerte?'c-red':'c-grey'),'Exécution passée : '+evo.moyenne+'/100 sur '+evo.nb+' commande(s)');
-      ce.title='Note du partenaire sur ses commandes réceptionnées ; information pour l\u2019évaluateur, sans effet sur le classement.'; }
-    add(card,'div','muted', sep(o.montant)+' '+o.devise+' · '+o.delai+' j');
+    if(evo){ var ce=add(top,'span','chip '+(evo.alerte?'c-red':'c-grey'),'Exécution passée : '+evo.moyenne+'/100 sur '+evo.nb+' commande(s)');
+      ce.title='Note du partenaire sur ses commandes réceptionnées ; information pour l’évaluateur, sans effet sur le classement.'; }
     var corr = montantCorrige(o);
-    var mline = add(card,'div','muted', 'Contre-valeur : '+xof(montantXOF(o)) + (Math.abs(corr-montantXOF(o))>1 ? ' → comparé à '+xof(corr) : ''));
-    mline.style.cssText+=';margin-bottom:4px';
-    if (Math.abs(corr-montantXOF(o))>1) mline.style.color='var(--violet)';
+    grilleLecture(card,[
+      ['Montant de l’offre', sep(o.montant)+' '+o.devise], ['Délai', o.delai+' jours'],
+      ['Contre-valeur', xof(montantXOF(o))], ['Prix comparé', Math.abs(corr-montantXOF(o))>1 ? xof(corr) : null]
+    ]);
+    if(coiBloque){ var wc=add(card,'div','warn'); wc.style.margin='0 0 12px'; wc.textContent='Déclaration de conflit d’intérêts requise avant toute notation : faites-la depuis l’écran d’évaluation.'; }
 
     state.criteria.forEach(function(cr){
       var crit=add(card,'div','crit');
@@ -59,9 +131,10 @@ function vEvaluation(m){
       } else {
         var cur=curScore(o,cr.id);
         var st=add(crit,'span','stepper');
+        var verrou = coiBloque || state.evalDone;
         var mi=add(st,'button','step-btn','−'); mi.setAttribute('aria-label','Diminuer '+cr.label+' pour '+o.name);
         fk(mi,'dec-'+o.id+'-'+cr.id); guard('eval.score',mi);
-        if(coiBloque){ mi.disabled=true; mi.setAttribute('title','Déclaration de conflit d\u2019intérêts requise avant toute notation.'); }
+        if(verrou){ mi.disabled=true; }
         mi.addEventListener('click',function(){
           var v=Math.max(0,cur-5);
           cibler('PUT','/scores/'+enc(o.id)+'/'+enc(cr.id),{note:v}).then(function(r){ if(r) logit('Score « '+cr.label+' » ajusté à '+v+' — '+o.name); });
@@ -69,7 +142,7 @@ function vEvaluation(m){
         add(st,'span','step-v', cur.toFixed(0)+'/100');
         var pl=add(st,'button','step-btn','+'); pl.setAttribute('aria-label','Augmenter '+cr.label+' pour '+o.name);
         fk(pl,'inc-'+o.id+'-'+cr.id); guard('eval.score',pl);
-        if(coiBloque){ pl.disabled=true; pl.setAttribute('title','Déclaration de conflit d\u2019intérêts requise avant toute notation.'); }
+        if(verrou){ pl.disabled=true; }
         pl.addEventListener('click',function(){
           var v=Math.min(100,cur+5);
           cibler('PUT','/scores/'+enc(o.id)+'/'+enc(cr.id),{note:v}).then(function(r){ if(r) logit('Score « '+cr.label+' » ajusté à '+v+' — '+o.name); });
@@ -91,7 +164,7 @@ function vEvaluation(m){
             cibler('PUT','/scores/'+enc(o.id)+'/'+enc(cr.id),{justification:motif}).then(function(r){
               if(!r || !motif) return;
               logit('Justification saisie — '+o.name+' / '+cr.label);
-              notify('ecart.ia','Écart motivé avec un score proposé par l\u2019IA',
+              notify('ecart.ia','Écart motivé avec un score proposé par l’IA',
                 o.name+" — "+cr.label+" : score proposé "+ai+", score retenu "+cur2+". Motif : "+motif);
               save(); render();
             });
@@ -104,36 +177,4 @@ function vEvaluation(m){
     add(tot,'span','total-v', r.total.toFixed(1));
     add(card,'div','muted','IA : '+o.aiWhy).style.cssText+=';margin-top:10px;padding-top:10px;border-top:1px solid var(--line-2)';
   });
-
-  SEED_OFFERS.filter(excluded).forEach(function(o){
-    var c2=add(m,'div','card pad'); c2.style.cssText+=';margin-top:14px;border-color:var(--red-line)';
-    var tt=add(c2,'div'); tt.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-    add(tt,'strong',null,o.name+' — écartée de l\u2019évaluation'); originChip(tt,o);
-    var mis=missingDocs(o);
-    add(c2,'div','muted', mis.length? 'Motif : '+mis.map(function(d){return d.label;}).join(' ; ')+'. Décision réversible depuis l\u2019écran Conformité.' : 'Écartée par décision manuelle. Réversible depuis l\u2019écran Conformité.');
-  });
-
-  var miss=missingJustifs(), wt=weightTotal();
-  var foot=add(m,'div','card'); foot.style.marginTop='18px';
-  var fp=add(foot,'div','panel-foot'); fp.style.borderTop='none';
-  var msg=add(fp,'span',null, miss.length? miss.length+' justification(s) manquante(s) : '+miss.join(', ') : 'Toutes les modifications sont justifiées.');
-  msg.style.cssText='font-size:12.5px;color:'+(miss.length?'var(--red)':'var(--muted)');
-  var v=add(fp,'button','btn btn-dark btn-sm', state.evalDone?'Évaluation validée ✓':'Valider l\u2019évaluation');
-  v.disabled=miss.length>0||state.evalDone||wt!==100; guard('eval.validate',v);
-  fk(v,'valid-eval');
-  v.addEventListener('click',function(){
-    ask('Le classement sera transmis au circuit d\u2019approbation et les notes ne pourront plus être modifiées.', function(){
-      state.evalDone=true; logit('Évaluation validée — classement transmis au circuit d\u2019approbation');
-      var rr=ranking();
-      notify('eval.validee','Évaluation validée',
-        "Le classement de la procédure "+REF()+" est arrêté. Premier : "+(rr[0]?rr[0].o.name+" ("+rr[0].total.toFixed(1)+"/100)":"—")+".");
-      notify('appro.attendue','Approbation attendue',
-        "Le circuit d'approbation de la procédure "+REF()+" est ouvert. Premier niveau attendu : "+(state.approvals[0]?state.approvals[0].role:'—')+".");
-      save(); go('decision');
-    }, 'Valider l\u2019évaluation ?', 'Valider');
-  });
-  if(wt!==100){
-    var w=add(m,'div','warn'); w.style.marginTop='14px';
-    w.appendChild(document.createTextNode('Le total des pondérations est de '+wt+' % : ajustez la grille de critères avant de valider.'));
-  }
 }

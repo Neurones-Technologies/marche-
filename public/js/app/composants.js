@@ -41,6 +41,8 @@ var ICONS = {
   chevL:'m15 6-6 6 6 6',
   chevR:'m9 6 6 6-6 6',
   plus:'M12 5v14M5 12h14',
+  x:'M6 6l12 12M18 6 6 18',
+  eye:'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z|M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   clipboard:'M9 4h6v3H9z|M9 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-3|M9 12h6M9 16h4'
 };
 function icon(parent, name){
@@ -238,7 +240,7 @@ function tableau(parent, o){
     else {
       var tbl=add(corps,'table','tbl dt-table');
       var tr=add(add(tbl,'thead'),'tr');
-      o.colonnes.forEach(function(c){ var th=add(tr,'th',c.num?'num':null,c.lab); th.scope='col'; });
+      o.colonnes.forEach(function(c){ var th=add(tr,'th',(c.num?'num':'')+(c.court?' dt-court':'')||null,c.lab); th.scope='col'; });
       if(o.actions){ var tha=add(tr,'th','dt-act','Actions'); tha.scope='col'; }
       var tb=add(tbl,'tbody');
       vis.slice(st.page*st.parPage, (st.page+1)*st.parPage).forEach(function(l){
@@ -265,14 +267,11 @@ function tableau(parent, o){
   dessiner();
   return carte;
 }
-/* ============ Panneau latéral : sommaire collé, étape suivante, sections repliables ============
-   Les écrans des six étapes de la procédure ont, à droite, un panneau qui reste visible pendant le défilement : le
-   sommaire de la page (dès deux sections) et le passage à l'étape suivante (l'étape elle-même est dans la frise).
-   Les autres écrans ne reçoivent le panneau (sommaire seul) qu'à partir de quatre sections.
-   Une section est une carte à en-tête (.panel-head) posée directement dans le contenu. Elle porte une pastille
-   numérotée, se replie depuis son en-tête et s'éclaire quand on la lit. Par défaut, toutes les sections sont
-   ouvertes, sauf sur un écran d'au moins quatre sections où seule la première l'est. L'état est gardé par écran
-   dans UI.replis, pour survivre aux rendus. */
+/* ============ Écrans longs : sommaire collé, sections repliables ============
+   Un écran d'au moins quatre sections (cartes à en-tête .panel-head, posées directement dans le contenu) reçoit à
+   droite un sommaire qui reste visible pendant le défilement, suit la section lue et mène à chacune d'un clic.
+   Chaque section porte une pastille numérotée, se replie depuis son en-tête et s'éclaire quand on la lit ; seule la
+   première est ouverte au départ. L'état est gardé par écran dans UI.replis, pour survivre aux rendus. */
 UI.replis = {};
 function titreSection(head){
   var t=head.firstChild && head.firstChild.nodeType===1 ? head.firstChild.textContent : head.textContent;
@@ -295,16 +294,14 @@ function pastilleSection(head, rang){
     head.insertBefore(b,head.firstChild);
   }
 }
-function organiserSections(conteneur, cle, avecEtape){
+function organiserSections(conteneur, cle){
   var cartes=[].slice.call(conteneur.children).filter(function(e){ return e.classList.contains('card') && e.firstElementChild && e.firstElementChild.classList.contains('panel-head'); });
   SUIVI_SECTIONS=null;
-  var etape = avecEtape ? etapeDe(cle) : null;
-  if(!etape && cartes.length<4) return;
-  var avecSommaire = cartes.length>=2;
+  if(cartes.length<4) return;
   var etat = UI.replis[cle] = UI.replis[cle] || {};
-  var sections = avecSommaire ? cartes.map(function(c,i){
+  var sections = cartes.map(function(c,i){
     var head=c.firstElementChild, titre=titreSection(head);
-    if(!(titre in etat)) etat[titre] = cartes.length>=4 && i>0; // écran long : seule la première section est ouverte
+    if(!(titre in etat)) etat[titre] = i>0; // seule la première section est ouverte au départ
     c.classList.add('sec-carte'); if(!c.id) c.id='sec-'+i;
     pastilleSection(head, i+1);
     var bt=document.createElement('button'); bt.type='button'; bt.className='sec-bascule'; icon(bt,'chevD');
@@ -321,26 +318,21 @@ function organiserSections(conteneur, cle, avecEtape){
     head.addEventListener('click',function(e){ if(etat[titre] && !e.target.closest('button,a,input,select,textarea,label')) basculer(); });
     appliquer(false);
     return { carte:c, titre:titre, ouvrir:function(){ if(etat[titre]){ etat[titre]=false; appliquer(true); } } };
-  }) : [];
+  });
 
-  var suiv = etape ? ETAPES[ETAPES.indexOf(etape)+1] : null;
-  if(suiv && !vuesPermises(suiv).length) suiv=null;
-  if(!sections.length && !suiv) return;
   conteneur.classList.add('avec-sommaire');
   var aside=add(conteneur,'aside','sec-sommaire'); aside.setAttribute('aria-label','Sommaire de la page');
   var boite=add(aside,'div','sec-boite');
 
-  // 1. Le sommaire de la page
-  var liens=[], ol=null;
-  if(avecSommaire){
-    var tete=add(boite,'div','sec-titre-ligne');
+  var liens=[];
+  var tete=add(boite,'div','sec-titre-ligne');
     add(tete,'div','sec-titre','Sommaire');
     var tous=add(tete,'div','sec-tous');
     var bd=boutonIcone(tous,'chevD','Tout déplier',function(){ sections.forEach(function(s){ etat[s.titre]=false; }); render(); },'sommaire-deplier');
     var br=boutonIcone(tous,'chevD','Tout replier',function(){ sections.forEach(function(s){ etat[s.titre]=true; }); render(); },'sommaire-replier');
     bd.classList.add('sec-mini'); br.classList.add('sec-mini','sec-mini-replier');
-    ol=add(boite,'ol','sec-liste');
-    sections.forEach(function(s,i){
+  var ol=add(boite,'ol','sec-liste');
+  sections.forEach(function(s,i){
       var li=add(ol,'li');
       var a=add(li,'button','sec-lien'); a.type='button'; fk(a,'sommaire-'+i);
       var m=s.titre.match(/^(\d+)\s*·\s*(.*)$/);
@@ -348,17 +340,7 @@ function organiserSections(conteneur, cle, avecEtape){
       var lib=add(a,'span','sec-lib', m ? m[2] : s.titre); a.title=lib.textContent;
       a.addEventListener('click',function(){ s.ouvrir(); SUIVI_VERROU=Date.now()+1200; s.carte.scrollIntoView({behavior:'smooth', block:'start'}); actif(i); });
       liens.push(a);
-    });
-  }
-
-  // 2. Passage à l'étape suivante : sur grand écran, il remplace celui du pied de page (masqué par la feuille de style)
-  if(suiv){
-    var bs=add(boite,'button','sec-suivante'); bs.type='button'; fk(bs,'panneau-suivante');
-    var tx=add(bs,'span'); add(tx,'span','sec-suivante-lab','Étape suivante'); add(tx,'span','sec-suivante-nom',suiv.lab);
-    var fl=add(bs,'span','sec-suivante-ic'); icon(fl,'chevR');
-    bs.addEventListener('click',function(){ go(vuesPermises(suiv)[0]); });
-    document.getElementById('main').classList.add('suivante-panneau');
-  }
+  });
 
   function actif(i){
     liens.forEach(function(a,j){
@@ -366,9 +348,8 @@ function organiserSections(conteneur, cle, avecEtape){
       if(i===j) a.setAttribute('aria-current','true'); else a.removeAttribute('aria-current');
     });
     sections.forEach(function(s,j){ s.carte.classList.toggle('actif', i===j); });
-    if(ol) ol.style.setProperty('--avance', sections.length>1 ? String(i/(sections.length-1)) : '0');
+    ol.style.setProperty('--avance', String(i/(sections.length-1)));
   }
-  if(!sections.length) return;
   actif(0);
   // suit la section affichée : la dernière dont le haut a franchi le haut de l'écran (sous la barre du haut)
   SUIVI_SECTIONS = function(){
@@ -391,6 +372,84 @@ window.addEventListener('scroll',function(){ if(SUIVI_SECTIONS) requestAnimation
   window.addEventListener('scroll',function(){ b.classList.toggle('on', window.scrollY>480); },{passive:true});
 })();
 
+/* ============ Fenêtre de détail (popup) ============
+   ouvrirFenetre(titre, remplir, o) ouvre une fenêtre au-dessus de l'écran. remplir(corps, pied) la dessine ; il est
+   rappelé à chaque rendu tant qu'elle est ouverte, pour qu'elle suive l'état (une confirmation, une note, une
+   réponse…) ; il doit donc relire l'état à chaque appel et renvoyer false si l'élément n'existe plus. titre peut être
+   une fonction. Les saisies en cours sont conservées d'un rendu à l'autre. La fenêtre se ferme par Échap, la croix,
+   un clic à côté, ou un changement d'écran. o.large : fenêtre large (document, offre détaillée). */
+UI.fenetre = null;
+function ouvrirFenetre(titre, remplir, o){
+  fermerFenetre();
+  o=o||{};
+  var prev=document.activeElement;
+  var ov=el('div','fen-ov');
+  var bx=add(ov,'div','fen'+(o.large?' fen-large':''));
+  bx.setAttribute('role','dialog'); bx.setAttribute('aria-modal','true'); bx.setAttribute('aria-labelledby','fen-titre');
+  var hd=add(bx,'div','fen-tete');
+  var h=add(hd,'h2','fen-titre'); h.id='fen-titre';
+  var x=add(hd,'button','icon-btn fen-fermer'); x.type='button'; icon(x,'x'); x.setAttribute('aria-label','Fermer'); x.title='Fermer'; fk(x,'fen-fermer');
+  var corps=add(bx,'div','fen-corps'), pied=add(bx,'div','fen-pied');
+  var f = UI.fenetre = { titre:titre, remplir:remplir, ov:ov, bx:bx, corps:corps, pied:pied, h:h, prev:prev, vue:state.view };
+  x.addEventListener('click',fermerFenetre);
+  ov.addEventListener('mousedown',function(e){ if(e.target===ov) fermerFenetre(); });
+  f.touche=function(e){
+    if(document.querySelector('.modal-ov')) return; // une confirmation est ouverte par-dessus
+    if(e.key==='Escape'){ e.preventDefault(); fermerFenetre(); }
+    else if(e.key==='Tab'){
+      var fo=[].slice.call(bx.querySelectorAll('button,a[href],input,select,textarea')).filter(function(z){ return !z.disabled && z.offsetParent!==null; });
+      if(!fo.length) return;
+      var i=fo.indexOf(document.activeElement);
+      if(e.shiftKey && i<=0){ e.preventDefault(); fo[fo.length-1].focus(); }
+      else if(!e.shiftKey && i===fo.length-1){ e.preventDefault(); fo[0].focus(); }
+    }
+  };
+  document.addEventListener('keydown',f.touche,true);
+  document.body.appendChild(ov);
+  document.body.classList.add('fen-ouverte');
+  dessinerFenetre();
+  if(UI.fenetre===f){ var premier=corps.querySelector('textarea,input,select') || x; premier.focus(); }
+}
+function dessinerFenetre(){
+  var f=UI.fenetre; if(!f) return;
+  if(f.vue!==state.view){ fermerFenetre(); return; }
+  var saisies={};
+  [].forEach.call(f.bx.querySelectorAll('input[data-fk],textarea[data-fk],select[data-fk]'),function(z){ saisies[z.getAttribute('data-fk')]=z.value; });
+  var sc=f.corps.scrollTop;
+  f.corps.textContent=''; f.pied.textContent='';
+  if(f.remplir(f.corps, f.pied)===false){ fermerFenetre(); return; }
+  f.h.textContent = typeof f.titre==='function' ? f.titre() : f.titre;
+  [].forEach.call(f.bx.querySelectorAll('input[data-fk],textarea[data-fk],select[data-fk]'),function(z){
+    var k=z.getAttribute('data-fk'); if(k in saisies && z.type!=='checkbox' && z.type!=='radio') z.value=saisies[k];
+  });
+  f.pied.hidden=!f.pied.childNodes.length;
+  f.corps.scrollTop=sc;
+}
+function fermerFenetre(){
+  var f=UI.fenetre; if(!f) return;
+  UI.fenetre=null;
+  document.removeEventListener('keydown',f.touche,true);
+  if(f.ov.parentNode) f.ov.parentNode.removeChild(f.ov);
+  document.body.classList.remove('fen-ouverte');
+  if(f.prev && f.prev.focus && document.body.contains(f.prev)) try{ f.prev.focus(); }catch(e){}
+}
+/* Champ en lecture dans une fenêtre : libellé, puis valeur (texte ou nœud). */
+function champLecture(parent, lab, val){
+  var d=add(parent,'div','fen-champ'); add(d,'div','fen-lab',lab);
+  var v=add(d,'div','fen-val'); if(val && val.nodeType) v.appendChild(val); else v.textContent = val==null||val==='' ? '—' : String(val);
+  return v;
+}
+/* Grille de champs en lecture : [[libellé, valeur], …], les valeurs vides sont omises. */
+function grilleLecture(parent, paires){
+  var g=add(parent,'div','fen-grille');
+  paires.forEach(function(p){ if(p[1]==null || p[1]==='') return; champLecture(g,p[0],p[1]); });
+  return g;
+}
+/* Bouton « voir le détail » d'une ligne de tableau : bouton texte si une action attend, icône sinon. */
+function boutonDetail(td, action, fkey, lab){
+  if(lab) return boutonCellule(td, lab, action, fkey, true);
+  return boutonIcone(td, 'eye', 'Voir le détail', action, fkey);
+}
 /* Bouton-icône (imprimer, exporter…) : libellé au survol (title) et pour les lecteurs d'écran (aria-label). */
 function boutonIcone(parent, ic, libelle, action, fkey){
   var b=add(parent,'button','icon-btn icon-action'); icon(b,ic); b.type='button';
