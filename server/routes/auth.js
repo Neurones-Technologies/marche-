@@ -68,26 +68,39 @@ r.post('/users', requireAuth, needPerm('roles.edit'), (req, res) => {
   res.status(201).json({ id, nom: nom.trim(), email: em, role });
 });
 
+/* Modification d'un compte : nom, courriel, rôle, accès, mot de passe. Tout est vérifié avant d'écrire quoi que ce
+   soit, puis enregistré d'un bloc. */
 r.patch('/users/:id', requireAuth, needPerm('roles.edit'), (req, res) => {
-  const { active, password, role } = req.body || {};
+  const { active, password, role, nom, email } = req.body || {};
   const u = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!u) return res.status(404).json({ error: 'Utilisateur introuvable.' });
   if (u.id === req.user.id && active === false) return res.status(422).json({ error: 'Vous ne pouvez pas désactiver votre propre compte.' });
+  const roles = require('../db').kvGet('roles').value;
   if (role !== undefined) {
-    const roles = require('../db').kvGet('roles').value;
     if (!roles[role]) return res.status(422).json({ error: 'Rôle inconnu.' });
     if (u.id === req.user.id && role !== u.role) return res.status(422).json({ error: 'Vous ne pouvez pas modifier votre propre rôle.' });
-    db.prepare('UPDATE users SET role=? WHERE id=?').run(role, u.id);
-    auditAppend(req.user.id, whoLabel(req.user), `Rôle modifié — ${u.nom} : ${u.role} → ${role}`);
   }
-  if (typeof active === 'boolean') db.prepare('UPDATE users SET active=? WHERE id=?').run(active ? 1 : 0, u.id);
-  if (password) {
-    if (String(password).length < 10) return res.status(422).json({ error: '10 caractères minimum.' });
-    db.prepare('UPDATE users SET pass_hash=? WHERE id=?').run(bcrypt.hashSync(String(password), 10), u.id);
+  const nouveauNom = nom !== undefined ? String(nom).trim() : u.nom;
+  if (!nouveauNom || nouveauNom.length > 120) return res.status(422).json({ error: 'Nom requis (120 caractères au plus).' });
+  const nouveauMail = email !== undefined ? String(email).trim().toLowerCase() : u.email;
+  if (!/^[^@s]+@[^@s]+.[^@s]+$/.test(nouveauMail)) return res.status(422).json({ error: 'Courriel invalide.' });
+  if (nouveauMail !== u.email && db.prepare('SELECT 1 FROM users WHERE email=? AND id<>?').get(nouveauMail, u.id))
+    return res.status(409).json({ error: 'Ce courriel est déjà utilisé par un autre compte.' });
+  if (password && String(password).length < 10) return res.status(422).json({ error: '10 caractères minimum.' });
+
+  const changes = [];
+  db.transaction(() => {
+    if (nouveauNom !== u.nom) { db.prepare('UPDATE users SET nom=? WHERE id=?').run(nouveauNom, u.id); changes.push(`nom : ${u.nom} → ${nouveauNom}`); }
+    if (nouveauMail !== u.email) { db.prepare('UPDATE users SET email=? WHERE id=?').run(nouveauMail, u.id); changes.push(`courriel : ${u.email} → ${nouveauMail}`); }
+    if (role !== undefined && role !== u.role) { db.prepare('UPDATE users SET role=? WHERE id=?').run(role, u.id); changes.push(`rôle : ${(roles[u.role] || {}).lab || u.role} → ${roles[role].lab}`); }
+    if (typeof active === 'boolean' && (active ? 1 : 0) !== u.active) { db.prepare('UPDATE users SET active=? WHERE id=?').run(active ? 1 : 0, u.id); changes.push(active ? 'activé' : 'désactivé'); }
+    if (password) { db.prepare('UPDATE users SET pass_hash=? WHERE id=?').run(bcrypt.hashSync(String(password), 10), u.id); changes.push('mot de passe réinitialisé'); }
+  })();
+  if (changes.length) {
+    require('../db').bumpRev();
+    auditAppend(req.user.id, whoLabel(req.user), `Compte modifié — ${u.nom} (${changes.join(' ; ')})`);
   }
-  require('../db').bumpRev();
-  auditAppend(req.user.id, whoLabel(req.user), `Compte modifié — ${u.nom}${typeof active === 'boolean' ? (active ? ' (activé)' : ' (désactivé)') : ''}${password ? ' (mot de passe réinitialisé)' : ''}`);
-  res.json({ ok: true });
+  res.json({ ok: true, id: u.id, nom: nouveauNom, email: nouveauMail, role: role !== undefined ? role : u.role });
 });
 
 module.exports = r;

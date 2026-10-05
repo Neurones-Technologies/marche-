@@ -48,3 +48,25 @@ test('un rôle attribué ou utilisé par la plateforme ne se supprime pas ; un r
   assert.equal((await ecrire(sansLibre)).status, 200);
   assert.equal((await getState(admin)).roles.temporaire, undefined);
 });
+
+test('un compte se modifie : nom et courriel, avec contrôles', async () => {
+  await connecter();
+  const liste = (await call('GET', '/api/auth/users', null, admin)).json;
+  const yao = liste.find((u) => u.email === 'k.yao@bal.ci');
+  const r = await call('PATCH', '/api/auth/users/' + yao.id, { nom: 'Kouadio Yao', email: 'K.Yao@bal.ci ' }, admin);
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  const apres = (await call('GET', '/api/auth/users', null, admin)).json.find((u) => u.id === yao.id);
+  assert.equal(apres.nom, 'Kouadio Yao');
+  assert.equal(apres.email, 'k.yao@bal.ci');
+  // courriel déjà pris, courriel invalide, nom vide : refusés, et rien n'est écrit
+  assert.equal((await call('PATCH', '/api/auth/users/' + yao.id, { email: 'y.koffi@bal.ci' }, admin)).status, 409);
+  assert.equal((await call('PATCH', '/api/auth/users/' + yao.id, { email: 'pas-un-courriel' }, admin)).status, 422);
+  assert.equal((await call('PATCH', '/api/auth/users/' + yao.id, { nom: '  ', role: 'audit' }, admin)).status, 422);
+  const inchange = (await call('GET', '/api/auth/users', null, admin)).json.find((u) => u.id === yao.id);
+  assert.equal(inchange.role, yao.role, 'le rôle n’a pas été modifié par la requête refusée');
+  // le titulaire se connecte avec son nouveau courriel
+  const c = await call('POST', '/api/auth/login', { email: 'k.yao@bal.ci', password: 'Marche+2026!' });
+  assert.equal(c.status, 200);
+  const journal = (await call('GET', '/api/audit', null, admin)).json.entrees;
+  assert.ok(journal.some((e) => /Compte modifié — K\. Yao \(nom : K\. Yao → Kouadio Yao/.test(e.a)));
+});

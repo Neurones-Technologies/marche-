@@ -72,8 +72,12 @@ function vComptes(m){
     var moi = u.id===me0;
     ouvrirFenetre(u.nom, function(c,p){
       var tete=add(c,'div','qui qui-lg'); avatar(tete,u.nom,true); var t=add(tete,'div'); add(t,'strong',null,u.nom); add(t,'div','muted',u.email);
+      var g=add(c,'div','fen-grille');
+      var nom=champ(g,'Nom','cpt-nom-'+u.id,'text'); nom.value=u.nom; nom.maxLength=120;
+      var mail=champ(g,'Courriel','cpt-mail-'+u.id,'email'); mail.value=u.email;
       var rs=champ(c,'Rôle','cpt-role-'+u.id,'select'); selectRoles(rs,u.role); rs.disabled=moi;
       if(moi) add(c,'p','muted','Vous ne pouvez pas modifier votre propre rôle ni désactiver votre compte.').style.marginTop='8px';
+      add(c,'p','muted','Le courriel sert d’identifiant de connexion : prévenez la personne si vous le changez.').style.marginTop='8px';
       var sec=add(c,'div','fen-section'); add(sec,'h3',null,'Sécurité');
       var lg=add(sec,'div','acces-ligne');
       var tl=add(lg,'div'); add(tl,'strong',null,'Mot de passe'); add(tl,'div','muted','Un mot de passe provisoire, à transmettre par un canal sûr.');
@@ -92,11 +96,17 @@ function vComptes(m){
         }, u.active?'Désactiver ce compte ?':'Réactiver ce compte ?', u.active?'Désactiver':'Réactiver');
       });
       var an=add(p,'button','btn btn-ghost','Fermer'); an.addEventListener('click',fermerFenetre);
-      var ok=add(p,'button','btn btn-primary','Enregistrer le rôle'); fk(ok,'cpt-enregistrer-'+u.id); ok.disabled=moi;
+      var ok=add(p,'button','btn btn-primary','Enregistrer'); fk(ok,'cpt-enregistrer-'+u.id);
       ok.addEventListener('click',function(){
-        if(rs.value===u.role){ fermerFenetre(); return; }
-        MP.api('PATCH','/api/auth/users/'+u.id,{role:rs.value}).then(function(){ toast('Rôle modifié — '+u.nom); fermerFenetre(); return majUtilisateurs(); })
-          .then(charger).catch(function(e){ toast(e.message); });
+        var corps={};
+        if(nom.value.trim()!==u.nom) corps.nom=nom.value.trim();
+        if(mail.value.trim().toLowerCase()!==u.email) corps.email=mail.value.trim();
+        if(!moi && rs.value!==u.role) corps.role=rs.value;
+        if(!Object.keys(corps).length){ fermerFenetre(); return; }
+        if(corps.nom===''){ toast('Le nom est obligatoire.'); nom.focus(); return; }
+        ok.disabled=true;
+        MP.api('PATCH','/api/auth/users/'+u.id,corps).then(function(r){ toast('Compte mis à jour — '+(r.nom||u.nom)); if(moi){ var bn=document.querySelector('#usr-name .usr-nom'); if(bn) bn.textContent=r.nom; } fermerFenetre(); return majUtilisateurs(); })
+          .then(charger).catch(function(e){ toast(e.message); ok.disabled=false; });
       });
     });
   }
