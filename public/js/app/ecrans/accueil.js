@@ -35,13 +35,13 @@ function vAccueil(m){
       if(sous) add(t,'div','kpi-sous',sous);
     }
     tuile('À faire pour moi', r.taches.length, r.taches.length ? 'action(s) qui vous attendent' : 'rien en attente', 'check', null, false);
-    if(c.besoins) tuile('Demandes d’achat en validation', c.besoins.soumis, c.besoins.valide+' validée(s), à transformer', 'clipboard', 'besoins');
+    if(c.besoins) tuile('Demandes d’achat en validation', c.besoins.soumis, c.besoins.valide+' validée(s), à transformer', 'demande', 'besoins');
     if(c.procedures && c.procedures.parPhase){
       var pp=c.procedures.parPhase, enCours=c.procedures.total-(pp.signee||0)-(pp.archivee||0)-(pp.infructueuse||0);
       tuile('Appels d’offres en cours', enCours, c.procedures.total+' au total', 'folder', 'procedures');
     }
     if(c.procedures && c.procedures.ouverts!=null) tuile('Appels d’offres ouverts', c.procedures.ouverts, 'auxquels vous pouvez répondre', 'folder', 'procedures');
-    if(c.commandes) tuile('Commandes en cours', c.commandes.enCours, c.commandes.enRetard ? c.commandes.enRetard+' en retard de livraison' : 'aucune en retard', 'cart', 'commandes', c.commandes.enRetard>0);
+    if(c.commandes) tuile('Commandes en cours', c.commandes.enCours, c.commandes.enRetard ? c.commandes.enRetard+' en retard de livraison' : 'aucune en retard', 'camion', 'commandes', c.commandes.enRetard>0);
     if(c.partenaires) tuile('Partenaires référencés', c.partenaires.references, c.partenaires.verification+' dossier(s) en instruction'+(c.partenaires.alertes?' · '+c.partenaires.alertes+' sous le seuil':''), 'users', 'partenaires', c.partenaires.alertes>0);
     if(c.monReferencement){
       var S={ candidat:'Dossier à compléter', verification:'En instruction', rejete:'À corriger', reference:'Référencé', suspendu:'Suspendu', exclu:'Exclu' };

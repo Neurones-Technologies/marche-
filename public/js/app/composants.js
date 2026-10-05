@@ -42,6 +42,8 @@ var ICONS = {
   chevR:'m9 6 6 6-6 6',
   plus:'M12 5v14M5 12h14',
   x:'M6 6l12 12M18 6 6 18',
+  demande:'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z|M14 3v5h5|M12 11v6M9 14h6',
+  camion:'M2 6h12v10H2z|M14 10h4l3 3v3h-7|M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z|M17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
   agrandir:'M15 3h6v6M9 21H3v-6|M21 3l-7 7M3 21l7-7',
   edit:'M4 20h4L19 9l-4-4L4 16z|M13.5 6.5l4 4',
   archive:'M3 4h18v4H3z|M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8|M10 12h4',
@@ -58,7 +60,7 @@ function icon(parent, name){
   return s;
 }
 /* Icône de chaque écran du menu. */
-var NAV_ICONS = { accueil:'home', dashboard:'info', envois:'chat', procedures:'folder', besoins:'clipboard', referencement:'badge', partenaires:'users', commandes:'cart', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
+var NAV_ICONS = { accueil:'home', dashboard:'info', envois:'chat', procedures:'folder', besoins:'demande', referencement:'badge', partenaires:'users', commandes:'camion', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
   reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
   recours:'scale', pv:'stamp', audit:'list', journal:'list', roles:'key', comptes:'users', suppleances:'clock', params:'cog', regles:'ring' };
 
