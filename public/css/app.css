@@ -81,21 +81,7 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 .avec-sommaire > * { grid-column: 1; }
 .avec-sommaire > .sec-sommaire { grid-column: 2; grid-row: 1 / span 200; align-self: stretch; }
 .sec-boite { position: sticky; top: calc(var(--topbar-h) + var(--space-4)); background: var(--color-surface); border: var(--border-w) solid var(--color-border); border-top: 3px solid var(--color-accent); border-radius: var(--radius); box-shadow: var(--shadow-card); max-height: calc(100vh - var(--topbar-h) - var(--space-8)); overflow-y: auto; }
-/* l'étape */
-.sec-etape { padding: var(--space-4); background: linear-gradient(160deg, var(--color-accent-soft) 0%, var(--color-surface) 85%); border-bottom: var(--border-w) solid var(--color-border); }
-.sec-surtitre, .sec-titre { font-size: var(--fs-tiny); font-weight: var(--fw-strong); letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-2); }
-.sec-etape-nom { margin-top: var(--space-1); font-size: var(--fs-title); font-weight: var(--fw-strong); line-height: var(--lh-tight); color: var(--color-text); }
-.sec-avance { display: flex; gap: 3px; margin: var(--space-3) 0 var(--space-2); }
-.sec-seg { flex: 1 1 0; height: 5px; border-radius: var(--radius-pill); background: var(--color-border-strong); }
-.sec-seg.done { background: var(--color-ok); }
-.sec-seg.now { background: var(--color-accent); }
-.sec-seg.blocked { background: var(--color-blocked); }
-.sec-seg.ici { transform: scaleY(1.7); box-shadow: 0 0 0 1px var(--color-surface); }
-.sec-statut { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-tiny); font-weight: var(--fw-strong); color: var(--color-text-2); }
-.sec-statut::before { content: ""; width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--color-text-3); }
-.sec-statut.done { color: var(--color-ok); } .sec-statut.done::before { background: var(--color-ok); }
-.sec-statut.now { color: var(--color-accent); } .sec-statut.now::before { background: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-ring); }
-.sec-statut.blocked { color: var(--color-blocked); } .sec-statut.blocked::before { background: var(--color-blocked); }
+.sec-titre { font-size: var(--fs-tiny); font-weight: var(--fw-strong); letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-2); }
 /* le sommaire */
 .sec-titre-ligne { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-4) var(--space-4) var(--space-2); }
 .sec-tous { display: flex; gap: 2px; }
@@ -145,6 +131,7 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 .haut-page:hover { background: var(--color-accent-hover); }
 .icon-action { color: var(--color-text-2); }
 .icon-action:hover { color: var(--color-accent); }
+@media (min-width: 1101px) { .suivante-panneau .proc-foot [data-fk="etape-suiv"] { display: none; } }
 @media (max-width: 1100px) {
   .avec-sommaire { display: block; }
   .sec-sommaire { display: none; }
@@ -234,7 +221,10 @@ button.kpi:hover { border-color: var(--color-accent); }
   min-height: var(--topbar-h); padding: var(--space-2) var(--space-8); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
 }
 .topbar > div:last-child { display: flex; align-items: center; gap: var(--space-3); }
-.topbar-titre { flex: 1 1 auto; min-width: 0; }
+.topbar-titre { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: var(--space-2); }
+.topbar-titre h1 { min-width: 0; }
+.top-ref { flex: 0 0 auto; font-size: var(--fs-title); color: var(--color-text-2); white-space: nowrap; }
+.top-ref::before { content: "— "; color: var(--color-text-3); }
 .topbar-titre h1 { font-size: var(--fs-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .btn.burger { display: none; }
 main { padding: var(--space-8); max-width: var(--content-max); width: 100%; }

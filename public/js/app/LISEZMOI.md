@@ -32,8 +32,8 @@ Avant eux, `profils.js`, `regles.js` (partagés avec le serveur) et `api.js` (co
 - Les champs de saisie sont soulignés (un trait, sans cadre) : style global de `app.css`, rien à faire par écran.
 - Imprimer, exporter et les autres actions secondaires sont des **boutons-icônes** : `boutonIcone(parent, icône,
   libellé, action, fk)`. Le libellé sert d’infobulle et de nom pour les lecteurs d’écran.
-- Le rendu appelle `organiserSections` : chaque écran d’étape de la procédure reçoit le panneau latéral (étape,
-  sommaire dès deux sections, étape suivante) ; un autre écran le reçoit à partir de quatre sections. Une section
+- Le rendu appelle `organiserSections` : chaque écran d’étape de la procédure reçoit le panneau latéral (sommaire
+  dès deux sections, étape suivante) ; un autre écran le reçoit à partir de quatre sections. Une section
   est une carte posée directement dans le contenu, qui commence par un `.panel-head`. Un titre « N · Titre »
   donne la pastille N (le texte de l’en-tête reste « N · Titre ») ; sans numéro, la pastille porte le rang.
   Une carte garde son `id` s’il en a un ; sinon elle reçoit `sec-N`.

@@ -41,12 +41,14 @@ Organisation de l'interface (menu) :
   partenaires (ou « Mon référencement » pour un prestataire).
 - **En cours** : une seule entrée, la procédure ouverte. Dans la page, une frise de six étapes (Préparer, Publication
   et offres, Dépouiller, Évaluer, Décider, Clore) montre ce qui est fait, en cours ou à venir ; une étape à plusieurs
-  écrans les présente en sous-onglets ; « Étape suivante » en bas, avec les outils (vue d'ensemble, journal d'audit)
-  et le changement de procédure en en-tête.
+  écrans les présente en sous-onglets ; « Étape suivante » dans le panneau de droite (en bas sur petit écran), avec
+  les outils (vue d'ensemble, journal d'audit) en pied de page et le changement de procédure en en-tête quand il y en
+  a plusieurs.
 - **Administration** : comptes, rôles, paramètres, alertes.
 
-Chaque écran des six étapes a, à droite, un panneau qui reste visible pendant le défilement : l’étape en cours et
-l’avancement de la procédure, le sommaire de la page (qui suit la section lue) et le passage à l’étape suivante.
+Dans le détail d’une procédure, la barre du haut affiche le titre de l’écran et la référence (« Cahier des charges
+— AO-2026-014 »). Chaque écran des six étapes a, à droite, un panneau qui reste visible pendant le défilement : le
+sommaire de la page (qui suit la section lue) et le passage à l’étape suivante.
 Les sections portent une pastille numérotée et se replient ; sur un écran long, seule la première est ouverte au
 départ. Les autres écrans longs (paramètres…) ont le même sommaire. Un bouton « haut de page » apparaît dès qu’on
 a défilé.

@@ -137,15 +137,11 @@ function avecCadreProcedure(){ return VIEWS.filter(function(v){ return v.grp==='
 
 /* En-tête, frise des étapes et sous-onglets ; retourne le conteneur où l'écran se dessine. */
 function cadreProcedureHaut(m){
-  var c=state.cdc||{}, cur=MP.current();
-  var hd=add(m,'div','proc-head');
-  var g=add(hd,'div'); g.style.cssText='min-width:0;flex:1 1 320px';
-  var t=add(g,'div'); add(t,'strong',null,REF()); add(t,'span','muted',' — '+(c.objet||''));
-  var ch=add(g,'div'); ch.style.cssText='display:flex;gap:6px;flex-wrap:wrap;margin-top:4px';
-  var ph=phase(); add(ch,'span','chip '+ph.c,ph.k);
-  add(ch,'span','chip c-grey',MPProfils.profil(R.profilId(RCTX())).lab);
+  // la référence de la procédure figure dans la barre du haut, à côté du titre (placerTitre)
+  var cur=MP.current();
   var autres=MP.procs().filter(function(p){ return !p.archive || p.id===MP.pid(); });
   if(autres.length>1){
+    var hd=add(m,'div','proc-head');
     var s=add(hd,'select'); s.setAttribute('aria-label','Changer de procédure'); fk(s,'proc-sel'); s.id='proc-sel';
     autres.forEach(function(p){ var o=add(s,'option',null,p.ref+(p.archive?' (archivée)':'')+' — '+(p.objet||'')); o.value=p.id; });
     s.value=MP.pid();
@@ -269,10 +265,10 @@ function tableau(parent, o){
   dessiner();
   return carte;
 }
-/* ============ Panneau latéral : étape, sommaire collé, sections repliables ============
-   Les écrans des six étapes de la procédure ont tous, à droite, un panneau qui reste visible pendant le défilement :
-   l'étape en cours et l'avancement de la procédure, le sommaire de la page (dès deux sections) et le passage à
-   l'étape suivante. Les autres écrans ne reçoivent le panneau (sommaire seul) qu'à partir de quatre sections.
+/* ============ Panneau latéral : sommaire collé, étape suivante, sections repliables ============
+   Les écrans des six étapes de la procédure ont, à droite, un panneau qui reste visible pendant le défilement : le
+   sommaire de la page (dès deux sections) et le passage à l'étape suivante (l'étape elle-même est dans la frise).
+   Les autres écrans ne reçoivent le panneau (sommaire seul) qu'à partir de quatre sections.
    Une section est une carte à en-tête (.panel-head) posée directement dans le contenu. Elle porte une pastille
    numérotée, se replie depuis son en-tête et s'éclaire quand on la lit. Par défaut, toutes les sections sont
    ouvertes, sauf sur un écran d'au moins quatre sections où seule la première l'est. L'état est gardé par écran
@@ -327,28 +323,18 @@ function organiserSections(conteneur, cle, avecEtape){
     return { carte:c, titre:titre, ouvrir:function(){ if(etat[titre]){ etat[titre]=false; appliquer(true); } } };
   }) : [];
 
+  var suiv = etape ? ETAPES[ETAPES.indexOf(etape)+1] : null;
+  if(suiv && !vuesPermises(suiv).length) suiv=null;
+  if(!sections.length && !suiv) return;
   conteneur.classList.add('avec-sommaire');
-  var aside=add(conteneur,'aside','sec-sommaire'); aside.setAttribute('aria-label', etape ? 'Étape et sommaire de la page' : 'Sommaire de la page');
+  var aside=add(conteneur,'aside','sec-sommaire'); aside.setAttribute('aria-label','Sommaire de la page');
   var boite=add(aside,'div','sec-boite');
 
-  // 1. L'étape en cours et l'avancement de la procédure
-  if(etape){
-    var st=etapesStatut(), rang=ETAPES.indexOf(etape);
-    var te=add(boite,'div','sec-etape');
-    add(te,'div','sec-surtitre','Étape '+(rang+1)+' sur '+ETAPES.length);
-    add(te,'div','sec-etape-nom',etape.lab);
-    var barre=add(te,'div','sec-avance'); barre.setAttribute('role','img');
-    var faites=ETAPES.filter(function(e){ return st[e.id]==='done'; }).length;
-    barre.setAttribute('aria-label',faites+' étape(s) terminée(s) sur '+ETAPES.length);
-    ETAPES.forEach(function(e){ var seg=add(barre,'span','sec-seg '+st[e.id]+(e===etape?' ici':'')); seg.title=e.lab+' — '+FLOW_LAB[st[e.id]]; });
-    add(te,'span','sec-statut '+st[etape.id], FLOW_LAB[st[etape.id]].replace(/^./,function(c){ return c.toUpperCase(); }));
-  }
-
-  // 2. Le sommaire de la page
+  // 1. Le sommaire de la page
   var liens=[], ol=null;
   if(avecSommaire){
     var tete=add(boite,'div','sec-titre-ligne');
-    add(tete,'div','sec-titre', etape ? 'Sur cette page' : 'Sommaire');
+    add(tete,'div','sec-titre','Sommaire');
     var tous=add(tete,'div','sec-tous');
     var bd=boutonIcone(tous,'chevD','Tout déplier',function(){ sections.forEach(function(s){ etat[s.titre]=false; }); render(); },'sommaire-deplier');
     var br=boutonIcone(tous,'chevD','Tout replier',function(){ sections.forEach(function(s){ etat[s.titre]=true; }); render(); },'sommaire-replier');
@@ -365,15 +351,13 @@ function organiserSections(conteneur, cle, avecEtape){
     });
   }
 
-  // 3. Passage à l'étape suivante
-  if(etape){
-    var suiv=ETAPES[ETAPES.indexOf(etape)+1];
-    if(suiv && vuesPermises(suiv).length){
-      var bs=add(boite,'button','sec-suivante'); bs.type='button'; fk(bs,'panneau-suivante');
-      var tx=add(bs,'span'); add(tx,'span','sec-suivante-lab','Étape suivante'); add(tx,'span','sec-suivante-nom',suiv.lab);
-      var fl=add(bs,'span','sec-suivante-ic'); icon(fl,'chevR');
-      bs.addEventListener('click',function(){ go(vuesPermises(suiv)[0]); });
-    }
+  // 2. Passage à l'étape suivante : sur grand écran, il remplace celui du pied de page (masqué par la feuille de style)
+  if(suiv){
+    var bs=add(boite,'button','sec-suivante'); bs.type='button'; fk(bs,'panneau-suivante');
+    var tx=add(bs,'span'); add(tx,'span','sec-suivante-lab','Étape suivante'); add(tx,'span','sec-suivante-nom',suiv.lab);
+    var fl=add(bs,'span','sec-suivante-ic'); icon(fl,'chevR');
+    bs.addEventListener('click',function(){ go(vuesPermises(suiv)[0]); });
+    document.getElementById('main').classList.add('suivante-panneau');
   }
 
   function actif(i){
