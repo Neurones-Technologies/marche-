@@ -77,6 +77,11 @@ app.use((req, res, next) => {
   res.sendFile(path.join(__dirname, '..', 'public', page));
 });
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'], setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
+// Portail des partenaires : inscription d'une entreprise prestataire, à part de la page de connexion.
+app.get('/portail-partenaires', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, '..', 'public', 'portail.html'));
+});
 // Adresses de l'interface (/demandes-achat, /appels-offres/p1/cahier-des-charges…) : la même page, qui lit
 // l'adresse pour ouvrir le bon écran. Un chemin avec une extension reste un fichier (404 s'il manque).
 app.get(/^\/(?!api\/)[^.]*$/, (req, res) => {

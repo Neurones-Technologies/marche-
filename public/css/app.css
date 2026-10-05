@@ -863,3 +863,7 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
   @page { margin: var(--print-margin); }
 }
 .nowrap { white-space: nowrap; }
+/* Paramètres : adresse du portail des partenaires */
+.portail-lien { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-tile); }
+.portail-lien a { font-family: ui-monospace, Consolas, monospace; font-size: 14px; color: var(--color-brand-text); overflow-wrap: anywhere; }
+.portail-lien .btn { margin-left: auto; }

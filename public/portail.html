@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Portail des partenaires — Marché+</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/plateforme.css">
+</head>
+<body class="pt">
+<header class="pf-tete">
+  <a class="pf-marque" href="/portail-partenaires" aria-label="Portail des partenaires">
+    <svg class="pf-logo" viewBox="0 0 120 120" aria-hidden="true"><path class="logo-forme" d="M44 16 H100 A10 10 0 0 1 110 26 V94 A10 10 0 0 1 100 104 H44 L10 60 Z"/><circle class="logo-trou" cx="38" cy="60" r="7"/><path class="logo-trait" d="M56 60 L70 75 L96 45"/></svg>
+    <span>Marché<span class="pf-plus">+</span></span>
+  </a>
+  <span class="pt-org" data-org></span>
+  <div class="pf-tete-actions">
+    <span class="pt-deja">Déjà partenaire ?</span>
+    <a class="btn btn-ghost btn-sm" href="/">Se connecter</a>
+  </div>
+</header>
+
+<main class="pt-corps">
+  <section class="pt-texte">
+    <span class="pf-badge"><span class="pf-point"></span>Portail des partenaires</span>
+    <h1>Devenez partenaire de <span class="pf-degrade" data-org>notre organisation</span></h1>
+    <p class="pf-chapeau">Inscrivez votre entreprise pour constituer votre dossier de référencement, répondre aux appels d’offres et suivre vos commandes, au même endroit.</p>
+    <ul class="pt-atouts">
+      <li><span class="pt-ic"><svg viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+        <div><strong>Votre dossier de référencement en ligne</strong><small>Déposez vos pièces administratives une fois, mettez-les à jour quand elles expirent.</small></div></li>
+      <li><span class="pt-ic"><svg viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg></span>
+        <div><strong>Les appels d’offres qui vous concernent</strong><small>Consultez les dossiers, posez vos questions, déposez votre offre avant la date limite.</small></div></li>
+      <li><span class="pt-ic"><svg viewBox="0 0 24 24"><path d="M2 6h12v10H2zM14 10h4l3 3v3h-7"/><circle cx="6" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span>
+        <div><strong>Vos commandes et vos livraisons</strong><small>Bons de commande, avenants, réceptions : vous suivez tout, sans relance.</small></div></li>
+    </ul>
+    <ol class="pt-etapes" aria-label="Les étapes">
+      <li><span>1</span>Créez le compte de votre entreprise</li>
+      <li><span>2</span>Confirmez votre courriel</li>
+      <li><span>3</span>Complétez votre dossier : le service des achats le valide</li>
+    </ol>
+  </section>
+
+  <section class="pf-carte pt-carte" aria-labelledby="signup-t">
+    <!-- Le compte reste inactif jusqu'à la vérification du courriel. Le champ « site » est un piège à robots. -->
+    <form id="signup-form" novalidate>
+      <h2 id="signup-t">Inscrire mon entreprise</h2>
+      <fieldset>
+        <legend>Votre entreprise</legend>
+        <label for="su-rs">Raison sociale</label>
+        <input id="su-rs" type="text" autocomplete="organization" maxlength="200" required>
+        <label for="su-pays">Pays d’établissement</label>
+        <select id="su-pays" required>
+          <option value="CI">Côte d’Ivoire</option><option value="BF">Burkina Faso</option><option value="BJ">Bénin</option>
+          <option value="GW">Guinée-Bissau</option><option value="ML">Mali</option><option value="NE">Niger</option>
+          <option value="SN">Sénégal</option><option value="TG">Togo</option><option value="CM">Cameroun</option>
+          <option value="GH">Ghana</option><option value="GN">Guinée</option><option value="MA">Maroc</option>
+          <option value="NG">Nigeria</option><option value="DE">Allemagne</option><option value="BE">Belgique</option>
+          <option value="CN">Chine</option><option value="FR">France</option><option value="US">États-Unis</option>
+        </select>
+        <label for="su-immat">Numéro d’immatriculation (RCCM ou équivalent)</label>
+        <input id="su-immat" type="text" maxlength="80">
+      </fieldset>
+      <fieldset>
+        <legend>Votre contact</legend>
+        <label for="su-nom">Nom et prénom</label>
+        <input id="su-nom" type="text" autocomplete="name" maxlength="120" required>
+        <label for="su-email">Courriel professionnel</label>
+        <input id="su-email" type="email" autocomplete="email" required>
+        <label for="su-pw">Mot de passe</label>
+        <input id="su-pw" type="password" autocomplete="new-password" required>
+        <div class="pf-aide">10 caractères minimum, avec majuscule, minuscule et chiffre.</div>
+      </fieldset>
+      <div class="pf-piege" aria-hidden="true"><label for="su-site">Site web</label><input id="su-site" type="text" tabindex="-1" autocomplete="off"></div>
+      <div id="su-err" class="pf-message" role="alert" hidden></div>
+      <button class="btn btn-primary btn-grand pf-envoyer" type="submit" id="su-go">Créer le compte</button>
+    </form>
+    <div id="su-fait" class="pf-fait" hidden>
+      <div class="pf-fait-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+      <h2>Vérifiez votre courriel</h2>
+      <p id="su-ok" role="status"></p>
+      <a class="btn btn-ghost" href="/">Aller à la connexion</a>
+    </div>
+    <div id="su-ferme" class="pf-fait" hidden>
+      <div class="pf-fait-ic pt-ferme" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 11h12v10H6z"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+      <h2>Inscription fermée</h2>
+      <p>L’inscription en ligne des partenaires n’est pas ouverte pour le moment. Contactez le service des achats de <span data-org>l’organisation</span>.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="pf-pied">
+  <span>Marché<span class="pf-plus">+</span> — une solution Neurones Technologies</span>
+</footer>
+<script src="/js/portail.js"></script>
+</body>
+</html>

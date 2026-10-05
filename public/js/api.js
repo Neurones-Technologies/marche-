@@ -149,30 +149,7 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('dlg').hidden = true; });
 
-  /* Inscription d'un prestataire, et vérification du courriel par le lien reçu (/?verifier=…). */
-  function basculer(inscription) {
-    $('login-form').hidden = inscription; $('signup-form').hidden = !inscription;
-    setTimeout(function () { $(inscription ? 'su-rs' : 'lg-email').focus(); }, 0);
-  }
-  $('lg-to-signup').addEventListener('click', function () { basculer(true); });
-  $('su-to-login').addEventListener('click', function () { basculer(false); });
-  $('signup-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var b = $('su-go'), er = $('su-err'), okb = $('su-ok'); b.disabled = true; er.hidden = true; okb.hidden = true;
-    api('POST', '/api/inscription', { raisonSociale: $('su-rs').value, pays: $('su-pays').value, immatriculation: $('su-immat').value,
-      nom: $('su-nom').value, email: $('su-email').value, motDePasse: $('su-pw').value, site: $('su-site').value })
-      .then(function (r) {
-        okb.hidden = false; okb.textContent = r.message;
-        if (r.lienVerification) { // hors production uniquement : les courriels ne sont pas envoyés
-          okb.appendChild(document.createElement('br'));
-          okb.appendChild(document.createTextNode('Démonstration — lien de vérification : '));
-          var a = document.createElement('a'); a.href = r.lienVerification; a.textContent = 'activer le compte'; okb.appendChild(a);
-        }
-        $('su-pw').value = '';
-      })
-      .catch(function (err) { er.hidden = false; er.textContent = err.message; })
-      .then(function () { b.disabled = false; });
-  });
+  /* Vérification du courriel d'un partenaire inscrit sur le portail (/portail-partenaires), par le lien reçu (/?verifier=…). */
   var jeton = (location.search.match(/[?&]verifier=([0-9a-f]{64})/) || [])[1];
   if (jeton) {
     history.replaceState(null, '', location.pathname); // le jeton ne reste ni dans la barre d'adresse ni dans l'historique

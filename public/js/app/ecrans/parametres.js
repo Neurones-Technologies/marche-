@@ -283,5 +283,12 @@ function vParamsInscription(m,o){
   var p=add(b,'button','pill'+(ouverte?' on':''), ouverte?'Inscription ouverte':'Inscription fermée'); fk(p,'par-inscription');
   p.setAttribute('aria-pressed',ouverte?'true':'false');
   p.addEventListener('click',function(){ o.inscriptionOuverte=!ouverte; logit('Inscription en ligne des prestataires '+(ouverte?'fermée':'ouverte')); save(); render(); });
-  add(b,'p','muted','Ouverte, un prestataire crée lui-même le compte de son entreprise depuis l\u2019écran de connexion ; le compte n\u2019est actif qu\u2019après vérification de son courriel. Fermée, seuls les comptes créés par l\u2019administrateur existent.').style.marginTop='10px';
+  add(b,'p','muted','Ouverte, un prestataire crée lui-même le compte de son entreprise sur le portail des partenaires ; le compte n\u2019est actif qu\u2019après vérification de son courriel. Fermée, le portail l\u2019indique et seuls les comptes créés par l\u2019administrateur existent.').style.marginTop='10px';
+  // adresse du portail, à communiquer aux prestataires (elle n'apparaît pas sur la page de connexion)
+  var lien=location.origin+'/portail-partenaires';
+  var l=add(b,'div','portail-lien');
+  add(l,'span','muted','Portail des partenaires');
+  var a=add(l,'a','',lien.replace(/^https?:\/\//,'')); a.href=lien; a.target='_blank'; a.rel='noopener';
+  var c=add(l,'button','btn btn-ghost btn-sm','Copier le lien'); c.type='button';
+  c.addEventListener('click',function(){ (navigator.clipboard?navigator.clipboard.writeText(lien):Promise.reject()).then(function(){ toast('Lien du portail copié.'); },function(){ toast(lien); }); });
 }

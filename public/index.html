@@ -65,55 +65,10 @@
     <div id="lg-err" class="lg-err" role="alert" hidden></div>
     <button class="btn btn-primary" type="submit" id="lg-go">Connecter</button>
     <div id="lg-ok" class="lg-ok" role="status" hidden></div>
-    <button class="lg-switch" type="button" id="lg-to-signup">Prestataire : inscrire mon entreprise</button>
     <details class="lg-demo" id="lg-demo" hidden>
       <summary>Comptes de démo</summary>
       <div id="lg-demo-list"></div>
     </details>
-  </form>
-  <!-- Inscription d'un prestataire : seule page utilisable sans compte. Le compte reste inactif jusqu'à la
-       vérification du courriel. Le champ « site » est un piège à robots, invisible pour une personne. -->
-  <form id="signup-form" class="login-card" novalidate hidden>
-    <div class="login-brand"><svg class="login-mark" viewBox="0 0 120 120" aria-hidden="true" focusable="false"><path class="logo-forme" d="M44 16 H100 A10 10 0 0 1 110 26 V94 A10 10 0 0 1 100 104 H44 L10 60 Z"/><circle class="logo-trou" cx="38" cy="60" r="7"/><path class="logo-trait" d="M56 60 L70 75 L96 45"/></svg><span class="logo-mot">Marché<span class="logo-plus">+</span></span></div>
-    <h1 id="signup-t">Inscrire mon entreprise</h1>
-    <p class="lg-note">Créez le compte de votre entreprise pour constituer votre dossier de référencement et répondre aux appels d’offres.</p>
-    <label for="su-rs">Raison sociale</label>
-    <input id="su-rs" type="text" autocomplete="organization" maxlength="200" required>
-    <label for="su-pays">Pays d’établissement</label>
-    <select id="su-pays" required>
-      <option value="CI">Côte d’Ivoire</option>
-      <option value="BF">Burkina Faso</option>
-      <option value="BJ">Bénin</option>
-      <option value="GW">Guinée-Bissau</option>
-      <option value="ML">Mali</option>
-      <option value="NE">Niger</option>
-      <option value="SN">Sénégal</option>
-      <option value="TG">Togo</option>
-      <option value="CM">Cameroun</option>
-      <option value="GH">Ghana</option>
-      <option value="GN">Guinée</option>
-      <option value="MA">Maroc</option>
-      <option value="NG">Nigeria</option>
-      <option value="DE">Allemagne</option>
-      <option value="BE">Belgique</option>
-      <option value="CN">Chine</option>
-      <option value="FR">France</option>
-      <option value="US">États-Unis</option>
-    </select>
-    <label for="su-immat">Numéro d’immatriculation (RCCM ou équivalent)</label>
-    <input id="su-immat" type="text" maxlength="80">
-    <label for="su-nom">Nom du contact</label>
-    <input id="su-nom" type="text" autocomplete="name" maxlength="120" required>
-    <label for="su-email">Courriel professionnel</label>
-    <input id="su-email" type="email" autocomplete="email" required>
-    <label for="su-pw">Mot de passe</label>
-    <input id="su-pw" type="password" autocomplete="new-password" required>
-    <small class="lg-note">10 caractères minimum, avec majuscule, minuscule et chiffre.</small>
-    <div class="lg-hp" aria-hidden="true"><label for="su-site">Site web</label><input id="su-site" type="text" tabindex="-1" autocomplete="off"></div>
-    <div id="su-err" class="lg-err" role="alert" hidden></div>
-    <div id="su-ok" class="lg-ok" role="status" hidden></div>
-    <button class="btn btn-primary" type="submit" id="su-go">Créer le compte</button>
-    <button class="lg-switch" type="button" id="su-to-login">J’ai déjà un compte : me connecter</button>
   </form>
 </div>
 <div id="dlg" class="dlg" hidden></div>

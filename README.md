@@ -96,7 +96,7 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
   Une commande émise ne se modifie que par avenant motivé, validé et émis sous un numéro dérivé (BC-2026-0001-A1),
   sans supprimer de ligne ni descendre sous les quantités reçues ; les versions antérieures sont conservées.
   Export CSV des commandes émises pour la comptabilité. La facture et le paiement restent dans l'ERP.
-- **Référencement des partenaires** : un prestataire crée le compte de son entreprise depuis l'écran de connexion
+- **Référencement des partenaires** : un prestataire crée le compte de son entreprise sur le portail des partenaires (`/portail-partenaires`, hors de la page de connexion)
   (limitation par adresse IP, champ piège, pas d'énumération des comptes, compte inactif jusqu'à la vérification du
   courriel), dépose ses pièces administratives et soumet son dossier au parcours de référencement de l'organisation.
   Une pièce validée et en cours de validité tient lieu de pièce du dossier à chaque dépôt d'offre ; en achats privés,
