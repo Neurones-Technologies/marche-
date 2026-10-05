@@ -4,7 +4,9 @@
 const R = require('../public/js/regles.js');
 const P = require('../public/js/profils.js');
 const C = require('../public/js/circuits.js');
-const { seed, frDate } = require('./db');
+const { seed, frDate, db } = require('./db');
+// rôles dont la plateforme a besoin : l'administrateur initial et le compte des prestataires inscrits en ligne
+const ROLES_SYSTEME = ['admin', 'soum'];
 
 // clé d'état -> habilitations (au moins une requise). '*' = tout utilisateur connecté.
 // recours.handle figure sur evalDone, approvals et standstill pour le seul cas du recours déclaré fondé.
@@ -306,6 +308,21 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       // un administrateur ne peut pas se retirer le droit de gérer les rôles
       const mine = value[req.user.role];
       if (!mine || !(mine.perms || {})['roles.edit']) return 'Vous ne pouvez pas retirer à votre propre rôle la gestion des habilitations.';
+      // identifiant, libellé obligatoire et unique
+      const libelles = new Set();
+      for (const [id, r] of Object.entries(value)) {
+        if (!/^[a-z][a-z0-9-]{1,39}$/.test(id)) return 'Identifiant de rôle invalide.';
+        const lab = r && typeof r.lab === 'string' ? r.lab.trim() : '';
+        if (!lab || lab.length > 80) return 'Chaque rôle doit avoir un libellé (80 caractères au plus).';
+        if (libelles.has(lab.toLowerCase())) return `Deux rôles portent le libellé « ${lab} ».`;
+        libelles.add(lab.toLowerCase());
+      }
+      // un rôle supprimé ne doit plus servir
+      for (const id of Object.keys(stored('roles') || {})) {
+        if (value[id]) continue;
+        if (ROLES_SYSTEME.includes(id)) return 'Ce rôle est utilisé par la plateforme : il peut être renommé, pas supprimé.';
+        if (db.prepare('SELECT 1 FROM users WHERE role=? LIMIT 1').get(id)) return 'Ce rôle est encore attribué à des comptes : changez d’abord leur rôle.';
+      }
       break;
     }
     case 'users': {

@@ -111,6 +111,11 @@ function vRoles(m){
 
   var rk=Object.keys(state.roles);
 
+  var barre=add(m,'div','roles-barre');
+  add(barre,'span','muted',rk.length+' rôles');
+  var bn=add(barre,'button','btn btn-primary btn-sm'); icon(bn,'plus'); bn.appendChild(document.createTextNode('Nouveau rôle')); fk(bn,'role-nouveau');
+  bn.addEventListener('click',nouveauRole);
+
   var g=add(m,'div','roles-grille');
   rk.forEach(function(r){
     var R_=state.roles[r], membres=state.users.filter(function(u){ return u.role===r; });
@@ -119,6 +124,7 @@ function vRoles(m){
     var t=add(k,'div','role-tete');
     icon(add(t,'span','role-ic'),'key');
     var tt=add(t,'div'); add(tt,'h3',null,R_.lab); add(tt,'div','muted',nb+' habilitation'+(nb>1?'s':'')+' sur '+PERMS.length);
+    boutonIcone(t,'edit','Renommer ou supprimer le rôle « '+R_.lab+' »',function(){ modifierRole(r); },'role-modifier-'+r).classList.add('role-modifier');
     var jauge=add(k,'div','role-jauge'); var jr=add(jauge,'span'); jr.style.width=Math.round(100*nb/PERMS.length)+'%';
     jauge.setAttribute('role','img'); jauge.setAttribute('aria-label',nb+' habilitations sur '+PERMS.length);
     var mb=add(k,'div','role-membres');
@@ -136,6 +142,81 @@ function vRoles(m){
     var pied=add(k,'div','role-pied');
     var b=add(pied,'button','btn btn-ghost btn-sm','Habilitations'); fk(b,'role-'+r);
     b.addEventListener('click',function(){ ouvrirHabilitations(r); });
+  });
+}
+
+/* Rôles dont la plateforme a besoin (administrateur initial, prestataires inscrits en ligne) : renommables, pas
+   supprimables. Le serveur applique la même règle. */
+var ROLES_SYSTEME = ['admin','soum'];
+/* Identifiant d'un nouveau rôle, tiré de son libellé : « Contrôle de gestion » → « controle-de-gestion ». */
+function idRole(lab){
+  var b=String(lab).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,34);
+  if(!/^[a-z]/.test(b)) b='role-'+b;
+  if(b.length<2) b='role';
+  var id=b, n=2; while(state.roles[id]){ id=b+'-'+n; n++; }
+  return id;
+}
+/* Libellé de rôle : obligatoire, 80 caractères au plus, différent de ceux des autres rôles. */
+function erreurLibelle(lab, sauf){
+  lab=String(lab||'').trim();
+  if(!lab) return 'Le libellé est obligatoire.';
+  if(lab.length>80) return 'Le libellé fait 80 caractères au plus.';
+  var pris=Object.keys(state.roles).some(function(r){ return r!==sauf && state.roles[r].lab.trim().toLowerCase()===lab.toLowerCase(); });
+  return pris ? 'Un autre rôle porte déjà ce libellé.' : null;
+}
+
+/* Fenêtre « Nouveau rôle » : libellé, et habilitations de départ copiées d'un rôle existant (ou aucune). */
+function nouveauRole(){
+  ouvrirFenetre('Nouveau rôle', function(c,p){
+    var d1=add(c,'div','fen-champ'); add(d1,'label','fen-lab','Libellé').htmlFor='role-lab';
+    var lab=add(d1,'input'); lab.type='text'; lab.id='role-lab'; lab.maxLength=80; lab.placeholder='Ex. Contrôle de gestion'; fk(lab,'role-lab');
+    var d2=add(c,'div','fen-champ'); add(d2,'label','fen-lab','Habilitations de départ').htmlFor='role-modele';
+    var mod=add(d2,'select'); mod.id='role-modele'; fk(mod,'role-modele');
+    add(mod,'option',null,'Aucune (à régler ensuite)').value='';
+    Object.keys(state.roles).forEach(function(r){ add(mod,'option',null,'Copier « '+state.roles[r].lab+' »').value=r; });
+    add(c,'p','muted','Le rôle est créé tout de suite ; ses habilitations s’ouvrent ensuite pour être ajustées.').style.marginTop='12px';
+    var an=add(p,'button','btn btn-ghost','Annuler'); an.addEventListener('click',fermerFenetre);
+    var ok=add(p,'button','btn btn-primary','Créer le rôle'); fk(ok,'role-creer');
+    ok.addEventListener('click',function(){
+      var err=erreurLibelle(lab.value); if(err){ toast(err); lab.focus(); return; }
+      var id=idRole(lab.value.trim());
+      var perms = mod.value ? JSON.parse(JSON.stringify(state.roles[mod.value].perms)) : permsDef([]);
+      state.roles[id]={ lab:lab.value.trim(), perms:perms };
+      logit('Rôle créé — '+lab.value.trim());
+      save(); render(); ouvrirHabilitations(id);
+    });
+  });
+}
+
+/* Fenêtre « Modifier le rôle » : renommer ; supprimer s'il n'a aucun membre et n'est pas un rôle de la plateforme. */
+function modifierRole(r){
+  ouvrirFenetre(function(){ return 'Rôle — '+((state.roles[r]||{}).lab||r); }, function(c,p){
+    var R_=state.roles[r]; if(!R_) return false;
+    var membres=state.users.filter(function(u){ return u.role===r; });
+    var d1=add(c,'div','fen-champ'); add(d1,'label','fen-lab','Libellé').htmlFor='role-renommer';
+    var lab=add(d1,'input'); lab.type='text'; lab.id='role-renommer'; lab.maxLength=80; lab.value=R_.lab; fk(lab,'role-renommer');
+    add(c,'p','muted', membres.length ? membres.length+' compte(s) ont ce rôle : '+membres.map(function(u){ return u.nom; }).join(', ')+'.' : 'Aucun compte n’a ce rôle.').style.marginTop='12px';
+    var raison = ROLES_SYSTEME.indexOf(r)>=0 ? 'Ce rôle est utilisé par la plateforme : il peut être renommé, pas supprimé.'
+      : (membres.length ? 'Changez d’abord le rôle des comptes qui l’ont.' : null);
+    var sup=add(p,'button','btn btn-danger','Supprimer'); fk(sup,'role-supprimer'); sup.style.marginRight='auto';
+    if(raison){ sup.disabled=true; sup.title=raison; }
+    sup.addEventListener('click',function(){
+      ask('Le rôle « '+R_.lab+' » sera supprimé, et retiré des destinataires des alertes.', function(){
+        delete state.roles[r];
+        Object.keys(state.notifRules||{}).forEach(function(e){ var x=state.notifRules[e].roles, i=x.indexOf(r); if(i>=0) x.splice(i,1); });
+        logit('Rôle supprimé — '+R_.lab);
+        fermerFenetre(); save(); render();
+      }, 'Supprimer le rôle « '+R_.lab+' » ?', 'Supprimer');
+    });
+    var an=add(p,'button','btn btn-ghost','Annuler'); an.addEventListener('click',fermerFenetre);
+    var ok=add(p,'button','btn btn-primary','Enregistrer'); fk(ok,'role-enregistrer');
+    ok.addEventListener('click',function(){
+      var v=lab.value.trim();
+      if(v===R_.lab){ fermerFenetre(); return; }
+      var err=erreurLibelle(v,r); if(err){ toast(err); lab.focus(); return; }
+      logit('Rôle renommé — '+R_.lab+' → '+v);
+      R_.lab=v; fermerFenetre(); save(); render();
+    });
   });
 }
 

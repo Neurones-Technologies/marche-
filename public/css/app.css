@@ -190,6 +190,11 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 .etat-point.off { color: var(--color-text-2); } .etat-point.off::before { background: var(--color-text-3); }
 .acces-ligne { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; }
 .acces-ligne + .acces-ligne { border-top: var(--border-w) solid var(--color-border); }
+.roles-barre { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.roles-barre .btn { display: inline-flex; align-items: center; gap: var(--space-1); }
+.role-tete > div { flex: 1 1 auto; min-width: 0; }
+.role-tete .role-modifier { flex: 0 0 auto; border-color: transparent; background: none; }
+.role-tete .role-modifier:hover { background: var(--color-bg); border-color: var(--color-border); }
 .roles-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-4); }
 .role-carte { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); transition: box-shadow .2s, transform .2s; }
 .role-carte:hover { box-shadow: var(--shadow-overlay); transform: translateY(-2px); }

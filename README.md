@@ -49,7 +49,8 @@ Organisation de l'interface (menu) :
   sont en tableaux (recherche, filtres, pagination, bouton « + ») et le détail d'une ligne s'ouvre dans une fenêtre :
   question et réponse, pli reçu, vérification d'une offre, pièces et signaux d'un soumissionnaire, clarification,
   notation, recours. Un tableau vide n'affiche ni recherche, ni filtres, ni pagination.
-- **Administration** : « Utilisateurs et accès » (onglets Comptes et Rôles), « Audit » (journal de toute l'instance :
+- **Administration** : « Utilisateurs et accès » (onglets Comptes et Rôles ; un rôle se crée, se renomme, et se
+  supprime s'il n'a plus de membre — « admin » et « soum », dont la plateforme a besoin, se renomment seulement), « Audit » (journal de toute l'instance :
   date, auteur, action, procédure, adresse IP, avec l'état de la chaîne d'empreintes), paramètres, alertes.
 
 Le bouton « + » d'un tableau ouvre le formulaire de création dans une fenêtre. Un détail (besoin, commande,
