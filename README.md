@@ -38,6 +38,9 @@ Organisation de l'interface (menu) :
   la page d'accueil de la plateforme (raison sociale, type d'acheteur, adresse `<entreprise>.<domaine>`, administrateur),
   confirme son courriel et y entre connectée. Une base et un dossier de pièces par espace ; une session ne vaut que
   dans son espace ; la réinitialisation n'existe que dans l'espace de démonstration. Voir deploiement/DEPLOIEMENT.md.
+- **Console de la plateforme** (`/console` à l'adresse de la plateforme) : les opérateurs Neurones Technologies acceptent
+  ou refusent les inscriptions, créent un espace à la main, suspendent, réactivent ou suppriment un espace, voient
+  l'activité de chacun (comptes, prestataires, appels d'offres, dernière connexion) et le journal des actions.
 - **Adresses** : chaque écran a son adresse (/demandes-achat, /execution/<commande>, /appels-offres/<procédure>/
   cahier-des-charges…) ; Précédent et Suivant du navigateur fonctionnent, et un lien copié ouvre le bon écran, après
   la connexion s'il le faut.

@@ -25,6 +25,12 @@ services:
       # Plateforme multi-entreprises (voir deploiement/DEPLOIEMENT.md) : vide = un seul client, comme avant
       PLATEFORME_DOMAINE: ${PLATEFORME_DOMAINE:-}
       ESPACE_INITIAL: ${ESPACE_INITIAL:-demo}
+      # Ouverture des espaces : accord d'un opérateur dans la console (défaut) ou « auto » dès la confirmation du courriel
+      PLATEFORME_VALIDATION: ${PLATEFORME_VALIDATION:-}
+      # Premier opérateur de la console (https://<domaine>/console), créé au démarrage s'il n'en existe aucun
+      CONSOLE_EMAIL: ${CONSOLE_EMAIL:-}
+      CONSOLE_NOM: ${CONSOLE_NOM:-}
+      CONSOLE_MOT_DE_PASSE: ${CONSOLE_MOT_DE_PASSE:-}
       MAIL_MODE: ${MAIL_MODE:-simule}
       M365_TENANT_ID: ${M365_TENANT_ID:-}
       M365_CLIENT_ID: ${M365_CLIENT_ID:-}

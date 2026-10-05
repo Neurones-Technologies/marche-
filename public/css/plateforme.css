@@ -211,3 +211,12 @@ main { overflow-x: clip; }
   .pf-creer { padding: 40px 20px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } html { scroll-behavior: auto; } .pf-fenetre { transform: none; } }
+
+/* Pages seules : « espace introuvable », « espace suspendu » */
+.pf-seul { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+  background: radial-gradient(600px 400px at 85% 10%, rgba(224, 106, 44, .18), transparent 70%), var(--color-bg); }
+.pf-seul .pf-carte { max-width: 520px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; border: 1px solid var(--color-border); box-shadow: 0 30px 70px -24px rgba(60, 40, 20, .3); }
+.pf-seul h1 { font-size: 26px; letter-spacing: -0.02em; }
+.pf-seul p { color: var(--color-text-2); }
+.pf-seul-ic { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--color-brand-soft); }
+.pf-seul-ic svg { width: 28px; height: 28px; fill: none; stroke: var(--color-brand-text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

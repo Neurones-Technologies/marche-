@@ -1,6 +1,7 @@
 /* Plateforme multi-entreprises : création d'un espace en libre-service, arrivée connectée, isolement des espaces.
    L'hôte de chaque requête est donné par X-Forwarded-Host (« trust proxy »), comme derrière nginx. */
 process.env.PLATEFORME_DOMAINE = 'plateforme.test';
+process.env.PLATEFORME_VALIDATION = 'auto'; // ouverture dès la confirmation ; la validation par un opérateur : console.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { base } = require('./_client');

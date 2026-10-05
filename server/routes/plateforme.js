@@ -20,6 +20,9 @@ const limite = rateLimit({ windowMs: 3600000, limit: Number(process.env.PLATEFOR
 /* Seule l'adresse de la plateforme répond ici. */
 r.use((req, res, next) => (req.plateforme ? next() : err(res, 404, 'NOT_PLATFORM', 'Route inconnue.')));
 
+/** Mode d'ouverture des espaces : après l'accord d'un opérateur (par défaut), ou dès la confirmation du courriel. */
+r.get('/infos', (req, res) => res.json({ validation: E.validationManuelle() ? 'manuelle' : 'auto' }));
+
 /** Disponibilité d'un sous-domaine. */
 r.get('/disponible', (req, res) => {
   const s = String(req.query.slug || '').trim().toLowerCase();
@@ -49,14 +52,26 @@ r.post('/espaces', limite, (req, res) => {
     corps: `Bonjour ${adminNom},\n\nPour créer l’espace Marché+ de ${nom} à l’adresse ${E.adresse(slug)}, confirmez votre courriel en ouvrant ce lien dans les 48 heures :\n${lien}\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message.` })
     .catch((e) => console.error('Courriel de confirmation', e));
   // sans envoi réel des courriels, le lien est rendu pour pouvoir avancer (démonstration)
-  res.status(201).json({ ok: true, adresse: E.adresse(slug), courriel: email, ...(mail.actif() ? {} : { lien }) });
+  res.status(201).json({ ok: true, adresse: E.adresse(slug), courriel: email, validation: E.validationManuelle() ? 'manuelle' : 'auto', ...(mail.actif() ? {} : { lien }) });
 });
 
-/** Confirmation : l'espace est créé et l'administrateur y entre, connecté. */
+/** Confirmation du courriel : l'inscription attend l'accord d'un opérateur, prévenu par courriel ; en mode « auto »,
+    l'espace est créé et l'administrateur y entre, connecté. */
 r.get('/confirmer', (req, res) => {
   const d = E.confirmer(req.query.jeton);
   if (!d) return res.redirect(E.adressePlateforme() + '/?confirmation=invalide');
   if (E.espace(d.slug)) return res.redirect(E.adressePlateforme() + '/?confirmation=prise');
+  if (E.validationManuelle()) {
+    const id = E.inscrire(d.slug, d.data);
+    const ops = E.registre().prepare('SELECT email FROM operateurs WHERE actif=1').all().map((o) => o.email);
+    if (ops.length) {
+      mail.envoyer({ a: ops, objet: 'Nouvelle demande d’espace : ' + d.data.nom,
+        corps: `${d.data.nom} (${d.data.pays || 'pays non précisé'}) demande l’espace ${E.adresse(d.slug)}.\nAdministrateur : ${d.data.admin.nom} <${d.data.admin.email}>.\n\nÀ examiner dans la console : ${E.adressePlateforme()}/console` })
+        .catch((e) => console.error('Courriel aux opérateurs', e));
+    }
+    E.journaliser(d.data.admin.nom + ' — inscription en ligne', `Demande n° ${id} reçue — ${d.data.nom} (${d.slug})`);
+    return res.redirect(E.adressePlateforme() + '/?confirmation=attente');
+  }
   const e = E.creer(d.data);
   const brut = E.dans(e, () => {
     auditAppend('u0', d.data.admin.nom + ' — inscription en ligne', `Espace créé — ${d.data.nom} (${e.slug})`);

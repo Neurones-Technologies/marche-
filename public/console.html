@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Console — Marché+</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/plateforme.css">
+<link rel="stylesheet" href="/css/console.css">
+</head>
+<body class="cs">
+<!-- Connexion -->
+<main id="cs-connexion" class="cs-connexion" hidden>
+  <form class="cs-login" id="cs-login" novalidate>
+    <div class="pf-marque">
+      <svg class="pf-logo" viewBox="0 0 120 120" aria-hidden="true"><path class="logo-forme" d="M44 16 H100 A10 10 0 0 1 110 26 V94 A10 10 0 0 1 100 104 H44 L10 60 Z"/><circle class="logo-trou" cx="38" cy="60" r="7"/><path class="logo-trait" d="M56 60 L70 75 L96 45"/></svg>
+      <span>Marché<span class="pf-plus">+</span></span>
+    </div>
+    <h1>Console de la plateforme</h1>
+    <p class="cs-sous">Réservée aux opérateurs Neurones Technologies.</p>
+    <div id="cs-login-erreur" class="pf-message" role="alert" hidden></div>
+    <label for="cs-email">Courriel</label>
+    <input id="cs-email" type="email" autocomplete="username" required>
+    <label for="cs-mdp">Mot de passe</label>
+    <input id="cs-mdp" type="password" autocomplete="current-password" required>
+    <button class="btn btn-primary btn-grand pf-envoyer" type="submit">Se connecter</button>
+  </form>
+</main>
+
+<!-- Console -->
+<div id="cs-app" hidden>
+  <header class="cs-tete">
+    <a class="pf-marque" href="/console">
+      <svg class="pf-logo" viewBox="0 0 120 120" aria-hidden="true"><path class="logo-forme" d="M44 16 H100 A10 10 0 0 1 110 26 V94 A10 10 0 0 1 100 104 H44 L10 60 Z"/><circle class="logo-trou" cx="38" cy="60" r="7"/><path class="logo-trait" d="M56 60 L70 75 L96 45"/></svg>
+      <span>Marché<span class="pf-plus">+</span></span>
+      <span class="cs-etiquette">Console</span>
+    </a>
+    <nav class="cs-onglets" id="cs-onglets" aria-label="Sections">
+      <button type="button" data-onglet="demandes">Demandes<span class="cs-pastille" id="cs-nb-attente" hidden></span></button>
+      <button type="button" data-onglet="espaces">Espaces</button>
+      <button type="button" data-onglet="operateurs">Opérateurs</button>
+      <button type="button" data-onglet="journal">Journal</button>
+    </nav>
+    <div class="cs-moi">
+      <button type="button" class="cs-avatar" id="cs-moi" aria-haspopup="menu" aria-expanded="false"></button>
+      <div class="cs-menu" id="cs-menu" role="menu" hidden>
+        <div class="cs-menu-tete" id="cs-menu-tete"></div>
+        <button type="button" role="menuitem" data-action="mot-de-passe">Changer mon mot de passe</button>
+        <button type="button" role="menuitem" data-action="deconnexion">Se déconnecter</button>
+      </div>
+    </div>
+  </header>
+  <main class="cs-corps">
+    <section class="cs-chiffres" id="cs-chiffres" aria-label="Vue d’ensemble"></section>
+    <div id="cs-avis" class="cs-avis" hidden></div>
+    <section id="cs-vue"></section>
+  </main>
+</div>
+
+<dialog id="cs-fenetre" class="cs-fenetre" aria-labelledby="cs-fenetre-titre">
+  <form method="dialog" class="cs-fenetre-tete">
+    <h2 id="cs-fenetre-titre"></h2>
+    <button class="cs-fermer" value="annuler" aria-label="Fermer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </form>
+  <div id="cs-fenetre-corps" class="cs-fenetre-corps"></div>
+</dialog>
+<div id="cs-toast" class="cs-toast" role="status" hidden></div>
+<script src="/js/profils.js"></script>
+<script src="/js/console.js"></script>
+</body>
+</html>

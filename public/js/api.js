@@ -29,6 +29,7 @@
     return fetch(url, opt).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (r.status === 401 && url.indexOf('/api/auth/login') < 0) { showLogin('Session expirée, reconnectez-vous.'); }
+        if (r.status === 403 && j.code === 'SPACE_SUSPENDED') { location.reload(); } // l'espace vient d'être suspendu : sa page le dit
         if (!r.ok) { var e = new Error(j.error || ('Erreur ' + r.status)); e.status = r.status; e.data = j; throw e; }
         return j;
       });

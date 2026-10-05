@@ -12,6 +12,21 @@
   var q = new URLSearchParams(location.search).get('confirmation');
   if (q === 'invalide') message('Ce lien de confirmation n’est plus valable (déjà utilisé, ou plus de 48 heures). Refaites la demande.');
   if (q === 'prise') message('Cette adresse a été prise entre-temps. Choisissez-en une autre.');
+  /* Courriel confirmé, demande en attente de l'accord de l'équipe Neurones Technologies. */
+  function etatFait(titre, texte) {
+    $('pf-form').hidden = true; $('pf-fait').hidden = false;
+    $('pf-fait-titre').textContent = titre; $('pf-fait-texte').textContent = texte;
+  }
+  if (q === 'attente') {
+    etatFait('Demande reçue', 'Votre courriel est confirmé. Notre équipe examine votre demande : vous recevrez un courriel dès l’ouverture de votre espace.');
+    setTimeout(function () { $('creer').scrollIntoView(); }, 50);
+  }
+  /* Ouverture immédiate (sans validation) : le texte de l'étape 3 le dit. */
+  var manuelle = true;
+  fetch('/api/plateforme/infos').then(function (r) { return r.json(); }).then(function (j) {
+    manuelle = j.validation !== 'auto';
+    if (!manuelle) $('pf-etape3').textContent = 'Vous entrez dans votre espace, prêt à l’emploi, et vous invitez votre équipe et vos prestataires.';
+  }).catch(function () {});
 
   /* Adresse proposée d'après la raison sociale, tant qu'elle n'a pas été modifiée à la main. */
   var touchee = false;
@@ -55,10 +70,10 @@
     fetch('/api/plateforme/espaces', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Création impossible.'); return j; }); })
       .then(function (j) {
-        $('pf-form').hidden = true; $('pf-fait').hidden = false;
-        $('pf-fait-texte').textContent = j.lien
-          ? 'Votre espace ' + j.adresse.replace(/^https?:\/\//, '') + ' est prêt à être créé.'
-          : 'Un lien de confirmation a été envoyé à ' + j.courriel + '. Ouvrez-le pour créer votre espace ' + j.adresse.replace(/^https?:\/\//, '') + ' et y entrer.';
+        var adr = j.adresse.replace(/^https?:\/\//, ''), valide = j.validation === 'manuelle';
+        etatFait('Vérifiez votre courriel', j.lien
+          ? 'Confirmez votre courriel pour ' + (valide ? 'transmettre votre demande d’espace ' + adr + ' à notre équipe.' : 'créer votre espace ' + adr + '.')
+          : 'Un lien de confirmation a été envoyé à ' + j.courriel + '. Ouvrez-le pour ' + (valide ? 'transmettre votre demande d’espace ' + adr + ' à notre équipe, qui vous répondra par courriel.' : 'créer votre espace ' + adr + ' et y entrer.'));
         if (j.lien) { var a = $('pf-confirmer'); a.href = j.lien; a.hidden = false; $('pf-demo').hidden = false; }
       })
       .catch(function (err) { message(err.message); b.disabled = false; b.textContent = 'Créer mon espace'; });

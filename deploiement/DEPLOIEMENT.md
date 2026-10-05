@@ -182,6 +182,13 @@ Mise en place, une fois (**sauvegarder le volume avant**) :
 5. **Vérifier** : `https://tenders.neuronestech.com` affiche « Créer votre espace » ; `https://demo.tenders.neuronestech.com`
    ouvre l'installation existante (mêmes comptes).
 
+**Console des opérateurs** : `https://tenders.neuronestech.com/console`. Une inscription en ligne, son courriel
+confirmé, y attend l'accord d'un opérateur (accepter ou refuser avec un motif) ; on y crée aussi un espace à la main,
+on suspend, réactive ou supprime un espace (suppression : espace suspendu d'abord, adresse ressaisie ; jamais l'espace
+`demo`), on gère les opérateurs, et un journal garde chaque action avec l'adresse IP. Le premier opérateur vient du
+.env : `CONSOLE_EMAIL`, `CONSOLE_NOM`, `CONSOLE_MOT_DE_PASSE` (lu une seule fois, quand aucun opérateur n'existe ;
+changer ensuite le mot de passe dans la console). `PLATEFORME_VALIDATION=auto` ouvre les espaces sans validation.
+
 Tant que Microsoft 365 n'est pas configuré (`MAIL_MODE=graph`), le lien de confirmation d'un nouvel espace est
 affiché directement à l'écran au lieu d'être envoyé : n'importe qui peut alors créer un espace. À réserver à la
 démonstration ; configurer les courriels avant d'ouvrir la plateforme au public. Limite :

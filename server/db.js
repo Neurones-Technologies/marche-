@@ -504,9 +504,11 @@ function resetDemo(uid, who) {
 }
 
 principale = ouvrirBase(cfg.dbFile);
+/** Ferme la base d'un espace (avant la suppression de ses fichiers). */
+function fermerBase(fichier) { const c = BASES.get(fichier); if (c && c !== principale) { c.close(); BASES.delete(fichier); } }
 
 module.exports = {
-  ouvrirBase, db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
+  ouvrirBase, fermerBase, db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
   auditAppend, auditList, auditJournal, auditVerify, offersAll, offerInsert, offersReplace,
   commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero,
   partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, jetonCreer, jetonUtiliser,
