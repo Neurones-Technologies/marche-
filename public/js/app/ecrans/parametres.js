@@ -27,6 +27,8 @@ function vParams(m){
   champ(f1,'Initiales (badge)',o.initiales,function(v){ o.initiales=v.slice(0,3).toUpperCase(); });
   champ(f1,'Devise pivot',o.devisePivot,function(v){ o.devisePivot=v.toUpperCase(); },'select',[['XOF','Franc CFA (XOF)'],['XAF','Franc CFA CEMAC (XAF)'],['GHS','Cedi (GHS)'],['NGN','Naira (NGN)']]);
   champ(f1,"Couleur d'accent",o.accent,function(v){ o.accent=v; logit('Couleur d\u2019accent modifiée'); },'color');
+  champ(f1,'Verrouillage après inactivité',String(o.verrouillageMinutes||15),function(v){ o.verrouillageMinutes=Number(v); logit('Verrouillage après '+v+' minutes d\u2019inactivité'); },'select',
+    [['5','5 minutes'],['10','10 minutes'],['15','15 minutes'],['30','30 minutes'],['60','1 heure']]);
 
   var k2=add(m,'div','card'); k2.style.marginTop='18px';
   var ph2=add(k2,'div','panel-head'); add(ph2,'span',null,'2 · Taux de conversion');

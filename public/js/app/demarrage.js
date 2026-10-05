@@ -158,9 +158,11 @@ window.MarchePlus = {
     if(r && (!r.pid || r.pid===MP.pid()) && viewAllowed(r.vue)){ state.view=r.vue; poserDetail(r); saveUI(); }
     else if((opts && opts.fromLogin) || !viewAllowed(state.view) || (!r && location.pathname!=='/')){ state.view=homeView(); state.offerIndex=0; saveUI(); } // adresse inconnue : l'accueil
     UI.remplacerUrl=true;
+    demarrerVerrou(!!(opts && opts.fromLogin)); // verrou.js
     resetBtn.style.display = can('params.edit')||can('roles.edit') ? '' : 'none'; render();
   },
   poll:poll,
+  nouvelleVersion:nouvelleVersion,
   /* Aucune procédure visible (soumissionnaire sans appel d'offres publié) : rien à afficher qu'un message. */
   none:function(user){
     state=null; synced={};

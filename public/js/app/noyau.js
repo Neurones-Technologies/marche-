@@ -134,7 +134,7 @@ function applyServer(payload, keepPending){
 }
 function save(){ saveUI(); dirty=true; if(flushTimer) clearTimeout(flushTimer); flushTimer=setTimeout(flush,250); }
 function flush(){
-  if(flushing || !dirty || !state) return;
+  if(flushing || !dirty || !state || UI.verrouille) return; // session verrouillée : l'envoi attend le déverrouillage
   var changes={}, sent={};
   SYNC_KEYS.forEach(function(k){ if(TARGETED.indexOf(k)>=0) return; var j=JSON.stringify(state[k]); if(j!==synced[k]){ changes[k]=state[k]; sent[k]=j; } });
   dirty=false;
@@ -179,7 +179,8 @@ function poll(){
   return MP.api('GET',MP.url('/state?since='+serverRev)).then(function(p){
     if(p.unchanged) return;
     var ae=document.activeElement;
-    if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest && ae.closest('#main')) return; // ne pas perturber une saisie
+    // ne pas perturber une saisie en cours (la recherche d'un tableau, elle, survit au rendu)
+    if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest && ae.closest('#main') && !ae.classList.contains('dt-recherche') && !ae.closest('.dt-outils')) return;
     applyServer(p,true);
     return MP.refreshProcs().then(render); // une autre procédure a pu être créée, publiée ou archivée
   }).catch(function(){});

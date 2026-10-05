@@ -37,6 +37,10 @@ Organisation de l'interface (menu) :
 - **Adresses** : chaque écran a son adresse (/demandes-achat, /execution/<commande>, /appels-offres/<procédure>/
   cahier-des-charges…) ; Précédent et Suivant du navigateur fonctionnent, et un lien copié ouvre le bon écran, après
   la connexion s'il le faut.
+- **Mises à jour automatiques** : les données se rafraîchissent toutes les 4 s et au retour sur l'onglet ; après une
+  mise à jour de l'application, la page se recharge d'elle-même (ou propose de le faire si une saisie est en cours).
+- **Verrouillage après inactivité** : délai réglé dans Paramètres (15 minutes par défaut) ; la session est fermée
+  côté serveur, l'écran reste en place, le mot de passe le déverrouille. Partagé entre les onglets.
 - **Notifications** : pas de page dédiée. La cloche de la barre du haut compte les non lues et ouvre un panneau
   déroulant ; une notification qui arrive pendant la session s'affiche un instant en bas à droite (« push »).
 - **Accueil** : tableau de bord de l'organisation, avec « À faire pour moi » (les actions qui attendent

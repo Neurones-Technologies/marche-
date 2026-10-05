@@ -348,6 +348,8 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       for (const v of Object.values(value.rates)) if (!(Number(v) > 0)) return 'Taux de change invalide.';
       if (value.profilDefaut != null && !P.existe(value.profilDefaut)) return refus(422, 'PROFILE_UNKNOWN', 'Profil réglementaire inconnu.');
       if (value.reglages != null && !isObj(value.reglages)) return 'Réglages invalides.';
+      if (value.verrouillageMinutes != null && ![5, 10, 15, 30, 60].includes(Number(value.verrouillageMinutes)))
+        return refus(422, 'LOCK_DELAY_INVALID', 'Délai de verrouillage : 5, 10, 15, 30 ou 60 minutes.');
       const errs = P.erreursReglages(R.profilId({ cdc: next('cdc'), org: value }), value.reglages);
       if (errs.length) return refus(422, 'SETTING_OUT_OF_BOUNDS', 'Réglage refusé par le profil réglementaire : ' + errs.map((e) => `${e.regle} (${e.motif})`).join(' ; ') + '.');
       break;

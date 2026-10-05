@@ -2,7 +2,26 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var pollTimer = null;
+  var pollTimer = null, VERSION = null, TOURS = 0;
+  var SONDAGE_MS = 4000; // mise à jour des données : toutes les 4 s, et dès qu'on revient sur l'onglet
+
+  /* Sondage : l'état du serveur, et toutes les 30 s environ la version de l'application (rechargement après mise à
+     jour). Suspendu pendant le verrouillage. */
+  function sonder() {
+    if (!window.MarchePlus) return;
+    window.MarchePlus.poll();
+    if (++TOURS % 8 === 0) verifierVersion();
+  }
+  function verifierVersion() {
+    return api('GET', '/api/version').then(function (r) {
+      if (!VERSION) { VERSION = r.version; return; }
+      if (r.version !== VERSION && window.MarchePlus && window.MarchePlus.nouvelleVersion) window.MarchePlus.nouvelleVersion();
+    }).catch(function () { /* serveur momentanément injoignable */ });
+  }
+  function reprendre() { if (!pollTimer && ME) pollTimer = setInterval(sonder, SONDAGE_MS); }
+  function suspendre() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && pollTimer) sonder(); });
+  window.addEventListener('focus', function () { if (pollTimer) sonder(); });
 
   function api(method, url, body) {
     var opt = { method: method, credentials: 'same-origin', headers: {} };
@@ -57,6 +76,8 @@
     procs: function () { return PROCS; },
     current: function () { return PROCS.filter(function (p) { return p.id === PID; })[0] || null; },
     refreshProcs: loadProcs,
+    moi: function () { return ME; },
+    suspendre: suspendre, reprendre: reprendre,
   };
 
   function showLogin(msg) {
@@ -83,7 +104,8 @@
         var n2 = document.createElement('span'); n2.className = 'usr-role'; n2.textContent = m.user.roleLab; un.appendChild(n2);
         $('usr-av').textContent = m.user.nom.replace(/[^A-Za-zÀ-ÿ ]/g, ' ').split(/\s+/).filter(Boolean).map(function (x) { return x[0]; }).join('').slice(0, 2).toUpperCase();
         return switchTo(choose(), { fromLogin: fromLogin === true }).then(function () {
-          if (!pollTimer) pollTimer = setInterval(function () { window.MarchePlus.poll(); }, 8000);
+          reprendre();
+          if (!VERSION) verifierVersion();
         });
       });
     });

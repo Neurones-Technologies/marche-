@@ -32,6 +32,10 @@ app.use('/api', (req, res, next) => {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !req.is('application/json')) return res.status(415).json({ error: 'JSON requis.' });
   next();
 });
+// Version de l'application : change à chaque démarrage du serveur (ou vaut APP_VERSION). Le navigateur la compare
+// à celle qu'il a chargée et se recharge de lui-même après une mise à jour.
+const VERSION = process.env.APP_VERSION || String(Date.now());
+app.get('/api/version', (req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ version: VERSION }); });
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/files', require('./routes/files').global);
 app.use('/api/procedures', require('./routes/procedures'));

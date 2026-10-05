@@ -212,6 +212,20 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 .dl-circuit[hidden] { display: none; }
 .dl-circuit:has(input:disabled) { color: var(--color-text-2); cursor: not-allowed; }
 .stepline > .chip + .icon-btn, .dt-table td .chip + .icon-btn { margin-left: var(--space-1); }
+/* Verrouillage après inactivité : l'écran reste en place, flouté, sous le panneau. */
+.verrou { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(31, 36, 48, .45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: fen-fond .2s ease both; }
+.verrou-carte { display: flex; flex-direction: column; gap: var(--space-2); width: min(400px, 100%); padding: var(--space-8) var(--space-6) var(--space-6); background: var(--color-surface); border-top: 3px solid var(--color-brand); border-radius: var(--radius); box-shadow: var(--shadow-overlay); text-align: left; animation: fen-entree .25s ease both; }
+.verrou-ic { align-self: center; display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: var(--color-brand-soft); color: var(--color-brand-text); margin-bottom: var(--space-2); }
+.verrou-ic .ic { width: var(--icon-lg); height: var(--icon-lg); }
+.verrou-carte h2 { text-align: center; font-size: var(--fs-title); }
+.verrou-carte > p { text-align: center; font-size: var(--fs-table); margin-bottom: var(--space-2); }
+.verrou-qui { margin: var(--space-2) 0 var(--space-3); padding: var(--space-3); background: var(--color-surface-2); border-radius: var(--radius-sm); }
+.verrou-carte input { width: 100%; }
+.verrou-carte .btn { margin-top: var(--space-3); }
+.verrou-autre { align-self: center; margin-top: var(--space-2); background: none; border: none; font: inherit; font-size: var(--fs-small); color: var(--color-brand-text); text-decoration: underline; cursor: pointer; }
+/* Mise à jour de l'application disponible */
+.maj-bandeau { position: fixed; left: 50%; bottom: var(--space-5); transform: translateX(-50%); z-index: 95; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); background: var(--color-text); color: var(--color-surface); border-radius: var(--radius-pill); box-shadow: var(--shadow-overlay); font-size: var(--fs-table); }
+.maj-ic { display: inline-flex; } .maj-ic .ic { width: var(--icon-sm); height: var(--icon-sm); }
 /* Lien de retour à la liste, en tête d'un détail. */
 .retour { display: inline-flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-3); padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1); background: none; border: none; border-radius: var(--radius-sm); font: inherit; font-size: var(--fs-table); font-weight: var(--fw-strong); color: var(--color-brand-text); cursor: pointer; }
 .retour:hover { background: var(--color-brand-soft); }
