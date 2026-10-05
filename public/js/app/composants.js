@@ -152,7 +152,8 @@ function cadreProcedureHaut(m){
   if(cur && cur.archive){ var na=add(m,'div','note'); add(na,'strong',null,'Procédure archivée. '); na.appendChild(document.createTextNode('Elle se consulte mais ne se modifie plus.')); }
 
   var st=etapesStatut(), etape=etapeDe(state.view);
-  var ol=add(m,'ol','flow'); ol.setAttribute('aria-label','Étapes de la procédure');
+  var bande=add(m,'div','proc-etapes');
+  var ol=add(bande,'ol','flow'); ol.setAttribute('aria-label','Étapes de la procédure');
   ETAPES.forEach(function(e,i){
     var li=add(ol,'li','flow-step '+st[e.id]);
     var vues=vuesPermises(e), b=add(li, vues.length?'button':'span');
@@ -166,7 +167,7 @@ function cadreProcedureHaut(m){
   if(etape){
     var vues=vuesPermises(etape);
     if(vues.length>1){
-      var tabs=add(m,'div','proc-tabs'); tabs.setAttribute('role','tablist');
+      var tabs=add(bande,'div','proc-tabs'); tabs.setAttribute('role','tablist');
       vues.forEach(function(v){
         var def=VIEWS.filter(function(x){ return x.id===v; })[0];
         var bt=add(tabs,'button','pill'+(v===state.view?' on':''),def.label); fk(bt,'onglet-'+v);
@@ -210,12 +211,13 @@ function tableau(parent, o){
   var barre=add(carte,'div','dt-barre');
   if(o.titre) add(barre,'strong','dt-titre',o.titre);
   var outils=add(barre,'div','dt-outils');
-  if(o.recherche){
+  var sansLignes=!o.lignes.length; // tableau vide : ni recherche, ni filtres, ni pagination
+  if(o.recherche && !sansLignes){
     var rq=add(outils,'input','dt-recherche'); rq.type='search'; rq.placeholder='Rechercher…'; rq.value=st.q;
     rq.setAttribute('aria-label','Rechercher dans le tableau'+(o.titre?' « '+o.titre+' »':'')); fk(rq,'dt-q-'+o.cle);
     rq.addEventListener('input',function(){ st.q=rq.value; st.page=0; dessiner(); });
   }
-  (o.filtres||[]).forEach(function(f,i){
+  (sansLignes ? [] : o.filtres||[]).forEach(function(f,i){
     var s=add(outils,'select'); s.setAttribute('aria-label',f.lab); fk(s,'dt-f'+i+'-'+o.cle);
     add(s,'option',null,f.lab+' : tous').value='';
     f.options.forEach(function(x){ add(s,'option',null,x[1]).value=x[0]; });
@@ -250,6 +252,7 @@ function tableau(parent, o){
       });
     }
     // pied : taille de page, position, précédent / suivant
+    if(sansLignes){ pied.hidden=true; return; }
     var g=add(pied,'label','dt-taille'); g.appendChild(document.createTextNode('Lignes par page '));
     var sp=add(g,'select'); fk(sp,'dt-pp-'+o.cle);
     [10,25,50].forEach(function(n){ add(sp,'option',null,String(n)).value=String(n); });

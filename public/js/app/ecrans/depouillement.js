@@ -23,7 +23,7 @@ function vDepouille(m){
       action: can('depouille.confirm') ? 'Commencer' : null, go:function(){ ouvrirOffreDepouillement(suivante.id); } });
   } else {
     guideCard(m,{ icon:'check', titre:'Tout est vérifié : vous pouvez clôturer', texte:'La clôture fige les données lues dans les offres et ouvre l’évaluation.',
-      action: can('depouille.close') ? 'Clôturer le dépouillement' : null, go:function(){ var b=document.querySelector('[data-fk="close-dep"]'); if(b) b.click(); } });
+      action: can('depouille.close') ? 'Clôturer le dépouillement' : null, go:cloturerDepouillement });
   }
 
   var h=add(m,'div','head'); var l=add(h,'div');
@@ -49,25 +49,20 @@ function vDepouille(m){
     filtres:[{ lab:'Vérification', options:[['afaire','À vérifier'],['ok','Vérifiée']], test:function(o,v){ return (aVerifier(o)>0) === (v==='afaire'); } }],
     actions:function(o,td){ boutonDetail(td,function(){ ouvrirOffreDepouillement(o.id); },'dep-ouvrir-'+o.id, aVerifier(o)>0 && can('depouille.confirm') ? 'Vérifier' : null); }
   });
+}
 
-  /* Clôture */
-  var kc=add(m,'div','card'); kc.style.marginTop='18px';
-  var foot=add(kc,'div','panel-foot'); foot.style.borderTop='none';
-  add(foot,'span',null, reste>0 ? 'Encore '+reste+' valeur'+(reste>1?'s':'')+' à vérifier sur l’ensemble des offres' : 'Toutes les valeurs sont vérifiées');
-  var cl=add(foot,'button','btn btn-primary', state.depClosed?'Dépouillement clôturé':'Clôturer le dépouillement'); cl.type='button';
-  cl.disabled=reste>0||state.depClosed; guard('depouille.close',cl);
-  fk(cl,'close-dep');
-  cl.addEventListener('click',function(){
-    ask('Les données lues dans les offres seront figées et l’évaluation s’ouvrira.', function(){
-      state.depClosed=true; logit('Dépouillement clôturé — évaluation ouverte');
-      notify('dep.cloture','Dépouillement clôturé',
-        "Le dépouillement de la procédure "+REF()+" est clôturé : "+conformes().length+" offre(s) conforme(s) sur "+SEED_OFFERS.length+". L'évaluation est ouverte aux évaluateurs désignés.");
-      var anoR=anomalies().filter(function(x){return x.lvl==='red';});
-      if(anoR.length) notify('anomalie',''+anoR.length+' anomalie(s) critique(s) à instruire',
-        anoR.slice(0,4).map(function(x){return '• '+x.who+' — '+x.t;}).join("\n"));
-      save(); go('evaluation');
-    }, 'Clôturer le dépouillement ?', 'Clôturer');
-  });
+/* Clôture du dépouillement : fige les données lues et ouvre l'évaluation. */
+function cloturerDepouillement(){
+  if(flagsRemaining()>0 || state.depClosed || !can('depouille.close')) return;
+  ask('Les données lues dans les offres seront figées et l’évaluation s’ouvrira.', function(){
+    state.depClosed=true; logit('Dépouillement clôturé — évaluation ouverte');
+    notify('dep.cloture','Dépouillement clôturé',
+      "Le dépouillement de la procédure "+REF()+" est clôturé : "+conformes().length+" offre(s) conforme(s) sur "+SEED_OFFERS.length+". L'évaluation est ouverte aux évaluateurs désignés.");
+    var anoR=anomalies().filter(function(x){return x.lvl==='red';});
+    if(anoR.length) notify('anomalie',''+anoR.length+' anomalie(s) critique(s) à instruire',
+      anoR.slice(0,4).map(function(x){return '• '+x.who+' — '+x.t;}).join("\n"));
+    save(); go('evaluation');
+  }, 'Clôturer le dépouillement ?', 'Clôturer');
 }
 
 /* Fenêtre de vérification d'une offre : document reçu à gauche, valeurs lues à droite. */

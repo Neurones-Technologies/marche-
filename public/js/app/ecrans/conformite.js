@@ -1,7 +1,7 @@
 /* Marché+ — Écran Conformité et anomalies.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
-   Deux tableaux : le contrôle des pièces par soumissionnaire et les signaux détectés ; le détail s'ouvre dans une
-   fenêtre. Écarter ou réintégrer une offre se fait depuis la ligne ou depuis sa fenêtre. */
+   Un tableau par soumissionnaire ; sa fenêtre de détail montre les pièces exigées et les signaux détectés sur son
+   offre. Écarter ou réintégrer une offre se fait depuis la ligne ou depuis sa fenêtre. */
 "use strict";
 
 var NIVEAUX_SIGNAL = { red:['Critique','c-red'], amber:['À examiner','c-amber'], info:['Information','c-violet'] };
@@ -16,6 +16,7 @@ function vConformite(m){
       {lab:'Origine', rendu:function(o,td){ originChip(td,o); }},
       {lab:'Pièces exigées', num:true, val:function(o){ return requiredDocs(o).length; }},
       {lab:'Manquantes', rendu:function(o,td){ var n=missingDocs(o).length; chipCellule(td, n ? n+' manquante'+(n>1?'s':'') : 'Aucune', n?'c-red':'c-green'); }},
+      {lab:'Signaux', rendu:function(o,td){ signauxCellule(td,o); }},
       {lab:'Décision', rendu:function(o,td){ chipCellule(td, excluded(o)?'Écartée':'Retenue', excluded(o)?'c-red':'c-green'); }}
     ],
     recherche:function(o){ return o.name+' '+o.pays+' '+missingDocs(o).map(function(d){ return d.label; }).join(' '); },
@@ -29,22 +30,19 @@ function vConformite(m){
     }
   });
 
-  var sig=anomalies();
-  tableau(m,{ cle:'signaux', titre:'Signaux détectés', lignes:sig.map(function(a,i){ return {a:a,i:i}; }),
-    vide:'Aucun signal détecté.',
-    colonnes:[
-      {lab:'Niveau', rendu:function(x,td){ var n=NIVEAUX_SIGNAL[x.a.lvl]||NIVEAUX_SIGNAL.info; chipCellule(td,n[0],n[1]); }},
-      {lab:'Signal', rendu:function(x,td){ add(td,'strong',null,x.a.t); }},
-      {lab:'Soumissionnaire', val:function(x){ return x.a.who; }}
-    ],
-    recherche:function(x){ return x.a.t+' '+x.a.who+' '+x.a.d; },
-    filtres:[{ lab:'Niveau', options:[['red','Critique'],['amber','À examiner'],['info','Information']], test:function(x,v){ return x.a.lvl===v; } }],
-    actions:function(x,td){ boutonDetail(td,function(){ ouvrirSignal(x.i); },'sig-'+x.i); }
-  });
-
   var n=add(m,'div','note');
   add(n,'strong',null,'Sur les offres étrangères. ');
   n.appendChild(document.createTextNode("Les signaux violets ne sont pas des reproches : ils rappellent qu'une offre hors zone se compare sur une base fiscale et douanière différente. Écarter un soumissionnaire étranger pour une pièce qu'on n'a jamais exigée dans le dossier d'appel d'offres est le meilleur moyen de perdre un recours."));
+}
+
+/* Signaux détectés sur l'offre d'un soumissionnaire. */
+function signauxDe(o){ return anomalies().filter(function(a){ return a.who===o.name; }); }
+/* Résumé des signaux dans une cellule : le niveau le plus grave et le nombre. */
+function signauxCellule(td, o){
+  var s=signauxDe(o);
+  if(!s.length){ add(td,'span','muted','—'); return; }
+  var lvl = s.some(function(a){ return a.lvl==='red'; }) ? 'red' : (s.some(function(a){ return a.lvl==='amber'; }) ? 'amber' : 'info');
+  chipCellule(td, s.length+' signal'+(s.length>1?'s':''), NIVEAUX_SIGNAL[lvl][1]);
 }
 
 /* Bouton Écarter / Réintégrer, avec confirmation et notification. */
@@ -71,26 +69,27 @@ function boutonEcarter(parent, o, petit){
 }
 
 function ouvrirConformite(id){
-  ouvrirFenetre(function(){ var o=offreParId(id); return o ? 'Pièces — '+o.name : 'Pièces'; }, function(c,p){
+  ouvrirFenetre(function(){ var o=offreParId(id); return o ? o.name : 'Soumissionnaire'; }, function(c,p){
     var o=offreParId(id); if(!o) return false;
     var ch=add(c,'div','fen-chips'); originChip(ch,o);
     chipCellule(ch, excluded(o)?'Écartée':'Retenue', excluded(o)?'c-red':'c-green');
     var manq=missingDocs(o).map(function(d){ return d.label; });
+    add(c,'h3','fen-sous-titre','Pièces exigées');
     var ul=add(c,'ul','fen-liste');
     requiredDocs(o).forEach(function(d){
       var li=add(ul,'li'); add(li,'span',null,d.label);
       var ko=manq.indexOf(d.label)>=0; chipCellule(li, ko?'Manquante':'Fournie', ko?'c-red':'c-green');
     });
+    var sec=add(c,'div','fen-section'); add(sec,'h3',null,'Signaux détectés');
+    var sig=signauxDe(o);
+    if(!sig.length) add(sec,'p','muted','Aucun signal sur cette offre.');
+    sig.forEach(function(a){
+      var n=NIVEAUX_SIGNAL[a.lvl]||NIVEAUX_SIGNAL.info;
+      var row=add(sec,'div','fen-signal');
+      var t=add(row,'div','fen-signal-t'); chipCellule(t,n[0],n[1]); add(t,'strong',null,a.t);
+      add(row,'div','muted',a.d);
+    });
     add(p,'span','muted','Décision réversible, consignée à la piste d’audit.');
     boutonEcarter(p,o,false);
-  });
-}
-
-function ouvrirSignal(i){
-  ouvrirFenetre(function(){ var a=anomalies()[i]; return a ? a.t : 'Signal'; }, function(c){
-    var a=anomalies()[i]; if(!a) return false;
-    var n=NIVEAUX_SIGNAL[a.lvl]||NIVEAUX_SIGNAL.info;
-    var ch=add(c,'div','fen-chips'); chipCellule(ch,n[0],n[1]); chipCellule(ch,a.who,'c-grey');
-    champLecture(c,'Détail',a.d);
   });
 }

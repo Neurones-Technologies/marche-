@@ -44,7 +44,8 @@ Organisation de l'interface (menu) :
   écrans les présente en sous-onglets ; « Étape suivante » en bas, avec les outils (vue d'ensemble, journal d'audit),
   et le changement de procédure en en-tête quand il y en a plusieurs. De l'étape 2 à l'étape 6, les informations
   sont en tableaux (recherche, filtres, pagination, bouton « + ») et le détail d'une ligne s'ouvre dans une fenêtre :
-  question et réponse, pli reçu, vérification d'une offre, pièces, clarification, notation, recours.
+  question et réponse, pli reçu, vérification d'une offre, pièces et signaux d'un soumissionnaire, clarification,
+  notation, recours. Un tableau vide n'affiche ni recherche, ni filtres, ni pagination.
 - **Administration** : comptes, rôles, paramètres, alertes.
 
 Dans le détail d’une procédure, la barre du haut affiche le titre de l’écran et la référence (« Cahier des charges
