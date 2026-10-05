@@ -123,6 +123,35 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 .haut-page:hover { background: var(--color-accent-hover); }
 .icon-action { color: var(--color-text-2); }
 .icon-action:hover { color: var(--color-accent); }
+/* Clôture : une carte, l'attributaire en tête, puis notification, recours et signature en frise verticale. */
+.clore { overflow: hidden; }
+.clore-tete { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-6); background: linear-gradient(135deg, var(--color-accent-soft) 0%, var(--color-surface) 75%); border-bottom: var(--border-w) solid var(--color-border); }
+.clore-lab { font-size: var(--fs-tiny); font-weight: var(--fw-strong); letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-2); }
+.clore-nom { font-size: var(--fs-display); font-weight: var(--fw-strong); line-height: var(--lh-tight); margin: var(--space-1) 0; }
+.clore-etat { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.clore-etapes { list-style: none; margin: 0; padding: var(--space-2) var(--space-6) var(--space-4); }
+.clore-etape { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: var(--space-4); align-items: start; padding: var(--space-5) 0; }
+.clore-etape::before { content: ""; position: absolute; left: 15px; top: 0; bottom: 0; width: 2px; background: var(--color-border); }
+.clore-etape:first-child::before { top: calc(var(--space-5) + 16px); }
+.clore-etape:last-child::before { bottom: calc(100% - var(--space-5) - 16px); }
+.clore-etape.done::before { background: var(--color-ok); }
+.clore-pt { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--color-surface); border: 2px solid var(--color-border-strong); color: var(--color-text-2); font-weight: var(--fw-strong); font-size: var(--fs-small); }
+.clore-pt .ic { width: var(--icon-sm); height: var(--icon-sm); }
+.clore-etape.done .clore-pt { background: var(--color-ok); border-color: var(--color-ok); color: var(--color-on-accent); }
+.clore-etape.now .clore-pt { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); box-shadow: 0 0 0 4px var(--color-accent-ring); }
+.clore-etape.blocked .clore-pt { background: var(--color-blocked-bg); border-color: var(--color-blocked); color: var(--color-blocked); }
+.clore-etape.sans-objet .clore-pt { background: var(--color-tile); border-color: var(--color-tile); color: var(--color-text-3); }
+.clore-corps h3 { font-size: var(--fs-body); font-weight: var(--fw-strong); line-height: 32px; }
+.clore-corps p { color: var(--color-text-2); font-size: var(--fs-table); max-width: var(--text-max); }
+.clore-etape.blocked .clore-corps > p:first-of-type { color: var(--color-blocked); }
+.clore-etape.sans-objet h3 { color: var(--color-text-2); }
+.clore-act { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; padding-top: var(--space-half); }
+.clore-info { margin-top: var(--space-2); }
+.clore-ligne { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--color-surface-2); border-radius: var(--radius-sm); font-size: var(--fs-table); }
+.clore-ligne .btn { margin-left: auto; }
+.clore-aide { margin-top: var(--space-2); font-size: var(--fs-small) !important; }
+@media (max-width: 720px) { .clore-etape { grid-template-columns: 32px minmax(0, 1fr); } .clore-act { grid-column: 2; justify-content: flex-start; margin-top: var(--space-2); } }
+.fen-liste-motifs li { align-items: flex-start; }
 /* Fenêtre de détail (popup). */
 .fen-ov { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-start; justify-content: center; padding: calc(var(--topbar-h) + var(--space-2)) var(--space-4) var(--space-4); background: var(--color-overlay); animation: fen-fond .15s ease both; }
 .fen { display: flex; flex-direction: column; width: 100%; max-width: 640px; max-height: calc(100vh - var(--topbar-h) - var(--space-8)); background: var(--color-surface); border: var(--border-w) solid var(--color-border); border-top: 3px solid var(--color-accent); border-radius: var(--radius); box-shadow: var(--shadow-overlay); animation: fen-entree .2s ease both; }
