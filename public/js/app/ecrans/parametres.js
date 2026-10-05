@@ -59,7 +59,7 @@ function vParams(m){
   add(add(k3,'div','panel-foot'),'span','muted','Abaisser le seuil de confiance réduit le nombre de vérifications manuelles — et augmente le risque qu\u2019un montant mal extrait fausse le classement. Ce réglage engage l\u2019organisation.');
 
   var k4=add(m,'div','card'); k4.style.marginTop='18px';
-  add(k4,'div','panel-head','4 · Pièces exigibles du dossier de candidature');
+  add(k4,'div','panel-head','4 · Pièces exigées dans une offre');
   var b4=add(k4,'div','pad');
   state.docDefs.forEach(function(d,i){
     var row=add(b4,'div','docline');
@@ -81,7 +81,7 @@ function vParams(m){
     });
   });
   var f4b=add(k4,'div','panel-foot');
-  add(f4b,'span','muted','Le contrôle de conformité et le portail de dépôt se reconfigurent automatiquement sur ce référentiel.');
+  add(f4b,'span','muted','Pièces du dossier de candidature à chaque appel d\u2019offres : le contrôle de conformité et le dépôt des offres suivent ce référentiel. Les pièces du référencement des partenaires se règlent à la section 10.');
   add(f4b,'button','btn btn-ghost btn-sm','+ Ajouter une pièce').addEventListener('click',function(){
     state.docDefs.push({id:'d'+Date.now(), label:'Nouvelle pièce exigée', scope:'tous'});
     SEED_OFFERS.forEach(function(oo){ oo.docs['d'+0]=true; });
@@ -150,11 +150,12 @@ function vParams(m){
   vParamsCadre(m,o);
   vParamsCircuitOrg(m,'circuitBesoin','8 · Circuit de validation des demandes d’achat','Une demande d’achat suit ce circuit à sa soumission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce budget. Le demandeur ne valide jamais sa propre demande.');
   vParamsCircuitOrg(m,'circuitReferencement','9 · Parcours de référencement des partenaires','Un dossier de référencement suit ces étapes ; les pièces déposées sont validées au dernier niveau.');
+  vParamsFormulaire(m);
   vParamsInscription(m,o);
-  vParamsCircuitOrg(m,'circuitCommande','11 · Circuit de validation des bons de commande','Une commande suit ce circuit avant émission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (en XOF). Celui qui établit la commande ne la valide pas.');
+  vParamsCircuitOrg(m,'circuitCommande','12 · Circuit de validation des bons de commande','Une commande suit ce circuit avant émission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (en XOF). Celui qui établit la commande ne la valide pas.');
   vParamsEvaluation(m);
   var kc=add(m,'div','card'); kc.style.marginTop='18px';
-  add(kc,'div','panel-head','13 · Numérotation des bons de commande');
+  add(kc,'div','panel-head','14 · Numérotation des bons de commande');
   var fc=add(add(kc,'div','pad'),'div','frm');
   champ(fc,'Préfixe des numéros',o.prefixeCommande||'BC',function(v){ o.prefixeCommande=String(v).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)||'BC'; logit('Préfixe des bons de commande : '+o.prefixeCommande); });
   add(add(kc,'div','panel-foot'),'span','muted','Numéros continus et sans trou, attribués par le serveur à l\u2019émission : '+(o.prefixeCommande||'BC')+'-'+new Date().getFullYear()+'-0001, puis 0002…');
@@ -256,7 +257,7 @@ function vParamsCircuitOrg(m, cle, titre, note){
 function vParamsEvaluation(m){
   var e=state.evaluationPartenaires=state.evaluationPartenaires||{criteres:{delais:30,conformite:30,completude:20,qualite:20},seuilAlerte:60,plafondRetardJours:30};
   var k=add(m,'div','card'); k.style.marginTop='18px';
-  var ph=add(k,'div','panel-head'); add(ph,'span',null,'12 · Évaluation des partenaires');
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,'13 · Évaluation des partenaires');
   var somme=['delais','conformite','completude','qualite'].reduce(function(t,x){ return t+Number(e.criteres[x]||0); },0);
   add(ph,'span','chip '+(somme===100?'c-green':'c-red'),'Total des poids : '+somme);
   var f=add(add(k,'div','pad'),'div','frm');
@@ -274,10 +275,113 @@ function vParamsEvaluation(m){
   add(add(k,'div','panel-foot'),'span','muted','La note d\u2019une commande est calculée à sa réception définitive, avec les réglages en vigueur ce jour-là. Les poids doivent totaliser 100 pour être enregistrés.');
 }
 
+/* Formulaire de référencement des partenaires : les questions posées et les documents demandés au prestataire,
+   sur le portail des partenaires et dans sa fiche. Distinct des pièces d'une offre (section 4). */
+var SCOPES_PIECE = { tous:'Tous les prestataires', local:'Prestataires locaux', etranger:'Prestataires hors UEMOA' };
+function vParamsFormulaire(m){
+  var F=state.formulaireReferencement=state.formulaireReferencement||{champs:[],pieces:[]};
+  var k=add(m,'div','card'); k.style.marginTop='18px';
+  add(k,'div','panel-head','10 · Formulaire de référencement des partenaires');
+  var b=add(k,'div','pad');
+  add(b,'p','muted','Ce que le prestataire renseigne et dépose pour demander son référencement, sur le portail des partenaires. Le dossier complet est ensuite instruit selon le parcours de la section 9.');
+
+  add(b,'h3','sous-titre-param','Questions');
+  tableau(b,{ cle:'form-questions', lignes:F.champs, vide:'Aucune question : seules les informations de l\u2019entreprise sont demandées.',
+    colonnes:[
+      {lab:'Question', val:function(q){ return q.label; }},
+      {lab:'Réponse', val:function(q){ return TYPES_QUESTION[q.type]+(q.type==='choix'?' ('+(q.options||[]).join(', ')+')':''); }},
+      {lab:'Obligatoire', rendu:function(q,td){ chipCellule(td,q.obligatoire?'Oui':'Non',q.obligatoire?'c-grey':'c-teal'); }}
+    ],
+    nouveau:{ lab:'Question', action:function(){ fenQuestion(null); } },
+    actions:function(q,td){
+      boutonIcone(td,'edit','Modifier « '+q.label+' »',function(){ fenQuestion(q); },'fq-mod-'+q.id);
+      boutonIcone(td,'x','Supprimer « '+q.label+' »',function(){
+        ask('Les réponses déjà données à cette question ne seront plus affichées.',function(){
+          F.champs.splice(F.champs.indexOf(q),1); logit('Formulaire de référencement : question retirée — '+q.label); save(); render();
+        },'Supprimer la question « '+q.label+' » ?','Supprimer');
+      },'fq-sup-'+q.id);
+    }
+  });
+
+  add(b,'h3','sous-titre-param','Documents à fournir');
+  tableau(b,{ cle:'form-pieces', lignes:F.pieces, vide:'Aucun document demandé.',
+    colonnes:[
+      {lab:'Document', val:function(p){ return p.label; }},
+      {lab:'Concerne', val:function(p){ return SCOPES_PIECE[p.scope]||p.scope; }},
+      {lab:'Obligatoire', rendu:function(p,td){ chipCellule(td,p.obligatoire?'Oui':'Non',p.obligatoire?'c-grey':'c-teal'); }},
+      {lab:'Date de validité', val:function(p){ return p.expiration?'Exigée':'—'; }}
+    ],
+    nouveau:{ lab:'Document', action:function(){ fenPiece(null); } },
+    actions:function(p,td){
+      boutonIcone(td,'edit','Modifier « '+p.label+' »',function(){ fenPiece(p); },'fp-mod-'+p.id);
+      boutonIcone(td,'x','Supprimer « '+p.label+' »',function(){
+        ask('Ce document ne sera plus demandé aux prestataires ; les pièces déjà déposées restent archivées.',function(){
+          F.pieces.splice(F.pieces.indexOf(p),1); logit('Formulaire de référencement : document retiré — '+p.label); save(); render();
+        },'Retirer « '+p.label+' » ?','Retirer');
+      },'fp-sup-'+p.id);
+    }
+  });
+  add(add(k,'div','panel-foot'),'span','muted','Une pièce de même nature validée au référencement (même document dans la section 4) tient lieu de pièce d\u2019offre au dépôt.');
+
+  function caseACocher(parent, id, lab, val){
+    var w=add(parent,'label','case-param'); var c=add(w,'input'); c.type='checkbox'; c.id=id; c.checked=!!val; fk(c,id);
+    w.appendChild(document.createTextNode(' '+lab)); return c;
+  }
+  function fenQuestion(q){
+    ouvrirFenetre(q?'Modifier la question':'Nouvelle question',function(corps,pied){
+      var f=add(corps,'div','frm');
+      var w1=add(f,'div'); add(w1,'label',null,'Question').setAttribute('for','fq-lab');
+      var lab=add(w1,'input'); lab.type='text'; lab.id='fq-lab'; lab.maxLength=200; fk(lab,'fq-lab'); lab.value=q?q.label:'';
+      var w2=add(f,'div'); add(w2,'label',null,'Type de réponse').setAttribute('for','fq-type');
+      var ty=add(w2,'select'); ty.id='fq-type'; fk(ty,'fq-type');
+      Object.keys(TYPES_QUESTION).forEach(function(t){ add(ty,'option',null,TYPES_QUESTION[t]).value=t; });
+      ty.value=q?q.type:'texte';
+      var w3=add(corps,'div'); w3.style.marginTop='12px';
+      add(w3,'label',null,'Choix proposés (un par ligne)').setAttribute('for','fq-opt');
+      var op=add(w3,'textarea'); op.id='fq-opt'; op.rows=4; fk(op,'fq-opt'); op.value=q&&q.options?q.options.join('\n'):'';
+      var majChoix=function(){ w3.hidden=ty.value!=='choix'; }; ty.addEventListener('change',majChoix); majChoix();
+      var ob=caseACocher(corps,'fq-obl','Réponse obligatoire pour soumettre le dossier',q?q.obligatoire:true);
+      var err=add(corps,'div','lg-err'); err.hidden=true;
+      add(pied,'button','btn btn-ghost','Annuler').addEventListener('click',fermerFenetre);
+      add(pied,'button','btn btn-primary',q?'Enregistrer':'Ajouter').addEventListener('click',function(){
+        var v={ id:q?q.id:'q'+Date.now().toString(36), label:lab.value.trim(), type:ty.value, obligatoire:ob.checked };
+        if(v.type==='choix') v.options=op.value.split('\n').map(function(x){ return x.trim(); }).filter(Boolean);
+        if(!v.label){ err.textContent='Saisissez la question.'; err.hidden=false; return; }
+        if(v.type==='choix' && v.options.length<2){ err.textContent='Proposez au moins deux choix.'; err.hidden=false; return; }
+        if(q) F.champs[F.champs.indexOf(q)]=v; else F.champs.push(v);
+        logit('Formulaire de référencement : question '+(q?'modifiée':'ajoutée')+' — '+v.label);
+        fermerFenetre(); save(); render();
+      });
+    });
+  }
+  function fenPiece(p){
+    ouvrirFenetre(p?'Modifier le document':'Nouveau document',function(corps,pied){
+      var f=add(corps,'div','frm');
+      var w1=add(f,'div'); add(w1,'label',null,'Document demandé').setAttribute('for','fp-lab');
+      var lab=add(w1,'input'); lab.type='text'; lab.id='fp-lab'; lab.maxLength=200; fk(lab,'fp-lab'); lab.value=p?p.label:'';
+      var w2=add(f,'div'); add(w2,'label',null,'Prestataires concernés').setAttribute('for','fp-scope');
+      var sc=add(w2,'select'); sc.id='fp-scope'; fk(sc,'fp-scope');
+      Object.keys(SCOPES_PIECE).forEach(function(s){ add(sc,'option',null,SCOPES_PIECE[s]).value=s; });
+      sc.value=p?p.scope:'tous';
+      var ob=caseACocher(corps,'fp-obl','Document obligatoire pour soumettre le dossier',p?p.obligatoire:true);
+      var ex=caseACocher(corps,'fp-exp','Date de fin de validité exigée (attestation, certificat…)',p?p.expiration:false);
+      var err=add(corps,'div','lg-err'); err.hidden=true;
+      add(pied,'button','btn btn-ghost','Annuler').addEventListener('click',fermerFenetre);
+      add(pied,'button','btn btn-primary',p?'Enregistrer':'Ajouter').addEventListener('click',function(){
+        var v={ id:p?p.id:'d'+Date.now().toString(36), label:lab.value.trim(), scope:sc.value, obligatoire:ob.checked, expiration:ex.checked };
+        if(!v.label){ err.textContent='Saisissez le nom du document.'; err.hidden=false; return; }
+        if(p) F.pieces[F.pieces.indexOf(p)]=v; else F.pieces.push(v);
+        logit('Formulaire de référencement : document '+(p?'modifié':'ajouté')+' — '+v.label);
+        fermerFenetre(); save(); render();
+      });
+    });
+  }
+}
+
 /* Inscription en ligne des prestataires : ouverte ou fermée par l'organisation. */
 function vParamsInscription(m,o){
   var k=add(m,'div','card'); k.style.marginTop='18px';
-  add(k,'div','panel-head','10 · Inscription en ligne des prestataires');
+  add(k,'div','panel-head','11 · Inscription en ligne des prestataires');
   var b=add(k,'div','pad');
   var ouverte=o.inscriptionOuverte!==false;
   var p=add(b,'button','pill'+(ouverte?' on':''), ouverte?'Inscription ouverte':'Inscription fermée'); fk(p,'par-inscription');

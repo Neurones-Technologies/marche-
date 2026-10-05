@@ -13,7 +13,7 @@ const { requireAuth, whoLabel } = require('../auth');
 const { lireFichier, corpsBrut, diskPath } = require('./files');
 const SU = require('../suppleance');
 const C = require('../../public/js/circuits.js');
-const R = require('../../public/js/regles.js');
+const F = require('../formulaire');
 
 const r = express.Router();
 r.use(requireAuth);
@@ -26,13 +26,8 @@ const journal = (req, p, action) => {
   auditAppend(req.user.id, whoLabel(req.user), `Partenaire ${p.id} (${p.raisonSociale}) — ${action}`);
 };
 
-/** Pièces administratives exigées pour le référencement, selon le pays du partenaire et le profil de l'organisation.
-    Les pièces propres à une offre (caution de soumission, contre-garantie) ne relèvent pas du référencement. */
-const PROPRES_A_UNE_OFFRE = ['caution', 'contreGarantie'];
-function piecesExigees(p) {
-  const org = (kvGet('org') || { value: {} }).value, docDefs = (kvGet('docDefs') || { value: [] }).value;
-  return R.requiredDocs({ org, docDefs }, { iso: p.pays }).filter((d) => PROPRES_A_UNE_OFFRE.indexOf(d.id) < 0);
-}
+/** Pièces demandées pour le référencement : celles du formulaire de l'organisation, selon le pays du partenaire. */
+const piecesExigees = (p) => F.piecesPour(p.pays);
 /** Une pièce tient lieu de pièce de dossier si elle est validée et non expirée. */
 const pieceValable = (x) => !!x && x.statut === 'valide' && (!x.expire || x.expire >= aujourdhui());
 /** Vue d'une fiche : avec les pièces exigées et leur état, pour l'interface. */
@@ -40,12 +35,12 @@ function vue(p) {
   const exigees = piecesExigees(p).map((d) => {
     const x = p.pieces[d.id];
     const etat = !x ? 'manquante' : (x.expire && x.expire < aujourdhui() ? 'expiree' : x.statut);
-    return { id: d.id, label: d.label, etat, piece: x || null };
+    return { id: d.id, label: d.label, obligatoire: d.obligatoire !== false, expiration: !!d.expiration, etat, piece: x || null };
   });
   // évaluations reçues (module 5) : une par commande clôturée
   const evaluations = commandesAll().filter((c) => c.evaluation && c.evaluation.partenaire === p.id)
     .map((c) => ({ commande: c.numero, procedure: c.procedure.ref, date: c.receptionDefinitive && c.receptionDefinitive.date, ...c.evaluation }));
-  return { ...p, exigees, evaluations };
+  return { ...p, reponses: p.reponses || {}, exigees, evaluations, questions: F.formulaire().champs };
 }
 
 r.get('/', (req, res) => {
@@ -85,6 +80,12 @@ r.put('/:id', (req, res) => {
   // un partenaire référencé qui change d'identité légale repasse par l'instruction
   const identite = champs.raisonSociale !== p.raisonSociale || champs.pays !== p.pays || champs.immatriculation !== p.immatriculation;
   if (identite && ['reference', 'suspendu'].includes(p.statut)) return err(res, 409, 'PARTNER_IDENTITY_LOCKED', 'Raison sociale, pays et immatriculation d’un partenaire référencé ne se modifient que par le service des achats.');
+  // réponses aux questions du formulaire de référencement (complètes seulement à la soumission)
+  if (d.reponses !== undefined) {
+    const v = F.verifierReponses(d.reponses, false);
+    if (v.erreur) return err(res, 422, 'PARTNER_INVALID', v.erreur);
+    champs.reponses = v.reponses;
+  }
   db.transaction(() => { Object.assign(p, champs); journal(req, p, 'fiche modifiée'); partenaireSave(p); })();
   res.json({ partenaire: vue(p) });
 });
@@ -96,8 +97,10 @@ r.post('/:id/fichiers', corpsBrut, (req, res) => {
   if (['verification', 'exclu'].includes(p.statut)) return err(res, 409, 'PARTNER_LOCKED', 'Les pièces ne se modifient pas pendant l’instruction du dossier.');
   const fx = lireFichier(req);
   if (fx.erreur) return err(res, fx.status, 'FILE_INVALID', fx.erreur);
-  if (!piecesExigees(p).some((d) => d.id === fx.doc)) return err(res, 422, 'PIECE_NOT_REQUIRED', 'Cette pièce ne fait pas partie du dossier de référencement.');
+  const def = piecesExigees(p).find((d) => d.id === fx.doc);
+  if (!def) return err(res, 422, 'PIECE_NOT_REQUIRED', 'Cette pièce ne fait pas partie du dossier de référencement.');
   const expire = String(req.query.expire || '');
+  if (def.expiration && !expire) return err(res, 422, 'PIECE_EXPIRY_REQUIRED', '« ' + def.label + ' » : indiquez sa date de fin de validité.');
   if (expire && !/^\d{4}-\d{2}-\d{2}$/.test(expire)) return err(res, 422, 'FILE_INVALID', 'Date de validité invalide (AAAA-MM-JJ).');
   if (expire && expire < aujourdhui()) return err(res, 422, 'PIECE_EXPIRED', 'Cette pièce est déjà expirée.');
   const id = crypto.randomUUID(), ancienne = p.pieces[fx.doc];
@@ -134,8 +137,10 @@ r.post('/:id/soumettre', (req, res) => {
   if (!req.titulaire) return err(res, 403, 'PARTNER_NOT_OWNER', 'Seul le partenaire soumet son dossier.');
   if (!['candidat', 'rejete'].includes(p.statut)) return err(res, 409, 'PARTNER_LOCKED', 'Ce dossier n’est pas à soumettre.');
   if (!p.raisonSociale || !p.pays || !p.immatriculation) return err(res, 422, 'PARTNER_INCOMPLETE', 'Raison sociale, pays et numéro d’immatriculation sont obligatoires.');
-  const manquantes = vue(p).exigees.filter((e) => e.etat === 'manquante' || e.etat === 'expiree' || e.etat === 'refuse');
+  const manquantes = vue(p).exigees.filter((e) => e.obligatoire && (e.etat === 'manquante' || e.etat === 'expiree' || e.etat === 'refuse'));
   if (manquantes.length) return err(res, 422, 'PIECES_MISSING', 'Pièces manquantes, expirées ou refusées : ' + manquantes.map((e) => e.label).join(' ; ') + '.');
+  const rep = F.verifierReponses(p.reponses, true);
+  if (rep.erreur) return err(res, 422, 'PARTNER_INCOMPLETE', rep.erreur);
   const modele = (kvGet('circuitReferencement') || { value: [] }).value;
   const circuit = C.appliquerMontant(C.reinitialiser(modele), 0);
   if (!C.nbRequises(circuit)) return err(res, 409, 'CIRCUIT_EMPTY', 'Le parcours de référencement n’a aucune étape : à configurer dans Paramètres.');
@@ -196,7 +201,7 @@ r.post('/:id/statut', (req, res) => {
   if (!TRANSITIONS[statut] || !TRANSITIONS[statut].includes(p.statut)) return err(res, 409, 'PARTNER_TRANSITION', `Passage de « ${p.statut} » à « ${statut} » impossible.`);
   if (!motif || motif.length > 1000) return err(res, 422, 'REASON_REQUIRED', 'La décision doit être motivée (1 000 caractères au plus).');
   if (statut === 'reference') {
-    const ko = vue(p).exigees.filter((e) => e.etat !== 'valide');
+    const ko = vue(p).exigees.filter((e) => e.obligatoire && e.etat !== 'valide');
     if (ko.length) return err(res, 422, 'PIECES_MISSING', 'Réactivation impossible : pièces à jour requises — ' + ko.map((e) => e.label).join(' ; ') + '.');
   }
   db.transaction(() => {

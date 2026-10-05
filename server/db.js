@@ -284,6 +284,21 @@ const CIRCUIT_REFERENCEMENT = [
   { role: 'Vérification des pièces', who: 'Service achats' },
   { role: 'Décision de référencement', who: 'Responsable des achats' },
 ];
+/** Formulaire de référencement par défaut : quelques questions, et les pièces administratives du référentiel des
+    offres (sans celles propres à une offre : caution, contre-garantie), attestations à date de validité. */
+const CHAMPS_REFERENCEMENT = [
+  { id: 'activite', label: 'Activité principale', type: 'texte', obligatoire: true },
+  { id: 'effectif', label: 'Effectif', type: 'nombre', obligatoire: false },
+  { id: 'chiffreAffaires', label: 'Chiffre d’affaires du dernier exercice (XOF)', type: 'nombre', obligatoire: false },
+  { id: 'references', label: 'Principales références clients', type: 'texte', obligatoire: false },
+];
+function formulaireDefaut(docDefs) {
+  return {
+    champs: clone(CHAMPS_REFERENCEMENT),
+    pieces: (docDefs || []).filter((d) => !['caution', 'contreGarantie'].includes(d.id))
+      .map((d) => ({ id: d.id, label: d.label, scope: d.scope || 'tous', obligatoire: true, expiration: ['fiscal', 'cnps'].includes(d.id) })),
+  };
+}
 const partenairesAll = () => db.prepare('SELECT data FROM partenaires ORDER BY ord').all().map((r) => JSON.parse(r.data));
 const partenaireGet = (id) => { const r = db.prepare('SELECT data FROM partenaires WHERE id=?').get(id); return r ? JSON.parse(r.data) : null; };
 function partenaireInsert(p) {
@@ -361,7 +376,7 @@ function defaultOrgKv() {
       rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {}, inscriptionOuverte: true, prefixeCommande: 'BC' },
     seuils: { confianceMin: 75, prixBas: 25, structureEcart: 0.8, refsMin: 3, validiteMin: 90, ecartIaMax: 0 },
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
-    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT), circuitCommande: clone(CIRCUIT_COMMANDE), evaluationPartenaires: clone(EVALUATION_PARTENAIRES),
+    notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT), formulaireReferencement: formulaireDefaut(seed.DOC_DEFS), circuitCommande: clone(CIRCUIT_COMMANDE), evaluationPartenaires: clone(EVALUATION_PARTENAIRES),
     mailFrom: 'marches@bal.ci', mailSuffix: '@bal.ci',
   };
 }
@@ -480,6 +495,9 @@ db.transaction(function migrate() {
   // 02/10/2026 : module 1 (référencement). Parcours par défaut ; chaque compte soumissionnaire existant reçoit une fiche
   // « candidat » à compléter (son référencement n'a jamais été instruit).
   if (kvGet('org') && !kvGet('circuitReferencement')) kvSet('circuitReferencement', clone(CIRCUIT_REFERENCEMENT), 'migration');
+  // 05/10/2026 : formulaire de référencement propre à l'organisation (questions et pièces), distinct des pièces d'une
+  // offre ; repris des pièces du référentiel des offres en vigueur.
+  if (kvGet('org') && !kvGet('formulaireReferencement')) kvSet('formulaireReferencement', formulaireDefaut((kvGet('docDefs') || { value: seed.DOC_DEFS }).value), 'migration');
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.
   if (kvGet('org') && !kvGet('circuitCommande')) kvSet('circuitCommande', clone(CIRCUIT_COMMANDE), 'migration');
   // 02/10/2026 : module 5 (évaluation des partenaires). Réglages par défaut.

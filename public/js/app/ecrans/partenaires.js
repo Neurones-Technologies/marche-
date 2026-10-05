@@ -15,6 +15,28 @@ UI.partenaire = null;
 
 function chipStatutPartenaire(parent, s){ var x=STATUTS_PARTENAIRE[s]||[s,'c-grey']; return add(parent,'span','chip '+x[1],x[0]); }
 
+/* Questions du formulaire de référencement (Paramètres) : un champ selon le type de réponse attendue. */
+var TYPES_QUESTION = { texte:'Texte', nombre:'Nombre', date:'Date', choix:'Liste de choix', ouinon:'Oui / non' };
+function champQuestion(parent, q, val, inactif){
+  var w=add(parent,'div'); var id='q-'+q.id;
+  add(w,'label',null,q.label+(q.obligatoire?' *':'')).setAttribute('for',id);
+  var i;
+  if(q.type==='choix' || q.type==='ouinon'){
+    i=add(w,'select'); add(i,'option',null,'—').value='';
+    (q.type==='ouinon' ? [['oui','Oui'],['non','Non']] : (q.options||[]).map(function(o){ return [o,o]; }))
+      .forEach(function(x){ add(i,'option',null,x[1]).value=x[0]; });
+  } else if(q.type==='texte'){ i=add(w,'textarea'); i.rows=2; i.maxLength=2000; }
+  else { i=add(w,'input'); i.type=q.type==='nombre'?'number':'date'; }
+  i.id=id; fk(i,id); i.value=val==null?'':String(val); i.disabled=!!inactif;
+  return i;
+}
+function valeurReponse(q, v){
+  if(v==null || v==='') return '—';
+  if(q.type==='ouinon') return v==='oui'?'Oui':'Non';
+  if(q.type==='nombre') return Number(v).toLocaleString('fr-FR');
+  return String(v);
+}
+
 /* Parcours de référencement (lecture, ou décisions pour les achats). */
 function circuitPartenaire(parent, p, decider){
   if(!p.circuit || !p.circuit.length || p.statut==='candidat') return;
@@ -120,6 +142,24 @@ function vReferencement(m){
       });
     }
 
+    /* Questionnaire (formulaire de référencement de l'organisation) */
+    var questions=p.questions||[], rep=p.reponses||{};
+    if(questions.length){
+      var kq=add(zone,'div','card'); kq.style.marginTop='18px';
+      add(kq,'div','panel-head','Questionnaire de référencement');
+      var fq=add(add(kq,'div','pad'),'div','frm'), qs={};
+      questions.forEach(function(q){ qs[q.id]=champQuestion(fq,q,rep[q.id],!editable); });
+      var fqf=add(kq,'div','panel-foot');
+      add(fqf,'span','muted','Les questions marquées * sont obligatoires pour soumettre le dossier.');
+      if(editable){
+        var bq=add(fqf,'button','btn btn-ghost btn-sm','Enregistrer les réponses'); fk(bq,'ref-rep');
+        bq.addEventListener('click',function(){
+          var r={}; questions.forEach(function(q){ r[q.id]=qs[q.id].value; });
+          apres(MP.api('PUT','/api/partenaires/'+enc(p.id),{ reponses:r }),'Réponses enregistrées.');
+        });
+      }
+    }
+
     /* Pièces */
     var kp=add(zone,'div','card'); kp.style.marginTop='18px';
     add(kp,'div','panel-head','Pièces administratives');
@@ -128,28 +168,33 @@ function vReferencement(m){
     p.exigees.forEach(function(e){
       var row=add(bp,'div','docline');
       var lf=add(row,'div'); lf.style.flex='1 1 260px';
-      add(lf,'div',null,e.label).style.fontWeight='600';
+      var tl=add(lf,'div'); add(tl,'span',null,e.label).style.fontWeight='600';
+      add(tl,'span','chip '+(e.obligatoire?'c-grey':'c-teal'), e.obligatoire?'Obligatoire':'Facultative').style.marginLeft='8px';
       if(e.piece) add(lf,'div','muted',e.piece.nom+' · déposée le '+e.piece.depose+(e.piece.expire?' · valable jusqu’au '+e.piece.expire:''));
       if(e.piece && e.piece.statut==='refuse' && e.piece.motif) add(lf,'div','muted','Refusée : '+e.piece.motif);
       var x=ETATS_PIECE[e.etat]||[e.etat,'c-grey']; add(row,'span','chip '+x[1],x[0]);
       if(!piecesOuvertes) return;
       var act=add(row,'div'); act.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
       var dt=add(act,'input'); dt.type='date'; dt.setAttribute('aria-label','Date de fin de validité — '+e.label); fk(dt,'ref-exp-'+e.id);
-      dt.title='Date de fin de validité, si la pièce en a une';
+      dt.title=e.expiration ? 'Date de fin de validité : obligatoire pour cette pièce' : 'Date de fin de validité, si la pièce en a une';
+      if(e.expiration) dt.required=true;
       var inp=el('input'); inp.type='file'; inp.accept='.pdf,.png,.jpg,.jpeg,.docx,.xlsx'; inp.hidden=true; inp.setAttribute('aria-label','Choisir le fichier : '+e.label); act.appendChild(inp);
       var bt=add(act,'button','pill'+(e.piece?' on':''), e.piece?'Remplacer':'Déposer'); fk(bt,'ref-doc-'+e.id);
       bt.addEventListener('click',function(){ inp.click(); });
       inp.addEventListener('change',function(){
         var fi=inp.files&&inp.files[0]; if(!fi) return;
         if(fi.size>10*1024*1024){ toast('Fichier trop volumineux (10 Mo maximum).'); return; }
+        if(e.expiration && !dt.value){ toast('Indiquez d’abord la date de fin de validité de « '+e.label+' ».'); inp.value=''; dt.focus(); return; }
         bt.disabled=true; bt.textContent='Envoi…';
         apres(MP.upload('/api/partenaires/'+enc(p.id)+'/fichiers?doc='+enc(e.id)+(dt.value?'&expire='+enc(dt.value):''), fi),'Pièce déposée.');
       });
     });
     if(p.statut==='candidat' || p.statut==='rejete'){
       var fp_=add(kp,'div','panel-foot');
-      var manquent=p.exigees.filter(function(e){ return ['manquante','expiree','refuse'].indexOf(e.etat)>=0; }).length;
-      add(fp_,'span','muted', manquent ? manquent+' pièce(s) à déposer avant de soumettre le dossier.' : 'Dossier complet : vous pouvez le soumettre.');
+      var manquent=p.exigees.filter(function(e){ return e.obligatoire && ['manquante','expiree','refuse'].indexOf(e.etat)>=0; }).length;
+      var sansReponse=questions.filter(function(q){ return q.obligatoire && (rep[q.id]==null || rep[q.id]===''); }).length;
+      add(fp_,'span','muted', manquent||sansReponse ? [manquent?manquent+' pièce(s) obligatoire(s) à déposer':'', sansReponse?sansReponse+' question(s) obligatoire(s) sans réponse':''].filter(Boolean).join(' et ')+' avant de soumettre le dossier.' : 'Dossier complet : vous pouvez le soumettre.');
+      manquent+=sansReponse;
       var bs=add(fp_,'button','btn btn-primary','Soumettre mon dossier'); fk(bs,'ref-soum'); bs.disabled=manquent>0;
       bs.addEventListener('click',function(){
         ask('Pendant l’instruction, la fiche et les pièces ne se modifient plus.', function(){
@@ -180,7 +225,7 @@ function vPartenaires(m){
       .catch(function(e){ toast(e.message); charger(); });
   }
   function dessiner(list){
-    tableau(zone,{ cle:'partenaires', lignes:list, vide:'Aucun partenaire : les prestataires s’inscrivent depuis l’écran de connexion.',
+    tableau(zone,{ cle:'partenaires', lignes:list, vide:'Aucun partenaire : les prestataires s’inscrivent sur le portail des partenaires (lien dans Paramètres).',
       colonnes:[
         {lab:'N°', val:function(p){ return p.id; }},
         {lab:'Raison sociale', val:function(p){ return p.raisonSociale; }},
@@ -208,6 +253,12 @@ function vPartenaires(m){
     });
     if(p.rejet && p.statut==='rejete'){ var w=add(b,'div','warn'); add(w,'strong',null,'Rejeté ('+p.rejet.role+') : '); w.appendChild(document.createTextNode(p.rejet.motif)); }
     if(p.decision){ var w2=add(b,'div','note'); add(w2,'strong',null,'Dernière décision ('+p.decision.at+') : '); w2.appendChild(document.createTextNode(p.decision.vers+' — '+p.decision.motif)); }
+    if((p.questions||[]).length){
+      var kq=add(zone,'div','card'); kq.style.marginTop='18px';
+      add(kq,'div','panel-head','Réponses au questionnaire');
+      var bq=add(kq,'div','pad');
+      p.questions.forEach(function(q){ var row=add(bq,'div','docline'); add(row,'div','muted',q.label); add(row,'div',null,valeurReponse(q,(p.reponses||{})[q.id])); });
+    }
     var foot=add(k,'div','panel-foot');
     function bouton(lab, statut, msg, titre){
       var bt=add(foot,'button','btn btn-ghost btn-sm',lab); fk(bt,'prt-'+statut);
@@ -225,7 +276,8 @@ function vPartenaires(m){
     p.exigees.forEach(function(e){
       var row=add(bp,'div','docline');
       var lf=add(row,'div'); lf.style.flex='1 1 260px';
-      add(lf,'div',null,e.label).style.fontWeight='600';
+      var tl=add(lf,'div'); add(tl,'span',null,e.label).style.fontWeight='600';
+      if(!e.obligatoire) add(tl,'span','chip c-teal','Facultative').style.marginLeft='8px';
       if(e.piece){
         var a=add(lf,'a',null,e.piece.nom); a.href='/api/files/'+e.piece.fichier; a.setAttribute('download',e.piece.nom); a.title='SHA-256 '+e.piece.sha256;
         add(lf,'div','muted','Déposée le '+e.piece.depose+(e.piece.expire?' · valable jusqu’au '+e.piece.expire:'')+(e.piece.motif?' · refus : '+e.piece.motif:''));

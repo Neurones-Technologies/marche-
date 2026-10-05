@@ -22,7 +22,7 @@ const WRITE_PERMS = {
   evalDone: ['eval.validate', 'recours.handle'],
   approvals: ['decision.approve', 'params.edit', 'recours.handle'],
   org: ['params.edit'], seuils: ['params.edit'], docDefs: ['params.edit'],
-  mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'], circuitReferencement: ['params.edit'], circuitCommande: ['params.edit'], evaluationPartenaires: ['params.edit'],
+  mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'], circuitReferencement: ['params.edit'], formulaireReferencement: ['params.edit'], circuitCommande: ['params.edit'], evaluationPartenaires: ['params.edit'],
   offers: ['params.edit'],
   roles: ['roles.edit'], users: ['roles.edit'], // délégations et affectations : routes /api/suppleances uniquement
   notifRules: ['notif.manage'],
@@ -378,6 +378,11 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (Math.round(somme) !== 100) return refus(422, 'EVALUATION_INVALID', `Les poids des critères doivent totaliser 100 (ici ${somme}).`);
       if (!(Number(value.seuilAlerte) >= 0 && Number(value.seuilAlerte) <= 100)) return refus(422, 'EVALUATION_INVALID', 'Seuil d’alerte entre 0 et 100.');
       if (!(Number(value.plafondRetardJours) >= 1 && Number(value.plafondRetardJours) <= 365)) return refus(422, 'EVALUATION_INVALID', 'Retard plafond entre 1 et 365 jours.');
+      break;
+    }
+    case 'formulaireReferencement': {
+      const e = require('./formulaire').verifierDefinition(value);
+      if (e) return refus(422, 'FORM_INVALID', e);
       break;
     }
     case 'docDefs': {

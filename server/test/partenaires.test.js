@@ -73,8 +73,16 @@ test('dossier : fiche, pièces exigées selon le pays, contrôles du dépôt de 
   refusé(await piece(mobilia, moi.id, 'caution'), 422, 'PIECE_NOT_REQUIRED');
   refusé(await piece(mobilia, moi.id, 'fiscal', '2020-01-01'), 422, 'PIECE_EXPIRED');
   ok(await piece(mobilia, moi.id, 'registre'), 201);
+  refusé(await piece(mobilia, moi.id, 'fiscal'), 422, 'PIECE_EXPIRY_REQUIRED'); // attestation : date de validité exigée
   ok(await piece(mobilia, moi.id, 'fiscal', '2099-12-31'), 201);
   ok(await piece(mobilia, moi.id, 'cnps', '2099-12-31'), 201);
+  // questions du formulaire : contrôlées à la saisie, obligatoires à la soumission
+  assert.ok(moi.questions.some((q) => q.id === 'activite' && q.obligatoire));
+  refusé(await call('PUT', `/api/partenaires/${moi.id}`, { reponses: { effectif: 'beaucoup' } }, mobilia), 422, 'PARTNER_INVALID');
+  refusé(await call('POST', `/api/partenaires/${moi.id}/soumettre`, {}, mobilia), 422, 'PARTNER_INCOMPLETE');
+  const r = await call('PUT', `/api/partenaires/${moi.id}`, { reponses: { activite: 'Mobilier de bureau', effectif: '42', inconnue: 'x' } }, mobilia);
+  ok(r);
+  assert.deepEqual(r.json.partenaire.reponses, { activite: 'Mobilier de bureau', effectif: 42 });
   ok(await call('POST', `/api/partenaires/${moi.id}/soumettre`, {}, mobilia));
   refusé(await call('PUT', `/api/partenaires/${moi.id}`, { adresse: 'x' }, mobilia), 409, 'PARTNER_LOCKED');
   refusé(await piece(mobilia, moi.id, 'registre'), 409, 'PARTNER_LOCKED');
@@ -144,4 +152,21 @@ test('suspension, réactivation, exclusion : motivées, transitions contrôlées
   refusé(await call('POST', `/api/partenaires/${id}/statut`, { statut: 'reference', motif: 'Erreur.' }, achats), 409, 'PARTNER_TRANSITION');
   const v = await call('GET', '/api/audit/verify', null, admin);
   assert.equal(v.json.ok, true);
+});
+
+test('formulaire de référencement : défini par l’organisation, contrôlé à l’écriture', async () => {
+  const st = await getState(admin);
+  const f = st.formulaireReferencement;
+  assert.ok(f.champs.length && f.pieces.length);
+  assert.ok(!f.pieces.some((p) => p.id === 'caution'), 'distinct des pièces d’une offre');
+  refusé(await patch(admin, { formulaireReferencement: { ...f, champs: [...f.champs, { id: 'x', label: 'Type ?', type: 'couleur', obligatoire: false }] } }), 422, 'FORM_INVALID');
+  refusé(await patch(admin, { formulaireReferencement: { ...f, champs: [...f.champs, { id: 'secteur', label: 'Secteur', type: 'choix', options: ['BTP'], obligatoire: true }] } }), 422, 'FORM_INVALID');
+  refusé(await patch(mobilia, { formulaireReferencement: f }), 403);
+  const nouveau = { champs: [...f.champs, { id: 'secteur', label: 'Secteur', type: 'choix', options: ['BTP', 'Informatique'], obligatoire: true }],
+    pieces: [...f.pieces, { id: 'assurance', label: 'Attestation d’assurance', scope: 'tous', obligatoire: false, expiration: true }] };
+  ok(await patch(admin, { formulaireReferencement: nouveau }));
+  const moi = (await call('GET', '/api/partenaires/moi', null, mobilia)).json.partenaire;
+  assert.ok(moi.questions.some((q) => q.id === 'secteur'));
+  const as = moi.exigees.find((e) => e.id === 'assurance');
+  assert.equal(as.obligatoire, false); assert.equal(as.expiration, true);
 });
