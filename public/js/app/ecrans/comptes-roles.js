@@ -113,9 +113,18 @@ function vRoles(m){
   var confl=[];
   rk.forEach(function(r){ incompatOf(state.roles[r].perms).forEach(function(x){ confl.push({r:r,x:x}); }); });
   if(confl.length){
-    var w=add(m,'div','warn'); w.style.marginBottom='18px';
-    add(w,'strong',null,confl.length+' cumul(s) incompatible(s) détecté(s). ');
-    confl.forEach(function(cc){ add(w,'div','muted','« '+state.roles[cc.r].lab+' » : '+cc.x[2]); });
+    // séparation des fonctions : un rôle qui cumule deux habilitations à confier à des personnes différentes
+    var w=add(m,'div','cumuls');
+    var wt=add(w,'div','cumuls-tete'); icon(add(wt,'span','cumuls-ic'),'shield');
+    var wx=add(wt,'div');
+    add(wx,'strong',null,'Séparation des fonctions : '+confl.length+' point'+(confl.length>1?'s':'')+' d’attention');
+    add(wx,'p',null,'Certaines tâches doivent être faites par des personnes différentes, pour qu’un contrôle existe. Les rôles ci-dessous réunissent deux de ces tâches : l’outil le signale sans l’interdire. Si ce n’est pas voulu, retirez l’une des deux habilitations du rôle.');
+    var ul=add(w,'ul','cumuls-liste');
+    confl.forEach(function(cc){
+      var li=add(ul,'li');
+      var t=add(li,'div'); add(t,'strong',null,state.roles[cc.r].lab); t.appendChild(document.createTextNode(' peut à la fois '+cumulLab(cc.x)+'.'));
+      add(li,'div','muted',cc.x[2]);
+    });
   }
 
   var g=add(m,'div','roles-grille');
@@ -134,15 +143,11 @@ function vRoles(m){
       var pile=add(mb,'div','av-pile'); membres.slice(0,5).forEach(function(u){ avatar(pile,u.nom).title=u.nom; });
       add(mb,'span','muted', membres.length===1 ? membres[0].nom : membres.length+' membres');
     }
-    if(inc) chipCellule(k, inc+' cumul incompatible','c-red');
+    if(inc) chipCellule(k, inc+' point'+(inc>1?'s':'')+' d’attention','c-amber');
     var pied=add(k,'div','role-pied');
     var b=add(pied,'button','btn btn-ghost btn-sm','Habilitations'); fk(b,'role-'+r);
     b.addEventListener('click',function(){ ouvrirHabilitations(r); });
   });
-
-  var nb2=add(m,'div','note'); nb2.style.marginTop='18px';
-  add(nb2,'strong',null,'Pourquoi la séparation des fonctions compte ici. ');
-  nb2.appendChild(document.createTextNode("Un même agent qui note les offres et approuve l'attribution rend la procédure indéfendable en cas de recours : il n'existe plus de contrôle croisé à opposer au soumissionnaire évincé. L'outil signale ces cumuls sans les interdire, parce que dans une petite structure ils sont parfois inévitables — mais ils doivent alors être assumés et documentés."));
 }
 
 /* Fenêtre des habilitations d'un rôle : un interrupteur par permission, rangées par groupe. */
@@ -150,7 +155,7 @@ function ouvrirHabilitations(r){
   ouvrirFenetre(function(){ return 'Habilitations — '+((state.roles[r]||{}).lab||r); }, function(c){
     var R_=state.roles[r]; if(!R_) return false;
     var inc=incompatOf(R_.perms);
-    if(inc.length){ var w=add(c,'div','warn'); w.style.marginBottom='14px'; inc.forEach(function(x){ add(w,'div',null,x[2]); }); }
+    if(inc.length){ var w=add(c,'div','warn'); w.style.marginBottom='14px'; inc.forEach(function(x){ var d=add(w,'div'); add(d,'strong',null,'Ce rôle peut à la fois '+cumulLab(x)+'. '); d.appendChild(document.createTextNode(x[2])); }); }
     // permissions rangées par groupe (PERMS n'est pas trié : un groupe peut y revenir plus loin)
     var groupes=[]; PERMS.forEach(function(pp){ if(groupes.indexOf(pp.grp)<0) groupes.push(pp.grp); });
     var ordre=[]; groupes.forEach(function(g){ PERMS.forEach(function(pp){ if(pp.grp===g) ordre.push(pp); }); });

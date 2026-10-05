@@ -34,13 +34,15 @@ server/
 
 Organisation de l'interface (menu) :
 
+- **Notifications** : la cloche de la barre du haut, avec le nombre de non lues (pas d'entrée de menu).
 - **Accueil** : tableau de bord de l'organisation, avec « À faire pour moi » (les actions qui attendent
   l'utilisateur, calculées par le serveur selon ses habilitations) et les chiffres clés de chaque registre.
 - **Registres** : besoins, appels d'offres (toutes les procédures, en cours et passées : phase, titulaire, montant
   attribué, besoin d'origine, commandes ; filtres par phase, année et recherche), commandes et réceptions,
   partenaires (ou « Mon référencement » pour un prestataire).
 - **Détail d'un appel d'offres** : il n'a pas d'entrée dans le menu ; on l'ouvre depuis le registre (icône œil de
-  la ligne), et « Appels d'offres » reste en surbrillance. Une étape terminée se consulte sans se modifier. Dans la page, une frise de six étapes (Préparer, Publication
+  la ligne) : un AO en cours s'ouvre sur l'écran où l'on s'était arrêté (à défaut, l'étape en cours), un AO terminé
+  sur sa clôture. « Appels d'offres » reste en surbrillance. Une étape terminée se consulte sans se modifier. Dans la page, une frise de six étapes (Préparer, Publication
   et offres, Dépouiller, Évaluer, Décider, Clore) montre ce qui est fait, en cours ou à venir ; une étape à plusieurs
   écrans les présente en sous-onglets ; « Étape suivante » en bas, avec les outils (vue d'ensemble, journal d'audit),
   et le changement de procédure en en-tête quand il y en a plusieurs. De l'étape 2 à l'étape 6, les informations

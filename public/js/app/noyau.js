@@ -37,11 +37,17 @@ var PERMS = [
   {id:'commande.approve',lab:"Valider un bon de commande",          grp:'Exécution'}
 ];
 /* Incompatibilites : separation des fonctions */
+/* Cumuls d'habilitations à éviter (séparation des fonctions) : [habilitation, habilitation, pourquoi]. */
 var INCOMPAT = [
-  ['eval.score','decision.approve', "Noter et approuver relèvent de personnes distinctes : cumuler les deux prive la procédure de tout contrôle croisé."],
-  ['cdc.publish','portail.use',     "Publier le dossier et y répondre est un conflit d'intérêts caractérisé."],
-  ['eval.validate','decision.approve', "Valider l'évaluation et l'approuver ne peuvent relever du même titulaire."]
+  ['eval.score','decision.approve', "Qui note les offres ne devrait pas aussi approuver l'attribution : plus personne ne contrôlerait sa notation."],
+  ['cdc.publish','portail.use',     "Qui publie le dossier ne peut pas aussi déposer une offre : il connaîtrait le dossier avant les autres candidats."],
+  ['eval.validate','decision.approve', "Qui valide l'évaluation ne devrait pas aussi l'approuver : il validerait son propre travail."]
 ];
+/* « Noter les offres » et « Approuver l'attribution » : les deux habilitations d'un cumul, en clair. */
+function cumulLab(x){
+  function lab(id){ var p=PERMS.filter(function(q){ return q.id===id; })[0]; return '« '+(p?p.lab:id)+' »'; }
+  return lab(x[0])+' et '+lab(x[1]);
+}
 function permsDef(list){ var o={}; PERMS.forEach(function(p){ o[p.id]= list.indexOf(p.id)>=0; }); return o; }
 function ROLES_DEF(){
   return {
@@ -498,7 +504,7 @@ function vide(parent, ic, titre, texte){
    procédure ouverte (groupe « Procédure », avec son sélecteur), puis l'administration. */
 var VIEWS=[
   {id:'accueil',    label:'Tableau de bord', grp:'Accueil'},
-  {id:'notifs',     label:'Notifications', grp:'Accueil'},
+  {id:'notifs',     label:'Notifications', grp:'Accueil', menu:false}, // ouvert par la cloche de la barre du haut
   {id:'besoins',    label:'Besoins', grp:'Registres', perms:['besoin.create','besoin.approve','besoin.manage']},
   {id:'procedures', label:'Appels d’offres', grp:'Registres'},
   {id:'commandes',  label:'Commandes et réceptions', grp:'Registres'},
@@ -558,7 +564,7 @@ function renderNav(){
   var grp=null;
   // les écrans de la procédure ne figurent pas dans le menu : on ouvre un appel d'offres depuis le registre, et
   // « Appels d'offres » reste l'entrée active pendant qu'on est dans son détail
-  var vis=VIEWS.filter(vueVisible).filter(function(v){ return v.grp!=='Procédure'; });
+  var vis=VIEWS.filter(vueVisible).filter(function(v){ return v.grp!=='Procédure' && v.menu!==false; });
   var famillesPosees={};
   vis.forEach(function(v){
     if(v.famille){

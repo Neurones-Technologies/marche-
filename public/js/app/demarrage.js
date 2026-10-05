@@ -8,12 +8,41 @@ var ROUTER={accueil:vAccueil, dashboard:vDashboard, notifs:vNotifs, procedures:v
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
 /* Ouvre une autre procédure : les saisies en attente partent d'abord, l'écran courant est conservé s'il existe. */
 function ouvrirProcedure(id, vue){
-  if(id===MP.pid()){ if(vue) go(vue); return; }
+  // vue « entree » : l'écran d'arrivée se choisit une fois la procédure chargée (vueDEntree)
+  if(id===MP.pid()){ if(vue) go(vue==='entree' ? vueDEntree() : vue); return; }
   if(flushTimer) clearTimeout(flushTimer);
-  var v=vue||state.view;
-  Promise.resolve(flush()).then(function(){ return MP.switchTo(id); }).then(function(){ if(viewAllowed(v)) go(v); closeMenu(); })
-    .catch(function(e){ toast(e.message||'Procédure inaccessible.'); });
+  Promise.resolve(flush()).then(function(){ return MP.switchTo(id); }).then(function(){
+    var v = vue==='entree' ? vueDEntree() : (vue||state.view);
+    if(viewAllowed(v)) go(v); closeMenu();
+  }).catch(function(e){ toast(e.message||'Procédure inaccessible.'); });
 }
+/* Dernier écran consulté de chaque procédure, gardé dans ce navigateur. */
+function memoriserVue(pid, vue){ try{ localStorage.setItem('marcheplus.vue.'+pid, vue); }catch(e){} }
+function vueMemorisee(pid){ try{ return localStorage.getItem('marcheplus.vue.'+pid); }catch(e){ return null; } }
+/* Écran d'arrivée dans une procédure : la clôture si elle est terminée ; sinon l'écran où l'on s'était arrêté ;
+   à défaut, le premier écran de l'étape en cours. Le prestataire arrive sur son dépôt d'offre. */
+function vueDEntree(){
+  if(!can('offres.read') && !can('cdc.edit')) return viewAllowed('portail') ? 'portail' : 'dashboard';
+  var cur=MP.current()||{};
+  var terminee = state.contractSigned || state.infructueux || cur.archive;
+  if(terminee){ var fin=['recours','pv','dashboard'].filter(viewAllowed)[0]; if(fin) return fin; }
+  var m=vueMemorisee(MP.pid());
+  if(m && vueDeProcedure(m) && viewAllowed(m)) return m;
+  var st=etapesStatut();
+  for(var i=0;i<ETAPES.length;i++){ if(st[ETAPES[i].id]!=='done'){ var v=vuesPermises(ETAPES[i]); if(v.length) return v[0]; } }
+  return 'dashboard';
+}
+/* Cloche de la barre du haut : ouvre les notifications ; pastille du nombre de non lues. */
+function renderCloche(){
+  var b=document.getElementById('cloche'); if(!b) return;
+  b.textContent=''; icon(b,'bell');
+  var n = 0; try{ n = nonLues().length; }catch(e){}
+  if(n) add(b,'span','cloche-n', n>99 ? '99+' : String(n));
+  b.setAttribute('aria-label', n ? 'Notifications — '+n+' non lue(s)' : 'Notifications');
+  b.title = b.getAttribute('aria-label');
+  b.classList.toggle('on', state.view==='notifs');
+}
+document.getElementById('cloche').addEventListener('click',function(){ go('notifs'); });
 function renderHeader(){
   var org=state.org||{};
   var t=document.getElementById('tenant'); t.textContent='';
@@ -46,6 +75,7 @@ function render(){
 
   renderNav();
   renderHeader();
+  renderCloche();
   var chip=document.getElementById('phase-chip');
   if(avecProcedure()){ var ph=phase(); chip.textContent=ph.k; chip.className='chip '+ph.c; }
   // la phase figure dans l'en-tête des écrans de procédure ; la pastille du haut ne sert plus que sans ce cadre
@@ -57,7 +87,7 @@ function render(){
   var m=document.getElementById('main'); m.textContent=''; m.classList.remove('avec-sommaire'); // posée par organiserSections
   if(vueDeProcedure(state.view) && avecCadreProcedure()){
     // écran de procédure : en-tête, frise des étapes, sous-onglets, puis l'écran, puis précédente / suivante
-    UI.derniereVueProc=state.view;
+    UI.derniereVueProc=state.view; memoriserVue(MP.pid(), state.view);
     var corps=cadreProcedureHaut(m);
     (ROUTER[state.view]||vDashboard)(corps);
     organiserSections(corps, state.view);

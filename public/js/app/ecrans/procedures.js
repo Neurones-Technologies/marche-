@@ -59,9 +59,9 @@ function vProcedures(m){
       nouveau: can('cdc.edit') ? { lab:'Nouvelle procédure', action:nouvelleProcedure } : null,
       actions:function(p,td){
         // le détail de l'appel d'offres s'ouvre d'ici (il n'a plus d'entrée dans le menu)
+        // en cours : là où l'on s'était arrêté ; terminé : la clôture (vueDEntree)
         var b=boutonIcone(td,'eye','Ouvrir le détail de '+p.ref,function(){
-          var vue = can('offres.read')||can('cdc.edit') ? 'dashboard' : 'portail';
-          if(p.id===MP.pid()) go(vue); else MP.refreshProcs().then(function(){ ouvrirProcedure(p.id, vue); });
+          if(p.id===MP.pid()) ouvrirProcedure(p.id,'entree'); else MP.refreshProcs().then(function(){ ouvrirProcedure(p.id,'entree'); });
         },'proc-open-'+p.id);
         b.setAttribute('data-consult','');
         if(can('params.edit')) boutonIcone(td,'archive',(p.archive?'Désarchiver ':'Archiver ')+p.ref,function(){ archiver(p); },'proc-arch-'+p.id);
