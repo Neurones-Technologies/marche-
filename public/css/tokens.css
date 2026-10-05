@@ -5,7 +5,7 @@
    CSS ne permet pas d'exprimer en variables (480 / 720 / 980 px).
 
    Trois palettes, mêmes variables :
-     chaleureux     (par défaut, proche des couleurs Neurones)
+     chaleureux     (par défaut : orange et blanc, couleurs Neurones)
      institutionnel (bleu marine et or)
      vivant         (indigo)
    Choisie par l'utilisateur (menu Compte), posée sur <html data-theme="…">
@@ -88,11 +88,11 @@
   --color-text-2: #5C6371;
   --color-text-3: #A8A097;
 
-  --color-accent: #1F5F8B;           /* boutons principaux, étape en cours */
-  --color-chart: #1D6FB8;            /* marques de graphique (série unique) */
-  --color-accent-hover: #184C70;
-  --color-accent-soft: #E6F0F7;
-  --color-accent-ring: #D7E7F2;
+  --color-accent: #B4471B;           /* boutons principaux, étape en cours */
+  --color-chart: #D0601F;            /* marques de graphique (série unique) */
+  --color-accent-hover: #923914;
+  --color-accent-soft: #FDF0E7;
+  --color-accent-ring: #F7D8C4;
   --color-on-accent: #FFFFFF;
 
   --color-brand: #C2531F;            /* logo, élément de menu actif */
@@ -113,7 +113,7 @@
   --color-blocked: #A3392B;  --color-blocked-bg: #FBEAE7;
   --color-pending: #8A5205;  --color-pending-bg: #FFF5E3;  --color-pending-solid: #E39A1C;
   --color-draft: #5C6371;    --color-draft-bg: #F0EDE8;
-  --color-info: #1F5F8B;     --color-info-bg: #E6F0F7;
+  --color-info: #A3461A;     --color-info-bg: #FFF1E6;
 
   --color-overlay: rgba(31, 36, 48, .40);
   --shadow-card: 0 1px 2px rgba(60, 40, 20, .05), 0 4px 14px rgba(60, 40, 20, .05);
