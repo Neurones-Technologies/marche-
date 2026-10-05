@@ -55,6 +55,12 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Route inconnue.' })
 // no-cache : le navigateur revalide chaque fichier (304 s'il n'a pas changé). Avec un max-age, une mise à jour
 // pouvait mêler un index.html neuf et un script ancien resté en cache, et l'interface ne s'affichait plus.
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'], setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
+// Adresses de l'interface (/demandes-achat, /appels-offres/p1/cahier-des-charges…) : la même page, qui lit
+// l'adresse pour ouvrir le bon écran. Un chemin avec une extension reste un fichier (404 s'il manque).
+app.get(/^\/(?!api\/)[^.]*$/, (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
 app.use((err, req, res, next) => { // eslint-disable-line
   console.error(err);
   res.status(err.status || 500).json({ error: cfg.prod ? 'Erreur interne.' : String(err.message) });

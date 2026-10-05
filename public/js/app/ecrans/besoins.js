@@ -36,7 +36,7 @@ function vBesoins(m){
         filtres:[{ lab:'Statut', options:Object.keys(STATUTS_BESOIN).map(function(k){ return [k, STATUTS_BESOIN[k][0]]; }), test:function(b,v){ return b.statut===v; } }],
         nouveau: can('besoin.create') ? { lab:'Nouvelle demande', action:function(){ creation(r.regles); } } : null,
         actions:function(b,td){
-          boutonCellule(td, UI.besoin===b.id ? 'Affiché' : 'Ouvrir', function(){ UI.besoin=b.id; charger(); }, 'bes-open-'+b.id).disabled = UI.besoin===b.id;
+          boutonCellule(td, UI.besoin===b.id ? 'Affiché' : 'Ouvrir', function(){ UI.besoin=b.id; majUrl(); charger(); }, 'bes-open-'+b.id).disabled = UI.besoin===b.id;
         }
       });
       var cur=liste_.filter(function(b){ return b.id===UI.besoin; })[0];
@@ -87,14 +87,14 @@ function vBesoins(m){
       var go_=add(foot,'button','btn btn-primary','Enregistrer le brouillon'); fk(go_,'bes-creer');
       go_.addEventListener('click',function(){
         go_.disabled=true;
-        MP.api('POST','/api/besoins',lire()).then(function(r){ toast('Demande '+r.besoin.id+' enregistrée.'); fermerFenetre(); UI.besoin=r.besoin.id; charger(); })
+        MP.api('POST','/api/besoins',lire()).then(function(r){ toast('Demande '+r.besoin.id+' enregistrée.'); fermerFenetre(); UI.besoin=r.besoin.id; majUrl(); charger(); })
           .catch(function(e){ toast(e.message); go_.disabled=false; });
       });
     }, { large:true });
   }
 
   function fiche(parent, b, regles){
-    retourListe(parent,'Toutes les demandes',function(){ UI.besoin=null; charger(); },'bes-retour');
+    retourListe(parent,'Toutes les demandes',function(){ UI.besoin=null; majUrl(); charger(); },'bes-retour');
     var k=add(parent,'div','card');
     var ph=add(k,'div','panel-head'); add(ph,'span',null,b.id+' — '+b.objet);
     var st=STATUTS_BESOIN[b.statut]||[b.statut,'c-grey']; add(ph,'span','chip '+st[1],st[0]);

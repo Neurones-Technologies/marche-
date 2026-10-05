@@ -43,7 +43,7 @@ function vCommandes(m){
       recherche:function(c){ return [c.numero, c.titulaire.nom, c.procedure.ref, c.procedure.objet].join(' '); },
       filtres:[{ lab:'Statut', options:Object.keys(STATUTS_COMMANDE).map(function(k){ return [k, STATUTS_COMMANDE[k][0]]; }), test:function(c,v){ return c.statut===v; } }],
       nouveau: can('commande.manage') ? { lab:'Nouvelle commande', action:function(){ nouvelleCommande(eligibles); } } : null,
-      actions:function(c,td){ boutonCellule(td, UI.commande===c.id?'Affichée':'Ouvrir', function(){ UI.commande=c.id; zone.textContent=''; dessiner(list,eligibles); }, 'cmd-open-'+c.id).disabled=UI.commande===c.id; }
+      actions:function(c,td){ boutonCellule(td, UI.commande===c.id?'Affichée':'Ouvrir', function(){ UI.commande=c.id; majUrl(); zone.textContent=''; dessiner(list,eligibles); }, 'cmd-open-'+c.id).disabled=UI.commande===c.id; }
     });
     var cur=list.filter(function(c){ return c.id===UI.commande; })[0];
     if(cur) fiche(cur);
@@ -62,14 +62,14 @@ function vCommandes(m){
       var bn=add(p,'button','btn btn-primary','Établir la commande'); fk(bn,'cmd-new');
       bn.addEventListener('click',function(){
         bn.disabled=true;
-        MP.api('POST','/api/commandes',{procedure:sel.value}).then(function(r){ UI.commande=r.commande.id; toast('Brouillon de commande établi.'); fermerFenetre(); charger(); })
+        MP.api('POST','/api/commandes',{procedure:sel.value}).then(function(r){ UI.commande=r.commande.id; majUrl(); toast('Brouillon de commande établi.'); fermerFenetre(); charger(); })
           .catch(function(e){ toast(e.message); bn.disabled=false; });
       });
     });
   }
 
   function fiche(c){
-    var rt=retourListe(zone,'Toutes les commandes',function(){ UI.commande=null; charger(); },'cmd-retour'); rt.style.marginTop='18px';
+    var rt=retourListe(zone,'Toutes les commandes',function(){ UI.commande=null; majUrl(); charger(); },'cmd-retour'); rt.style.marginTop='18px';
     var modifiable = can('commande.manage') && (c.statut==='brouillon' || c.statut==='rejete');
     if(c.rejet && c.statut==='rejete'){ var w=add(zone,'div','warn'); w.style.marginTop='18px'; add(w,'strong',null,'Rejetée ('+c.rejet.role+', '+c.rejet.at+') : '); w.appendChild(document.createTextNode(c.rejet.motif)); }
     if(c.annulation){ var wa=add(zone,'div','warn'); wa.style.marginTop='18px'; add(wa,'strong',null,'Annulée le '+c.annulation.at+' : '); wa.appendChild(document.createTextNode(c.annulation.motif)); }

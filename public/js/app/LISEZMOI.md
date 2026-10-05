@@ -44,6 +44,9 @@ Avant eux, `profils.js`, `regles.js` (partagés avec le serveur) et `api.js` (co
 - Un détail commence par `retourListe(parent, libellé, action)` : lien de retour à la liste.
 - Deux écrans d’une même `famille` (`VIEWS`, `FAMILLES` dans `noyau.js`) n’ont qu’une entrée de menu ; le rendu pose
   leurs onglets en tête de page (`ongletsFamille`).
+- **Adresses** : chaque écran a la sienne (`routes.js` : `ROUTES_VUES`, `ROUTES_PROCEDURE`). Un nouvel écran y
+  reçoit son chemin ; un détail affiché sous une liste (`UI.besoin`…) est dans `DETAILS` et l'écran appelle `majUrl()`
+  quand il l'ouvre ou le ferme. Le serveur renvoie la page pour toute adresse sans extension hors /api.
 - Le rendu appelle `organiserSections` : un écran d’au moins quatre sections reçoit le sommaire collé à droite. Une section
   est une carte posée directement dans le contenu, qui commence par un `.panel-head`. Un titre « N · Titre »
   donne la pastille N (le texte de l’en-tête reste « N · Titre ») ; sans numéro, la pastille porte le rang.

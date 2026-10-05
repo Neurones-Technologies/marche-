@@ -36,6 +36,9 @@
   function choose() {
     var saved = null; try { saved = localStorage.getItem(procKey()); } catch (e) { /* stockage indisponible */ }
     var has = function (id) { return PROCS.some(function (p) { return p.id === id; }); };
+    // adresse d'un écran de procédure (/appels-offres/<id>/…) : cette procédure, si elle est visible
+    var m = /^\/appels-offres\/([^/]+)\/[^/]+\/?$/.exec(location.pathname), voulu = m ? decodeURIComponent(m[1]) : null;
+    if (voulu && has(voulu)) return voulu;
     if (saved && has(saved)) return saved;
     var actives = PROCS.filter(function (p) { return !p.archive; });
     return (actives[0] || PROCS[0] || {}).id || null;
@@ -96,7 +99,7 @@
   });
 
   $('btn-logout').addEventListener('click', function () {
-    api('POST', '/api/auth/logout', {}).catch(function () {}).then(function () { showLogin(); });
+    api('POST', '/api/auth/logout', {}).catch(function () {}).then(function () { try { history.replaceState(null, '', '/'); } catch (e) { /* sans historique */ } showLogin(); });
   });
 
   $('btn-pwd').addEventListener('click', function () {

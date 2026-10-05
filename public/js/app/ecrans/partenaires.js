@@ -192,13 +192,13 @@ function vPartenaires(m){
       ],
       recherche:function(p){ return [p.id, p.raisonSociale, p.pays, p.immatriculation, (p.domaines||[]).join(' ')].join(' '); },
       filtres:[{ lab:'Statut', options:Object.keys(STATUTS_PARTENAIRE).map(function(k){ return [k, STATUTS_PARTENAIRE[k][0]]; }), test:function(p,v){ return p.statut===v; } }],
-      actions:function(p,td){ boutonCellule(td, UI.partenaire===p.id?'Affiché':'Ouvrir', function(){ UI.partenaire=p.id; zone.textContent=''; dessiner(list); }, 'prt-open-'+p.id).disabled=UI.partenaire===p.id; }
+      actions:function(p,td){ boutonCellule(td, UI.partenaire===p.id?'Affiché':'Ouvrir', function(){ UI.partenaire=p.id; majUrl(); zone.textContent=''; dessiner(list); }, 'prt-open-'+p.id).disabled=UI.partenaire===p.id; }
     });
     var cur=list.filter(function(p){ return p.id===UI.partenaire; })[0];
     if(cur) fiche(cur);
   }
   function fiche(p){
-    var rt=retourListe(zone,'Tous les partenaires',function(){ UI.partenaire=null; charger(); },'prt-retour'); rt.style.marginTop='18px';
+    var rt=retourListe(zone,'Tous les partenaires',function(){ UI.partenaire=null; majUrl(); charger(); },'prt-retour'); rt.style.marginTop='18px';
     var k=add(zone,'div','card');
     var ph=add(k,'div','panel-head'); add(ph,'span',null,p.id+' — '+p.raisonSociale); chipStatutPartenaire(ph,p.statut);
     var b=add(k,'div','pad');

@@ -128,6 +128,7 @@ function render(){
       window.scrollTo(0,sy);
     }
   }
+  majUrl(); // l'adresse du navigateur suit l'écran (routes.js)
 }
 document.getElementById('burger').addEventListener('click',function(){
   var sd=document.getElementById('side');
@@ -152,7 +153,11 @@ window.MarchePlus = {
     UI.derniereVueProc=null; // l'écran où reprendre est propre à une session et à une procédure
     // Après une connexion, on part de l'accueil du rôle ; après un rechargement, on reprend l'écran mémorisé,
     // à condition qu'il figure encore dans le menu de ce rôle (le rôle a pu changer entre-temps).
-    if((opts && opts.fromLogin) || !viewAllowed(state.view)){ state.view=homeView(); state.offerIndex=0; saveUI(); }
+    // Une adresse d'écran (lien copié, rechargement, retour après connexion) l'emporte, si le rôle y a accès.
+    var r=lireChemin(location.pathname);
+    if(r && (!r.pid || r.pid===MP.pid()) && viewAllowed(r.vue)){ state.view=r.vue; poserDetail(r); saveUI(); }
+    else if((opts && opts.fromLogin) || !viewAllowed(state.view) || (!r && location.pathname!=='/')){ state.view=homeView(); state.offerIndex=0; saveUI(); } // adresse inconnue : l'accueil
+    UI.remplacerUrl=true;
     resetBtn.style.display = can('params.edit')||can('roles.edit') ? '' : 'none'; render();
   },
   poll:poll,

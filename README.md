@@ -34,6 +34,9 @@ server/
 
 Organisation de l'interface (menu) :
 
+- **Adresses** : chaque écran a son adresse (/demandes-achat, /execution/<commande>, /appels-offres/<procédure>/
+  cahier-des-charges…) ; Précédent et Suivant du navigateur fonctionnent, et un lien copié ouvre le bon écran, après
+  la connexion s'il le faut.
 - **Notifications** : pas de page dédiée. La cloche de la barre du haut compte les non lues et ouvre un panneau
   déroulant ; une notification qui arrive pendant la session s'affiche un instant en bas à droite (« push »).
 - **Accueil** : tableau de bord de l'organisation, avec « À faire pour moi » (les actions qui attendent
