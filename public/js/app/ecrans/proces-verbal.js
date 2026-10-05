@@ -2,8 +2,8 @@
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
    Le procès-verbal se présente comme un document : une page posée sur une table grise, avec en-tête de
    l'autorité contractante, titre, informations de la procédure, sections numérotées, tableaux et cartouches de
-   signature. L'écran n'en montre que le haut ; l'icône ou le bouton « Voir le document complet » l'ouvre en entier dans
-   une fenêtre. La barre de la carte porte la référence, l'état, l'impression (document complet) et l'agrandissement. */
+   signature. L'écran n'en montre que le haut ; l'icône d'agrandissement de la barre l'ouvre en entier dans une
+   fenêtre. La barre de la carte porte la référence, l'état, l'impression (document complet) et l'agrandissement. */
 "use strict";
 
 function vPV(m){
@@ -22,9 +22,7 @@ function vPV(m){
   // aperçu : le haut du document ; le document entier s'ouvre en fenêtre (l'impression reste complète)
   var scene=add(carte,'div','doc-scene doc-apercu');
   remplirPV(add(scene,'article','pv-doc doc-imprimable'));
-  var suite=add(scene,'div','doc-suite');
-  var bs=add(suite,'button','btn btn-primary'); bs.type='button'; icon(bs,'agrandir'); bs.appendChild(document.createTextNode('Voir le document complet'));
-  fk(bs,'pv-voir-tout'); bs.setAttribute('data-consult',''); bs.addEventListener('click',ouvrirPV);
+  add(scene,'div','doc-suite').setAttribute('aria-hidden','true'); // fondu vers le bas
 }
 
 /* Le procès-verbal entier, dans une fenêtre large. */
