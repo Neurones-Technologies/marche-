@@ -2,12 +2,12 @@
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
    Le procès-verbal se présente comme un document : une page posée sur une table grise, avec en-tête de
    l'autorité contractante, titre, informations de la procédure, sections numérotées, tableaux et cartouches de
-   signature. La barre de la carte porte la référence, l'état et l'impression (seule la page est imprimée). */
+   signature. L'écran n'en montre que le haut ; l'icône ou le bouton « Voir le document complet » l'ouvre en entier dans
+   une fenêtre. La barre de la carte porte la référence, l'état, l'impression (document complet) et l'agrandissement. */
 "use strict";
 
 function vPV(m){
   if(!allApproved()) return locked(m,"Le procès-verbal est généré une fois les niveaux d'approbation franchis.",'decision',"Aller au circuit d'approbation");
-  var rows=ranking(), win=rows[0], c=state.cdc, org=state.org||{};
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,"Procès-verbal d'attribution");
 
@@ -17,7 +17,27 @@ function vPV(m){
   chipCellule(barre, state.contractSigned ? 'Marché signé' : 'Attribution prononcée', state.contractSigned ? 'c-green' : 'c-amber');
   boutonIcone(barre,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'pv-imprimer');
 
-  var pv=add(add(carte,'div','doc-scene'),'article','pv-doc doc-imprimable');
+  var voir=boutonIcone(barre,'agrandir','Voir le procès-verbal en entier',ouvrirPV,'pv-voir'); voir.setAttribute('data-consult','');
+
+  // aperçu : le haut du document ; le document entier s'ouvre en fenêtre (l'impression reste complète)
+  var scene=add(carte,'div','doc-scene doc-apercu');
+  remplirPV(add(scene,'article','pv-doc doc-imprimable'));
+  var suite=add(scene,'div','doc-suite');
+  var bs=add(suite,'button','btn btn-primary'); bs.type='button'; icon(bs,'agrandir'); bs.appendChild(document.createTextNode('Voir le document complet'));
+  fk(bs,'pv-voir-tout'); bs.setAttribute('data-consult',''); bs.addEventListener('click',ouvrirPV);
+}
+
+/* Le procès-verbal entier, dans une fenêtre large. */
+function ouvrirPV(){
+  ouvrirFenetre('Procès-verbal — '+REF(), function(c){
+    if(!allApproved()) return false;
+    remplirPV(add(add(c,'div','doc-scene'),'article','pv-doc'));
+  }, { large:true });
+}
+
+/* Contenu du procès-verbal, dans l'élément pv. */
+function remplirPV(pv){
+  var rows=ranking(), win=rows[0], c=state.cdc, org=state.org||{};
 
   /* En-tête */
   var et=add(pv,'header','pvd-entete');
