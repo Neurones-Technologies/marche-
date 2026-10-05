@@ -1,65 +1,150 @@
-/* Marché+ — Écran Notifications.
-   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
+/* Marché+ — Notifications : panneau de la cloche, notifications « push », journal des envois.
+   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
+   Pas de page « Notifications » : la cloche de la barre du haut ouvre un panneau déroulant, et une notification
+   qui arrive pendant la session s'affiche un instant en bas à droite. L'administration consulte tous les envois
+   (application et courriel) avec leur statut dans « Alertes › Journal des envois ». */
 "use strict";
 
-/* ============ Notifications (centre) ============ */
-function vNotifs(m){
-  setTimeout(function(){ if(state.view==='notifs'){ var k=marquerLues(); if(k){ renderNav(); var bn=document.getElementById('bell-n'); if(bn){bn.textContent='';bn.style.cssText='';} } } },1500);
-  var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,'Notifications');
-  var mk=add(h,'button','btn btn-ghost btn-sm','Tout marquer comme lu'); fk(mk,'mk-read');
-  mk.addEventListener('click',function(){ var k=marquerLues(); render(); toast(k?k+' notification(s) marquée(s) comme lue(s).':'Aucune notification non lue.'); });
-
-  var mine=notifsPourMoi(), unread=nonLues().length;
-  var envoiReel=!!(state.courriels && state.courriels.mode==='microsoft365');
-  var st=add(m,'div','stats');
-  [['Non lues',String(unread),unread?'var(--amber)':null],
-   ['Reçues',String(mine.length),null],
-   [envoiReel ? 'Courriels' : 'Courriels simulés',String(state.emails.length),null],
-   ['Événements actifs',String(EVENTS.filter(function(e){var r=state.notifRules[e.id];return r&&(r.inapp||r.email);}).length)+' / '+EVENTS.length,null]
-  ].forEach(function(x){ var c=add(st,'div','card pad'); add(c,'div','stat-k',x[0]); var v=add(c,'div','stat-v',x[1]); if(x[2]) v.style.color=x[2]; });
-
-  var c1=add(m,'div','card');
-  add(c1,'div','panel-head','Fil des notifications');
-  var b1=add(c1,'div','pad');
-  if(!mine.length) add(b1,'p','muted',"Aucune notification pour ce rôle. Réalisez une action (publier le dossier, déposer une offre, approuver) pour en déclencher.");
-  var uid=state.me;
-  mine.forEach(function(nn){
-    var lu=nn.lu.indexOf(uid)>=0;
-    var row=add(b1,'div'); row.style.cssText='display:flex;gap:12px;padding:13px 0;border-top:1px solid var(--line-2);align-items:flex-start';
-    var dot=add(row,'span'); dot.setAttribute('aria-hidden','true');
-    dot.style.cssText='width:9px;height:9px;border-radius:50%;margin-top:7px;flex:0 0 auto;background:'+(lu?'var(--line)':'var(--teal)');
-    var d=add(row,'div'); d.style.flex='1 1 auto';
-    var t=add(d,'div'); t.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-    add(t,'strong',null,nn.titre);
-    add(t,'span','chip c-grey',nn.lab);
-    if(!lu) add(t,'span','chip c-teal','Non lue');
-    add(d,'div','muted',nn.corps);
-    add(d,'div','muted',nn.t+' · destinataires : '+nn.roles.map(roleLab).join(', '));
+/* ============ Panneau de la cloche ============ */
+UI.panneauNotifs = null;
+function basculerPanneauNotifs(){ if(UI.panneauNotifs) fermerPanneauNotifs(); else ouvrirPanneauNotifs(); }
+function ouvrirPanneauNotifs(){
+  fermerPanneauNotifs();
+  var p=el('div','notif-panneau'); p.setAttribute('role','dialog'); p.setAttribute('aria-label','Notifications');
+  document.body.appendChild(p);
+  function dehors(e){ if(!p.contains(e.target) && !e.target.closest('#cloche')) fermerPanneauNotifs(); }
+  function touche(e){ if(e.key==='Escape'){ fermerPanneauNotifs(); var b=document.getElementById('cloche'); if(b) b.focus(); } }
+  document.addEventListener('mousedown',dehors,true); document.addEventListener('keydown',touche,true);
+  UI.panneauNotifs={ el:p, dehors:dehors, touche:touche };
+  dessinerPanneauNotifs();
+  var b=document.getElementById('cloche'); if(b){ b.setAttribute('aria-expanded','true'); b.classList.add('on'); }
+  var premier=p.querySelector('button'); if(premier) premier.focus();
+}
+function fermerPanneauNotifs(){
+  var P=UI.panneauNotifs; if(!P) return;
+  UI.panneauNotifs=null;
+  document.removeEventListener('mousedown',P.dehors,true); document.removeEventListener('keydown',P.touche,true);
+  if(P.el.parentNode) P.el.parentNode.removeChild(P.el);
+  var b=document.getElementById('cloche'); if(b){ b.setAttribute('aria-expanded','false'); b.classList.remove('on'); }
+}
+function dessinerPanneauNotifs(){
+  var P=UI.panneauNotifs; if(!P) return;
+  var p=P.el; p.textContent='';
+  var uid=state.me, miennes=notifsPourMoi(), nl=nonLues().length;
+  var tete=add(p,'div','notif-tete');
+  var tt=add(tete,'div'); add(tt,'strong',null,'Notifications'); add(tt,'span','muted', nl ? ' · '+nl+' non lue'+(nl>1?'s':'') : ' · tout est lu');
+  if(nl){ var tl=add(tete,'button','notif-tout','Tout marquer comme lu'); tl.type='button'; fk(tl,'notif-tout-lu');
+    tl.addEventListener('click',function(){ marquerLues(); render(); }); }
+  var liste=add(p,'div','notif-liste');
+  if(!miennes.length){ var v=add(liste,'div','notif-vide'); icon(add(v,'span','notif-vide-ic'),'bell'); add(v,'p',null,'Aucune notification pour le moment.'); return; }
+  miennes.slice(0,20).forEach(function(n){
+    var lu=n.lu.indexOf(uid)>=0;
+    var b=add(liste,'button','notif-item'+(lu?'':' nonlue')); b.type='button'; fk(b,'notif-'+n.id);
+    add(b,'span','notif-point').setAttribute('aria-hidden','true');
+    var d=add(b,'span','notif-texte');
+    add(d,'strong',null,n.titre);
+    add(d,'span','notif-corps',n.corps);
+    add(d,'span','notif-meta',n.t+' · '+n.lab);
+    if(!lu) add(b,'span','sr-only',' — non lue');
+    b.addEventListener('click',function(){ if(n.lu.indexOf(uid)<0){ n.lu.push(uid); save(); render(); } });
   });
+}
 
-  var c2=add(m,'div','card'); c2.style.marginTop='18px';
-  var ph=add(c2,'div','panel-head');
-  add(ph,'span',null,"Boîte d'envoi — courriels");
-  add(ph,'span','chip '+(envoiReel?'c-green':'c-amber'), envoiReel ? 'Envoi par Microsoft 365 — '+state.courriels.expediteur : 'Simulation : aucun message n\u2019est réellement expédié');
-  var b2=add(c2,'div','pad');
-  if(!state.emails.length) add(b2,'p','muted',"Aucun courriel généré pour l'instant.");
-  state.emails.slice(0,12).forEach(function(mm){
-    var row=add(b2,'div'); row.style.cssText='padding:14px 0;border-top:1px solid var(--line-2)';
-    var t=add(row,'div'); t.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-    add(t,'strong',null,mm.objet);
-    add(t,'span','chip c-grey',mm.t);
-    var ST={ 'envoyé':'c-green', 'en cours':'c-amber', 'échec':'c-red', 'simulé':'c-grey', 'sans destinataire':'c-grey' };
-    if(mm.statut) add(t,'span','chip '+(ST[mm.statut]||'c-grey'), mm.statut==='échec' && mm.erreur ? 'Échec : '+mm.erreur : mm.statut);
-    add(row,'div','muted','De : '+mm.de+' — À : '+(mm.a.join(', ')||'(aucun destinataire pour les rôles visés)'));
-    if(mm.noms.length) add(row,'div','muted','Soit : '+mm.noms.join(' · '));
-    var pre=add(row,'div',null,mm.corps);
-    pre.style.cssText='white-space:pre-line;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:8px;font-size:13px';
+/* ============ Notifications « push » ============ */
+/* Identifiants déjà connus de cette session : seules les notifications arrivées ensuite s'affichent en push
+   (celles déclenchées par l'utilisateur lui-même sont ajoutées dès leur création, voir notify). */
+UI.notifsConnues = null; UI.notifsConnuesDe = null;
+function suivreNotifs(){
+  if(!state || !state.notifs || !state.me) return;
+  var uid=state.me, miennes=notifsPourMoi();
+  if(!UI.notifsConnues || UI.notifsConnuesDe!==uid){
+    UI.notifsConnues={}; UI.notifsConnuesDe=uid;
+    miennes.forEach(function(n){ UI.notifsConnues[n.id]=1; });
+    return;
+  }
+  miennes.slice().reverse().forEach(function(n){
+    if(UI.notifsConnues[n.id]) return;
+    UI.notifsConnues[n.id]=1;
+    if(n.lu.indexOf(uid)<0) pousser(n);
   });
+}
+function pousser(n){
+  var pile=document.getElementById('push-pile');
+  if(!pile){ pile=el('div','push-pile'); pile.id='push-pile'; pile.setAttribute('aria-live','polite'); document.body.appendChild(pile); }
+  while(pile.children.length>=3) pile.removeChild(pile.firstChild);
+  var c=add(pile,'div','push');
+  var ic=add(c,'span','push-ic'); icon(ic,'bell');
+  var b=add(c,'button','push-texte'); b.type='button';
+  add(b,'strong',null,n.titre); add(b,'span',null,n.corps);
+  b.addEventListener('click',function(){ retirer(); ouvrirPanneauNotifs(); });
+  var x=add(c,'button','push-fermer'); x.type='button'; icon(x,'x'); x.setAttribute('aria-label','Fermer la notification');
+  x.addEventListener('click',retirer);
+  var minuterie=setTimeout(retirer,7000);
+  c.addEventListener('mouseenter',function(){ clearTimeout(minuterie); });
+  c.addEventListener('mouseleave',function(){ minuterie=setTimeout(retirer,3000); });
+  function retirer(){ clearTimeout(minuterie); c.classList.add('sort'); setTimeout(function(){ if(c.parentNode) c.parentNode.removeChild(c); },200); }
+}
 
-  var nb=add(m,'div','note');
-  add(nb,'strong',null, envoiReel ? 'Envoi des courriels. ' : 'Ce que ce module simule. ');
-  nb.appendChild(document.createTextNode(envoiReel
-    ? "Les courriels partent de la boîte "+state.courriels.expediteur+" par Microsoft 365, vers l'adresse réelle des comptes destinataires. Chaque message garde son statut (envoyé, ou échec avec sa cause). Vous ne voyez ici que les courriels qui vous sont adressés, sauf si vous administrez les notifications."
-    : "Les notifications internes sont réelles : ciblées par rôle, marquées lues par utilisateur et persistées. L'envoi de courriel est simulé tant que Microsoft 365 n'est pas configuré sur le serveur (MAIL_MODE=graph, voir le README) : les messages sont rendus tels qu'ils partiraient."));
+/* ============ Journal des envois (administration) ============ */
+var STATUTS_ENVOI = { 'envoyé':'c-green', 'simulé':'c-grey', 'en cours':'c-amber', 'échec':'c-red', 'sans destinataire':'c-amber' };
+/* « 05/10/2026 14:42:10 » → « 20261005144210 », pour trier. */
+function cleDate(t){ var m=/(\d{2})\/(\d{2})\/(\d{4})\D+(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(t||'')); return m ? m[3]+m[2]+m[1]+('0'+m[4]).slice(-2)+m[5]+(m[6]||'00') : ''; }
+
+function lignesEnvois(){
+  var app=(state.notifs||[]).map(function(n){
+    var dest=destinataires(n.roles), lus=n.lu.length, nb=dest.length;
+    var statut = !nb ? 'sans destinataire' : (lus>=nb ? 'lue par tous' : (lus ? 'lue par '+lus+' / '+nb : 'remise'));
+    return { id:n.id, canal:'Application', t:n.t, ev:n.lab, objet:n.titre, corps:n.corps, statut:statut,
+      couleur: !nb ? 'c-amber' : (lus>=nb ? 'c-green' : 'c-grey'), dest:n.roles.map(roleLab).join(', '),
+      lecteurs: n.lu.map(function(u){ var x=state.users.filter(function(z){ return z.id===u; })[0]; return x ? x.nom : u; }) };
+  });
+  var mails=(state.emails||[]).map(function(e){
+    var ev=EVENTS.filter(function(x){ return x.id===e.ev; })[0];
+    return { id:e.id, canal:'Courriel', t:e.t, ev:ev?ev.lab:(e.ev||'—'), objet:e.objet, corps:e.corps, statut:e.statut||'simulé',
+      couleur:STATUTS_ENVOI[e.statut]||'c-grey', dest:(e.noms||[]).join(', ') || (e.a||[]).join(', '), adresses:e.a||[], de:e.de, expedie:e.expedie, erreur:e.erreur };
+  });
+  return app.concat(mails).sort(function(a,b){ return cleDate(b.t).localeCompare(cleDate(a.t)); });
+}
+
+function vEnvois(m){
+  if(!can('notif.manage')) return denyBox(m,'notif.manage');
+  var h=add(m,'div','head'); add(add(h,'div'),'h1',null,'Alertes');
+  var reel=!!(state.courriels && state.courriels.mode==='microsoft365');
+  var bd=add(m,'div','journal-chaine '+(reel?'ok':'info'));
+  icon(add(bd,'span','journal-ic'),'chat');
+  var bt=add(bd,'div');
+  add(bt,'strong',null, reel ? 'Courriels envoyés par Microsoft 365' : 'Courriels en simulation');
+  add(bt,'div','muted', reel ? 'Expéditeur : '+state.courriels.expediteur+'. Chaque courriel garde son statut : envoyé, ou échec avec sa cause.'
+    : 'Microsoft 365 n’est pas encore configuré sur le serveur : les courriels sont préparés tels qu’ils partiraient, sans être expédiés.');
+
+  var L=lignesEnvois(), statuts=[];
+  L.forEach(function(l){ var s=l.statut.indexOf('lue par ')===0 && l.statut!=='lue par tous' ? 'lue en partie' : l.statut; if(statuts.indexOf(s)<0) statuts.push(s); });
+  tableau(m,{ cle:'envois', lignes:L, vide:'Aucun envoi pour le moment : les notifications apparaissent ici dès qu’un événement en déclenche.',
+    colonnes:[
+      {lab:'Date', rendu:function(l,td){ add(td,'span','nowrap',l.t); }},
+      {lab:'Canal', rendu:function(l,td){ var s=add(td,'span','canal'); icon(s, l.canal==='Courriel'?'chat':'bell'); s.appendChild(document.createTextNode(l.canal)); }},
+      {lab:'Événement', val:function(l){ return l.ev; }},
+      {lab:'Objet', rendu:function(l,td){ add(td,'div','dt-extrait',l.objet); }},
+      {lab:'Destinataires', rendu:function(l,td){ add(td,'div','dt-extrait',l.dest||'—'); }},
+      {lab:'Statut', rendu:function(l,td){ chipCellule(td, l.statut.charAt(0).toUpperCase()+l.statut.slice(1), l.couleur); }}
+    ],
+    recherche:function(l){ return [l.t,l.canal,l.ev,l.objet,l.dest,l.statut].join(' '); },
+    filtres:[
+      { lab:'Canal', options:[['Application','Application'],['Courriel','Courriel']], test:function(l,v){ return l.canal===v; } },
+      { lab:'Statut', options:statuts.map(function(s){ return [s, s.charAt(0).toUpperCase()+s.slice(1)]; }), test:function(l,v){ return v==='lue en partie' ? (l.statut.indexOf('lue par ')===0 && l.statut!=='lue par tous') : l.statut===v; } }
+    ],
+    actions:function(l,td){ boutonDetail(td,function(){ ouvrirEnvoi(l); },'envoi-'+l.id); }
+  });
+}
+
+function ouvrirEnvoi(l){
+  ouvrirFenetre(l.objet, function(c){
+    var ch=add(c,'div','fen-chips'); chipCellule(ch,l.canal,'c-grey'); chipCellule(ch,l.statut.charAt(0).toUpperCase()+l.statut.slice(1),l.couleur);
+    grilleLecture(c,[['Date',l.t],['Événement',l.ev],['Expéditeur',l.de],['Expédié le',l.expedie]]);
+    champLecture(c,'Destinataires',l.dest||'Aucun');
+    if(l.adresses && l.adresses.length) champLecture(c,'Adresses',l.adresses.join(', '));
+    if(l.lecteurs) champLecture(c,'Lue par',l.lecteurs.length ? l.lecteurs.join(', ') : 'Personne pour l’instant');
+    if(l.erreur) champLecture(c,'Cause de l’échec',l.erreur);
+    var corps=champLecture(c,'Message',l.corps); corps.classList.add('envoi-corps');
+  }, { large:false });
 }

@@ -2,7 +2,7 @@
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
-var ROUTER={accueil:vAccueil, dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
+var ROUTER={accueil:vAccueil, dashboard:vDashboard, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, envois:vEnvois, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit, journal:vJournal};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
@@ -40,9 +40,12 @@ function renderCloche(){
   if(n) add(b,'span','cloche-n', n>99 ? '99+' : String(n));
   b.setAttribute('aria-label', n ? 'Notifications — '+n+' non lue(s)' : 'Notifications');
   b.title = b.getAttribute('aria-label');
-  b.classList.toggle('on', state.view==='notifs');
+  b.setAttribute('aria-haspopup','dialog'); b.setAttribute('aria-expanded', UI.panneauNotifs ? 'true' : 'false');
+  b.classList.toggle('on', !!UI.panneauNotifs);
+  suivreNotifs();          // nouvelles notifications : affichage « push »
+  dessinerPanneauNotifs(); // panneau ouvert : il suit l'état
 }
-document.getElementById('cloche').addEventListener('click',function(){ go('notifs'); });
+document.getElementById('cloche').addEventListener('click',function(){ basculerPanneauNotifs(); });
 function renderHeader(){
   var org=state.org||{};
   var t=document.getElementById('tenant'); t.textContent='';

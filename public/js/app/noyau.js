@@ -402,7 +402,9 @@ function notify(evId, titre, corps){
   var ev=null; for(var i=0;i<EVENTS.length;i++) if(EVENTS[i].id===evId) ev=EVENTS[i];
   var t=new Date().toLocaleString('fr-FR');
   if(r.inapp){
-    state.notifs.unshift({ id:'n'+Date.now()+Math.random().toString(36).slice(2,6), ev:evId,
+    var nid='n'+Date.now()+Math.random().toString(36).slice(2,6);
+    if(UI.notifsConnues) UI.notifsConnues[nid]=1; // déclenchée ici : pas de « push » pour son auteur
+    state.notifs.unshift({ id:nid, ev:evId,
       lab:(ev?ev.lab:evId), titre:titre, corps:corps, t:t, roles:r.roles.slice(), lu:[] });
     if(state.notifs.length>120) state.notifs.length=120;
   }
@@ -504,7 +506,6 @@ function vide(parent, ic, titre, texte){
    procédure ouverte (groupe « Procédure », avec son sélecteur), puis l'administration. */
 var VIEWS=[
   {id:'accueil',    label:'Tableau de bord', grp:'Accueil'},
-  {id:'notifs',     label:'Notifications', grp:'Accueil', menu:false}, // ouvert par la cloche de la barre du haut
   {id:'besoins',    label:'Besoins', grp:'Registres', perms:['besoin.create','besoin.approve','besoin.manage']},
   {id:'procedures', label:'Appels d’offres', grp:'Registres'},
   {id:'commandes',  label:'Commandes et réceptions', grp:'Registres'},
@@ -529,7 +530,8 @@ var VIEWS=[
   {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit', famille:'acces'},
   {id:'journal',    label:'Audit', grp:'Administration', perm:'audit.read'},
   {id:'params',     label:'Paramètres', grp:'Administration', perm:'params.edit'},
-  {id:'regles',     label:'Alertes', grp:'Administration', perm:'notif.manage'}
+  {id:'regles',     label:'Règles', grp:'Administration', perm:'notif.manage', famille:'alertes'},
+  {id:'envois',     label:'Journal des envois', grp:'Administration', perm:'notif.manage', famille:'alertes'}
 ];
 function lockReason(id){
   if(id==='portail' && !state.cdc.cdcPublie) return "Publiez le cahier des charges pour ouvrir le dépôt.";
@@ -543,9 +545,9 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['accueil','notifs','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
+var SANS_PROCEDURE = ['accueil','envois','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
 /* Familles d'écrans : une seule entrée de menu, et des onglets en tête de page pour passer de l'un à l'autre. */
-var FAMILLES = { acces:{ lab:'Utilisateurs et accès', icone:'users' } };
+var FAMILLES = { acces:{ lab:'Utilisateurs et accès', icone:'users' }, alertes:{ lab:'Alertes', icone:'ring' } };
 function familleDe(id){ var v=VIEWS.filter(function(x){ return x.id===id; })[0]; return v && v.famille || null; }
 function avecProcedure(){ return !!(state && state.procedure); }
 /* Un écran est visible si l'une de ses habilitations est accordée (perm, ou perms pour plusieurs), et, sans
@@ -594,8 +596,6 @@ function renderNav(){
       b.appendChild(el('span','sr-only',' — verrouillé : '+reason));
     } else if(v.id==='depouille'&&flagsRemaining()>0){
       b.appendChild(el('span','n',String(flagsRemaining())));
-    } else if(v.id==='notifs'&&nonLues().length>0){
-      b.appendChild(el('span','n',String(nonLues().length)));
     }
     if(v.id===state.view || (v.id==='procedures' && vueDeProcedure(state.view))) b.setAttribute('aria-current','page');
     b.addEventListener('click',function(){ closeMenu(); go(v.id); });

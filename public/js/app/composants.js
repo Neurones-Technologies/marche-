@@ -57,7 +57,7 @@ function icon(parent, name){
   return s;
 }
 /* Icône de chaque écran du menu. */
-var NAV_ICONS = { accueil:'home', dashboard:'info', notifs:'bell', procedures:'folder', besoins:'clipboard', referencement:'badge', partenaires:'users', commandes:'cart', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
+var NAV_ICONS = { accueil:'home', dashboard:'info', envois:'chat', procedures:'folder', besoins:'clipboard', referencement:'badge', partenaires:'users', commandes:'cart', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
   reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
   recours:'scale', pv:'stamp', audit:'list', journal:'list', roles:'key', comptes:'users', params:'cog', regles:'ring' };
 

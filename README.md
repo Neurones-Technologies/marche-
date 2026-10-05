@@ -34,7 +34,8 @@ server/
 
 Organisation de l'interface (menu) :
 
-- **Notifications** : la cloche de la barre du haut, avec le nombre de non lues (pas d'entrée de menu).
+- **Notifications** : pas de page dédiée. La cloche de la barre du haut compte les non lues et ouvre un panneau
+  déroulant ; une notification qui arrive pendant la session s'affiche un instant en bas à droite (« push »).
 - **Accueil** : tableau de bord de l'organisation, avec « À faire pour moi » (les actions qui attendent
   l'utilisateur, calculées par le serveur selon ses habilitations) et les chiffres clés de chaque registre.
 - **Registres** : besoins, appels d'offres (toutes les procédures, en cours et passées : phase, titulaire, montant
@@ -51,7 +52,8 @@ Organisation de l'interface (menu) :
   notation, recours. Un tableau vide n'affiche ni recherche, ni filtres, ni pagination.
 - **Administration** : « Utilisateurs et accès » (onglets Comptes et Rôles ; un rôle se crée, se renomme, et se
   supprime s'il n'a plus de membre — « admin » et « soum », dont la plateforme a besoin, se renomment seulement), « Audit » (journal de toute l'instance :
-  date, auteur, action, procédure, adresse IP, avec l'état de la chaîne d'empreintes), paramètres, alertes.
+  date, auteur, action, procédure, adresse IP, avec l'état de la chaîne d'empreintes), paramètres, « Alertes » (onglets Règles et Journal des envois : chaque notification, dans
+  l'application ou par courriel, avec ses destinataires et son statut — lue, envoyée, simulée, en échec).
 
 Le bouton « + » d'un tableau ouvre le formulaire de création dans une fenêtre. Un détail (besoin, commande,
 partenaire, appel d'offres) commence par un lien de retour à la liste.
