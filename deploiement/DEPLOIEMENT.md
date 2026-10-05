@@ -157,6 +157,36 @@ Paramètres du `.env` utiles :
 
 Après modification du `.env` : `docker compose -f docker-compose.yml up -d`.
 
+## Plateforme multi-entreprises (sous-domaines)
+
+Avec `PLATEFORME_DOMAINE=tenders.neuronestech.com`, chaque entreprise a son espace à son sous-domaine
+(`bal.tenders.neuronestech.com`), avec sa base et ses pièces dans `/data/espaces/<sous-domaine>/`. L'adresse
+racine sert la page « Créer votre espace ». L'installation existante devient l'espace `demo`
+(`ESPACE_INITIAL`) sans rien perdre : sa base reste `/data/marcheplus.db`. Le registre des espaces est
+`/data/plateforme.db`.
+
+Mise en place, une fois (**sauvegarder le volume avant**) :
+
+1. **DNS** : une entrée générique `*.tenders.neuronestech.com` de type A vers `76.13.51.87` (en plus de
+   l'entrée `tenders.neuronestech.com` existante), chez l'hébergeur du domaine `neuronestech.com`.
+2. **Certificat générique** : Let's Encrypt n'en délivre qu'avec un défi DNS. Soit avec le greffon certbot de
+   l'hébergeur DNS (`certbot certonly --dns-<hebergeur> -d tenders.neuronestech.com -d '*.tenders.neuronestech.com'`),
+   soit à la main : `certbot certonly --manual --preferred-challenges dns -d tenders.neuronestech.com -d '*.tenders.neuronestech.com'`
+   puis poser l'enregistrement TXT `_acme-challenge.tenders.neuronestech.com` demandé (le renouvellement manuel
+   est à refaire tous les 90 jours : préférer le greffon).
+3. **nginx** : `server_name tenders.neuronestech.com *.tenders.neuronestech.com;` dans le vhost, certificat du point
+   2 sur le bloc 443. `proxy_set_header Host $host;` est indispensable (l'application lit le sous-domaine) ;
+   il y est déjà.
+4. **.env** : `PLATEFORME_DOMAINE=tenders.neuronestech.com`, `APP_URL=https://tenders.neuronestech.com` ; puis
+   `docker compose -f docker-compose.yml up -d`.
+5. **Vérifier** : `https://tenders.neuronestech.com` affiche « Créer votre espace » ; `https://demo.tenders.neuronestech.com`
+   ouvre l'installation existante (mêmes comptes).
+
+Tant que Microsoft 365 n'est pas configuré (`MAIL_MODE=graph`), le lien de confirmation d'un nouvel espace est
+affiché directement à l'écran au lieu d'être envoyé : n'importe qui peut alors créer un espace. À réserver à la
+démonstration ; configurer les courriels avant d'ouvrir la plateforme au public. Limite :
+`PLATEFORME_CREATIONS_PAR_HEURE` (5 par adresse IP et par heure).
+
 ## Problèmes rencontrés lors du premier déploiement
 
 | Symptôme | Cause | Correction |

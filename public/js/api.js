@@ -47,7 +47,7 @@
   }
   /* Procédure courante. La liste vient du serveur (un soumissionnaire n'y voit que les procédures publiées) ;
      le choix est mémorisé par utilisateur dans ce navigateur. */
-  var PID = null, PROCS = [], ME = null;
+  var PID = null, PROCS = [], ME = null, ESPACE = {};
   var procKey = function () { return 'marcheplus.proc.' + (ME ? ME.id : ''); };
   function loadProcs() {
     return api('GET', '/api/procedures').then(function (r) { PROCS = r.procedures || []; return PROCS; });
@@ -77,6 +77,7 @@
     current: function () { return PROCS.filter(function (p) { return p.id === PID; })[0] || null; },
     refreshProcs: loadProcs,
     moi: function () { return ME; },
+    espace: function () { return ESPACE; }, // nom de l'organisation, réinitialisation permise (/api/espace)
     suspendre: suspendre, reprendre: reprendre,
   };
 
@@ -86,6 +87,8 @@
     if (window.MarchePlus) window.MarchePlus.stop();
     $('usr').hidden = true;
     $('login').hidden = false;
+    // l'espace de l'entreprise : son nom au-dessus du formulaire
+    api('GET', '/api/espace').then(function (e) { var x = $('lg-espace'); x.hidden = !e.nom; x.textContent = e.nom ? 'Espace de ' + e.nom : ''; }).catch(function () {});
     var er = $('lg-err');
     er.hidden = !msg; er.textContent = msg || '';
     $('lg-pw').value = '';
@@ -96,7 +99,7 @@
   function enter(fromLogin) {
     return api('GET', '/api/auth/me').then(function (m) {
       ME = m.user;
-      return loadProcs().then(function () {
+      return api('GET', '/api/espace').then(function (e) { ESPACE = e || {}; }, function () { ESPACE = {}; }).then(loadProcs).then(function () {
         $('login').hidden = true;
         $('usr').hidden = false;
         var un = $('usr-name'); un.textContent = '';

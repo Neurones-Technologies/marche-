@@ -24,7 +24,8 @@ const TYPES = {
   xlsx: { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', magic: (b) => b[0] === 0x50 && b[1] === 0x4b },
 };
 const pub = (f) => ({ id: f.id, doc: f.doc_id, name: f.name, size: f.size, sha256: f.sha256, t: f.created_at });
-const diskPath = (id) => path.join(cfg.filesDir, id);
+// dossier des pièces de l'espace de l'entreprise (plateforme), sinon celui de l'instance
+const diskPath = (id) => { const d = require('../contexte').fichiers() || cfg.filesDir; fs.mkdirSync(d, { recursive: true }); return path.join(d, id); };
 
 /**
  * Lit un fichier téléversé (corps brut, nom dans x-filename, pièce visée dans ?doc=) et vérifie son format sur son

@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { db, auditAppend } = require('../db');
+const { db, auditAppend, jetonUtiliser } = require('../db');
 const { sign, setCookie, clearCookie, requireAuth, bcrypt, whoLabel, needPerm, roleDef } = require('../auth');
 const { slug } = require('../db');
 const cfg = require('../config');
@@ -34,6 +34,17 @@ r.get('/demo', (req, res) => {
 });
 
 r.post('/logout', (req, res) => { clearCookie(res); res.json({ ok: true }); });
+
+/** Connexion par jeton à usage unique (arrivée dans un espace qui vient d'être créé), puis l'accueil. */
+r.get('/jeton', (req, res) => {
+  const uid = jetonUtiliser(req.query.j, 'connexion');
+  const u = uid && db.prepare('SELECT * FROM users WHERE id=? AND active=1').get(uid);
+  if (!u) return res.redirect('/');
+  setCookie(res, sign(u));
+  db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
+  auditAppend(u.id, whoLabel({ ...u, roleLab: roleDef(u.role).lab }), 'Connexion');
+  res.redirect('/tableau-de-bord?bienvenue=1');
+});
 
 r.get('/me', requireAuth, (req, res) => res.json({ user: pub(req.user), perms: req.user.perms }));
 

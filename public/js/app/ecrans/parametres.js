@@ -21,7 +21,7 @@ function vParams(m){
 
   var k1=add(m,'div','card'); add(k1,'div','panel-head','1 · Organisation');
   var f1=add(add(k1,'div','pad'),'div','frm');
-  champ(f1,'Raison sociale',o.nom,function(v){ o.nom=v; state.cdc.autorite=v; logit('Raison sociale modifiée'); });
+  champ(f1,'Raison sociale',o.nom,function(v){ o.nom=v; if(state.cdc) state.cdc.autorite=v; logit('Raison sociale modifiée'); });
   champ(f1,'Pays',o.pays,function(v){ o.pays=v; });
   champ(f1,'Ville',o.ville,function(v){ o.ville=v; });
   champ(f1,'Initiales (badge)',o.initiales,function(v){ o.initiales=v.slice(0,3).toUpperCase(); });
@@ -89,10 +89,14 @@ function vParams(m){
   });
 
   var k5=add(m,'div','card'); k5.style.marginTop='18px';
-  add(k5,'div','panel-head','5 · Circuit d\u2019approbation de la procédure '+REF());
+  // sans procédure ouverte (espace neuf) : le circuit par défaut des appels d'offres, que chaque nouvelle procédure reprend
+  var sansProc=!avecProcedure();
+  if(sansProc && !Array.isArray(state.circuitModele)) state.circuitModele=[];
+  var circ = sansProc ? state.circuitModele : state.approvals;
+  add(k5,'div','panel-head', sansProc ? '5 · Circuit d’approbation par défaut des appels d’offres' : '5 · Circuit d’approbation de la procédure '+REF());
   var b5=add(k5,'div','pad');
   var rk=Object.keys(state.roles);
-  state.approvals.forEach(function(a,i){
+  circ.forEach(function(a,i){
     var row=add(b5,'div','docline');
     var lf=add(row,'div'); lf.style.flex='1 1 240px';
     var ti=add(lf,'input'); ti.type='text'; ti.value=a.role; ti.style.width='100%';
@@ -115,26 +119,26 @@ function vParams(m){
     var up=add(row,'button','icon-btn','↑'); up.setAttribute('aria-label','Remonter ce niveau');
     up.disabled = i===0;
     up.addEventListener('click',function(){
-      var t=state.approvals[i-1]; state.approvals[i-1]=state.approvals[i]; state.approvals[i]=t;
+      var t=circ[i-1]; circ[i-1]=circ[i]; circ[i]=t;
       logit('Ordre du circuit d\u2019approbation modifié'); save(); render();
     });
     var del=add(row,'button','icon-btn','×'); del.setAttribute('aria-label','Supprimer ce niveau');
     del.addEventListener('click',function(){
       var nmin=Math.max(1,CADRE().niveauxApprobationMin);
-      if(state.approvals.length<=nmin){ toast('Le profil réglementaire exige au moins '+nmin+' niveau(x) d’approbation.'); return; }
+      if(circ.length<=nmin){ toast('Le profil réglementaire exige au moins '+nmin+' niveau(x) d’approbation.'); return; }
       ask('Ce niveau de validation disparaîtra du circuit et du procès-verbal.', function(){
-        state.approvals.splice(i,1); logit('Niveau d\u2019approbation supprimé : '+a.role); save(); render();
+        circ.splice(i,1); logit('Niveau d\u2019approbation supprimé : '+a.role); save(); render();
       },'Supprimer « '+a.role+' » ?','Supprimer');
     });
   });
   var f5=add(k5,'div','panel-foot');
-  add(f5,'span','muted',state.approvals.length+' niveau(x) configuré(s). L\u2019ordre détermine la séquence d\u2019approbation ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (offre classée première, en XOF). Une nouvelle procédure part du circuit par défaut.');
-  add(f5,'button','btn btn-ghost btn-sm','Enregistrer comme circuit par défaut').addEventListener('click',function(){
-    state.circuitModele=state.approvals.map(function(a){ var e={role:a.role, who:a.who}; if(Number(a.seuil)>0) e.seuil=Number(a.seuil); if(a.roleId) e.roleId=a.roleId; return e; });
+  add(f5,'span','muted',circ.length+' niveau(x) configuré(s). L\u2019ordre détermine la séquence d\u2019approbation ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce montant (offre classée première, en XOF). Une nouvelle procédure part du circuit par défaut.');
+  if(!sansProc) add(f5,'button','btn btn-ghost btn-sm','Enregistrer comme circuit par défaut').addEventListener('click',function(){
+    state.circuitModele=circ.map(function(a){ var e={role:a.role, who:a.who}; if(Number(a.seuil)>0) e.seuil=Number(a.seuil); if(a.roleId) e.roleId=a.roleId; return e; });
     logit('Circuit d\u2019approbation par défaut : '+state.circuitModele.map(function(a){ return a.role; }).join(' → ')); save(); render();
   });
   add(f5,'button','btn btn-ghost btn-sm','+ Ajouter un niveau').addEventListener('click',function(){
-    state.approvals.push({role:'Nouveau niveau de validation', who:'À désigner', done:false});
+    circ.push(sansProc ? {role:'Nouveau niveau de validation', who:'À désigner'} : {role:'Nouveau niveau de validation', who:'À désigner', done:false});
     logit('Niveau d\u2019approbation ajouté'); save(); render();
   });
 
@@ -159,7 +163,7 @@ function vParams(m){
 
 /* Cadre réglementaire : profil par défaut et réglages du client, dans les bornes du profil (profils.js). */
 function vParamsCadre(m,o){
-  var P=MPProfils, pid=R.profilId({ cdc:state.cdc, org:o }), prof=P.profil(pid);
+  var P=MPProfils, pid=R.profilId({ cdc:state.cdc||{}, org:o }), prof=P.profil(pid);
   var eff=P.effectif(pid,o.reglages);
   var k7=add(m,'div','card'); k7.style.marginTop='18px';
   var ph=add(k7,'div','panel-head'); add(ph,'span',null,'7 · Cadre réglementaire');

@@ -547,7 +547,7 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['accueil','envois','suppleances','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
+var SANS_PROCEDURE = ['accueil','envois','suppleances','params','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
 /* Familles d'écrans : une seule entrée de menu, et des onglets en tête de page pour passer de l'un à l'autre. */
 var FAMILLES = { acces:{ lab:'Utilisateurs et accès', icone:'users' }, alertes:{ lab:'Alertes', icone:'ring' } };
 function familleDe(id){ var v=VIEWS.filter(function(x){ return x.id===id; })[0]; return v && v.famille || null; }

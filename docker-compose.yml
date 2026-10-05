@@ -22,6 +22,9 @@ services:
       MAX_FILE_MB: ${MAX_FILE_MB:-10}
       # Courriels par Microsoft 365 (voir README, « Courriels ») ; sans MAIL_MODE=graph, ils restent simulés
       APP_URL: ${APP_URL:-}
+      # Plateforme multi-entreprises (voir deploiement/DEPLOIEMENT.md) : vide = un seul client, comme avant
+      PLATEFORME_DOMAINE: ${PLATEFORME_DOMAINE:-}
+      ESPACE_INITIAL: ${ESPACE_INITIAL:-demo}
       MAIL_MODE: ${MAIL_MODE:-simule}
       M365_TENANT_ID: ${M365_TENANT_ID:-}
       M365_CLIENT_ID: ${M365_CLIENT_ID:-}

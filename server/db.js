@@ -10,11 +10,32 @@ const R = require('../public/js/regles.js');
 const P = require('../public/js/profils.js');
 const C = require('../public/js/circuits.js');
 
-if (cfg.dbFile !== ':memory:') fs.mkdirSync(path.dirname(cfg.dbFile), { recursive: true });
-const db = new Database(cfg.dbFile);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+/* ---- bases de données ----
+   Une base par espace d'entreprise (plateforme multi-entreprises, server/espaces.js), ouverte à la demande et
+   gardée ouverte. « db » désigne celle de l'espace de la requête en cours (contexte), ou la base principale
+   (cfg.dbFile) hors plateforme : tests, instance d'un seul client, espace « demo ». Toutes les fonctions de ce
+   module et des routes s'en servent sans savoir de quel espace il s'agit. */
+const BASES = new Map();
+let principale = null;
+const courante = () => contexte.base() || principale;
+const db = new Proxy({}, {
+  get(_, k) { const c = courante(); const v = c[k]; return typeof v === 'function' ? v.bind(c) : v; },
+});
 
+/** Ouvre (ou retrouve) la base d'un fichier ; une base neuve reçoit le schéma, les migrations, et son contenu
+    initial (options : voir seedAll ; sans options, celui de l'environnement). */
+function ouvrirBase(fichier, options) {
+  if (BASES.has(fichier)) return BASES.get(fichier);
+  if (fichier !== ':memory:') fs.mkdirSync(path.dirname(fichier), { recursive: true });
+  const conn = new Database(fichier);
+  conn.pragma('journal_mode = WAL');
+  conn.pragma('foreign_keys = ON');
+  BASES.set(fichier, conn);
+  contexte.avec({ base: conn }, () => preparerBase(options));
+  return conn;
+}
+
+function schema() {
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, nom TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
@@ -77,6 +98,7 @@ addColumn('audit', 'ip', 'TEXT');
 addColumn('users', 'partenaire_id', 'TEXT');
 addColumn('users', 'a_verifier', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('files', 'partenaire_id', 'TEXT');
+}
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const frDate = () => new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abidjan' });
@@ -354,19 +376,27 @@ function adminInitial() {
   if (tire) console.log(`Compte administrateur initial : ${email} — mot de passe : ${mdp} (à changer dès la première connexion).`);
 }
 
-function seedAll(withUsers = true) {
+/* options (création d'un espace) : { demo: false, org: { nom, pays, ville }, profil, admin: { nom, email, hash } }.
+   Sans options : l'environnement décide (SEED_DEMO, ORG_NOM, ADMIN_EMAIL…). */
+function seedAll(withUsers = true, options = null) {
+  const demo = options ? !!options.demo : cfg.seedDemo;
   const tx = db.transaction(() => {
     db.exec('DELETE FROM kv; DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins; DELETE FROM commandes; DELETE FROM partenaires; DELETE FROM jetons; UPDATE users SET partenaire_id=NULL;');
     const org = defaultOrgKv();
-    if (!cfg.seedDemo) {
-      // instance réelle : l'organisation est nommée par l'environnement, sans aucune donnée fictive
-      const nom = String(process.env.ORG_NOM || 'Mon organisation').trim();
-      Object.assign(org.org, { nom, ville: String(process.env.ORG_VILLE || '').trim(), pays: String(process.env.ORG_PAYS || '').trim(),
+    if (!demo) {
+      // instance réelle : l'organisation est nommée par l'environnement (ou par la création de l'espace), sans aucune
+      // donnée fictive
+      const o = (options && options.org) || {};
+      const nom = String(o.nom || process.env.ORG_NOM || 'Mon organisation').trim();
+      Object.assign(org.org, { nom, ville: String(o.ville || process.env.ORG_VILLE || '').trim(), pays: String(o.pays || process.env.ORG_PAYS || '').trim(),
         initiales: nom.split(/\s+/).map((x) => x[0] || '').join('').slice(0, 3).toUpperCase() });
+      if (options && options.profil && P.existe(options.profil)) org.org.profilDefaut = options.profil;
+      // l'administrateur d'une organisation réelle ne dépose pas d'offres : ni « Mon référencement », ni ce cumul
+      if (org.roles && org.roles.admin) org.roles.admin.perms['portail.use'] = false;
       org.mailFrom = ''; org.mailSuffix = '';
     }
     for (const [k, v] of Object.entries(org)) kvSet(k, v, 'seed');
-    if (cfg.seedDemo) {
+    if (demo) {
       // procédure de démonstration : AO-2026-014, telle que dans le prototype, avec ses offres
       const demo = procDefaults(clone(seed.CDC));
       seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
@@ -375,21 +405,30 @@ function seedAll(withUsers = true) {
     }
     if (withUsers) {
       db.exec('DELETE FROM users');
-      if (cfg.seedDemo) {
+      if (demo) {
         const h = bcrypt.hashSync(cfg.seedPassword, 10);
         const ins = db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)');
         for (const u of seed.USERS) ins.run(u.id, u.nom, slug(u.nom) + '@bal.ci', u.role, h);
+      } else if (options && options.admin) {
+        const a = options.admin;
+        db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)').run('u0', a.nom, a.email, 'admin', a.hash);
       } else adminInitial();
     }
-    if (cfg.seedDemo) partenaireDemo();
+    if (demo) partenaireDemo();
     auditAppend(null, 'Système', 'Instance initialisée');
   });
   tx();
 }
 
-if (db.prepare('SELECT COUNT(*) c FROM kv').get().c === 0) seedAll(true);
+/** Schéma, contenu initial d'une base vide, puis migrations de données. */
+function preparerBase(options) {
+  schema();
+  if (db.prepare('SELECT COUNT(*) c FROM kv').get().c === 0) seedAll(true, options);
+  migrer();
+}
 
 /* Migrations de données des instances existantes (idempotentes), dans l'ordre où elles ont été écrites. */
+function migrer() {
 db.transaction(function migrate() {
   // 02/10/2026 : la référence de la procédure devient un champ du cahier des charges.
   const cdc = kvGet('cdc');
@@ -454,6 +493,7 @@ db.transaction(function migrate() {
     }
   }
 })();
+}
 
 function resetDemo(uid, who) {
   const tx = db.transaction(() => {
@@ -463,8 +503,10 @@ function resetDemo(uid, who) {
   tx();
 }
 
+principale = ouvrirBase(cfg.dbFile);
+
 module.exports = {
-  db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
+  ouvrirBase, db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
   auditAppend, auditList, auditJournal, auditVerify, offersAll, offerInsert, offersReplace,
   commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero,
   partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, jetonCreer, jetonUtiliser,

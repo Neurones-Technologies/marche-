@@ -34,6 +34,10 @@ server/
 
 Organisation de l'interface (menu) :
 
+- **Plateforme multi-entreprises** (avec `PLATEFORME_DOMAINE`) : chaque entreprise crée son espace en libre-service sur
+  la page d'accueil de la plateforme (raison sociale, type d'acheteur, adresse `<entreprise>.<domaine>`, administrateur),
+  confirme son courriel et y entre connectée. Une base et un dossier de pièces par espace ; une session ne vaut que
+  dans son espace ; la réinitialisation n'existe que dans l'espace de démonstration. Voir deploiement/DEPLOIEMENT.md.
 - **Adresses** : chaque écran a son adresse (/demandes-achat, /execution/<commande>, /appels-offres/<procédure>/
   cahier-des-charges…) ; Précédent et Suivant du navigateur fonctionnent, et un lien copié ouvre le bon écran, après
   la connexion s'il le faut.

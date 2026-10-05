@@ -17,7 +17,7 @@ r.get('/audit', needPerm('audit.read'), (req, res) => {
 });
 
 r.post('/admin/reset', needPerm('params.edit', 'roles.edit'), (req, res) => {
-  if (!cfg.allowReset) return res.status(403).json({ error: 'Réinitialisation désactivée sur cette instance.' });
+  if (!require('../espaces').reinitialisable()) return res.status(403).json({ error: 'Réinitialisation désactivée dans cet espace.' });
   resetDemo(req.user.id, whoLabel(req.user));
   res.json({ ok: true });
 });

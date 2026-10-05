@@ -49,7 +49,7 @@ r.post('/', limite, (req, res) => {
     courriel = { id: 'm' + Date.now() + crypto.randomBytes(2).toString('hex'), ev: 'inscription', de: mail.actif() ? mail.expediteur() : (kvGet('mailFrom') ? kvGet('mailFrom').value : ''),
       ids: [uid], a: [email], noms: [nom + ' (' + raisonSociale + ')'], objet: 'Vérifiez votre adresse pour finaliser votre inscription',
       corps: 'Bonjour ' + nom + ',\n\nPour activer le compte de ' + raisonSociale + ' sur la plateforme d’achats de ' + (org.nom || 'l’organisation') +
-        ', ouvrez ce lien dans les 48 heures :\n' + cfg.appUrl + lien + '\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message.',
+        ', ouvrez ce lien dans les 48 heures :\n' + require('../espaces').adresseCourante() + lien + '\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message.',
       t: frDate(), statut: mail.actif() ? 'en cours' : 'simulé' };
     emails.unshift(courriel);
     kvSet('emails', emails.slice(0, 80), 'inscription');

@@ -159,7 +159,9 @@ window.MarchePlus = {
     else if((opts && opts.fromLogin) || !viewAllowed(state.view) || (!r && location.pathname!=='/')){ state.view=homeView(); state.offerIndex=0; saveUI(); } // adresse inconnue : l'accueil
     UI.remplacerUrl=true;
     demarrerVerrou(!!(opts && opts.fromLogin)); // verrou.js
-    resetBtn.style.display = can('params.edit')||can('roles.edit') ? '' : 'none'; render();
+    // arrivée dans un espace qui vient d'être créé (plateforme) : un mot d'accueil, puis l'adresse sans paramètre
+    if(/[?&]bienvenue=1/.test(location.search)){ try{ history.replaceState(null,'',location.pathname); }catch(e){} setTimeout(function(){ toast('Bienvenue dans votre espace Marché+.'); },400); }
+    resetBtn.style.display = (can('params.edit')||can('roles.edit')) && MP.espace().reinitialisable ? '' : 'none'; render();
   },
   poll:poll,
   nouvelleVersion:nouvelleVersion,

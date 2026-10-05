@@ -9,6 +9,8 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(require('./contexte').middleware); // adresse IP de la requête, pour le journal d'audit
+const espaces = require('./espaces');
+app.use(espaces.aiguillage); // plateforme multi-entreprises : l'espace d'après le sous-domaine (inactif sans PLATEFORME_DOMAINE)
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -36,6 +38,14 @@ app.use('/api', (req, res, next) => {
 // à celle qu'il a chargée et se recharge de lui-même après une mise à jour.
 const VERSION = process.env.APP_VERSION || String(Date.now());
 app.get('/api/version', (req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ version: VERSION }); });
+app.use('/api/plateforme', require('./routes/plateforme'));
+// À l'adresse de la plateforme, aucune route d'un espace : ni données, ni comptes.
+app.use('/api', (req, res, next) => (req.plateforme ? res.status(404).json({ error: 'Route inconnue sur la plateforme : ouvrez l’adresse de votre espace.', code: 'NOT_A_SPACE' }) : next()));
+/* Nom de l'organisation de l'espace, pour la page de connexion (sans compte). */
+app.get('/api/espace', (req, res) => {
+  const org = (require('./db').kvGet('org') || {}).value || {};
+  res.json({ nom: org.nom || '', espace: require('./contexte').espace(), inscriptionOuverte: org.inscriptionOuverte !== false, reinitialisable: espaces.reinitialisable() });
+});
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/files', require('./routes/files').global);
 app.use('/api/procedures', require('./routes/procedures'));
@@ -58,6 +68,12 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Route inconnue.' })
 
 // no-cache : le navigateur revalide chaque fichier (304 s'il n'a pas changé). Avec un max-age, une mise à jour
 // pouvait mêler un index.html neuf et un script ancien resté en cache, et l'interface ne s'affichait plus.
+// À l'adresse de la plateforme, ses pages : « Créer votre espace ».
+app.use((req, res, next) => {
+  if (!req.plateforme || /\.[a-z0-9]+$/i.test(req.path)) return next();
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, '..', 'public', 'plateforme.html'));
+});
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'], setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 // Adresses de l'interface (/demandes-achat, /appels-offres/p1/cahier-des-charges…) : la même page, qui lit
 // l'adresse pour ouvrir le bon écran. Un chemin avec une extension reste un fichier (404 s'il manque).

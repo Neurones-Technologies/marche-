@@ -9,6 +9,8 @@
 .login-brand { font-size: var(--fs-title); }
 .login-brand .login-mark { width: 36px; height: 36px; }
 .login-card[hidden] { display: none; }
+.login-espace { margin-top: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--color-brand-soft); color: var(--color-brand-text); font-size: var(--fs-small); font-weight: var(--fw-strong); }
+.login-espace[hidden] { display: none; }
 .login-card h1 { margin: var(--space-4) 0 var(--space-2); }
 .login-card label { font-size: var(--fs-small); color: var(--color-text-2); margin-top: var(--space-3); }
 .login-card input { width: 100%; }

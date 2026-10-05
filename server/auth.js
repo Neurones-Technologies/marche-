@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const cfg = require('./config');
+const contexte = require('./contexte');
 const { db, kvGet } = require('./db');
 
 const COOKIE = 'mp_token';
@@ -12,7 +13,8 @@ function parseCookies(h) {
 }
 
 function sign(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, cfg.jwtSecret, { expiresIn: cfg.jwtTtl });
+  // l'espace de l'entreprise entre dans le jeton : il ne vaut que dans cet espace (plateforme multi-entreprises)
+  return jwt.sign({ sub: user.id, role: user.role, esp: contexte.espace() }, cfg.jwtSecret, { expiresIn: cfg.jwtTtl });
 }
 
 function setCookie(res, token) {
@@ -31,6 +33,7 @@ function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Authentification requise.' });
   try {
     const p = jwt.verify(token, cfg.jwtSecret);
+    if ((p.esp || null) !== contexte.espace()) return res.status(401).json({ error: 'Session d’un autre espace : reconnectez-vous.' });
     const u = db.prepare('SELECT id,nom,email,role,active FROM users WHERE id=?').get(p.sub);
     if (!u || !u.active) return res.status(401).json({ error: 'Compte introuvable ou désactivé.' });
     const rd = roleDef(u.role);
