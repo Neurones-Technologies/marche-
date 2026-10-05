@@ -94,7 +94,7 @@ test('confidentialité : chacun ne voit que ses courriels et les notifications d
 });
 
 test('inscription : courriel de vérification envoyé au déclarant, avec un lien absolu', async () => {
-  const r = await C.call('POST', '/api/inscription', { raisonSociale: 'Mobilia SARL', pays: 'CI', nom: 'A. Kouassi', email: 'contact@mobilia.example', motDePasse: 'Mobilia2026!x' });
+  const r = await C.inscrire({ raisonSociale: 'Mobilia SARL', pays: 'CI', nom: 'A. Kouassi', email: 'contact@mobilia.example', motDePasse: 'Mobilia2026!x' });
   assert.equal(r.status, 202);
   await attendre(300);
   const m = recus.envois.find((e) => e.a[0] === 'contact@mobilia.example');

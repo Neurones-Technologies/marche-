@@ -131,25 +131,38 @@ r.put('/:id/pieces/:doc', (req, res) => {
   res.json({ partenaire: vue(p) });
 });
 
-/** Soumission du dossier : fiche complète et toutes les pièces exigées déposées et en cours de validité. */
+/**
+ * Soumission d'un dossier au référencement : fiche complète, réponses obligatoires données, pièces obligatoires
+ * déposées et en cours de validité. Retourne { status, code, error } si le dossier n'est pas soumissible, sinon met le
+ * dossier en instruction (parcours de l'organisation) et retourne null. Sert aussi à l'inscription sur le portail,
+ * dont le dossier part en instruction à la vérification du courriel.
+ */
+function soumettreDossier(p, qui) {
+  const ko = (status, code, error) => ({ status, code, error });
+  if (!['candidat', 'rejete'].includes(p.statut)) return ko(409, 'PARTNER_LOCKED', 'Ce dossier n’est pas à soumettre.');
+  if (!p.raisonSociale || !p.pays || !p.immatriculation) return ko(422, 'PARTNER_INCOMPLETE', 'Raison sociale, pays et numéro d’immatriculation sont obligatoires.');
+  const manquantes = vue(p).exigees.filter((e) => e.obligatoire && (e.etat === 'manquante' || e.etat === 'expiree' || e.etat === 'refuse'));
+  if (manquantes.length) return ko(422, 'PIECES_MISSING', 'Pièces manquantes, expirées ou refusées : ' + manquantes.map((e) => e.label).join(' ; ') + '.');
+  const rep = F.verifierReponses(p.reponses, true);
+  if (rep.erreur) return ko(422, 'PARTNER_INCOMPLETE', rep.erreur);
+  const modele = (kvGet('circuitReferencement') || { value: [] }).value;
+  const circuit = C.appliquerMontant(C.reinitialiser(modele), 0);
+  if (!C.nbRequises(circuit)) return ko(409, 'CIRCUIT_EMPTY', 'Le parcours de référencement n’a aucune étape : à configurer dans Paramètres.');
+  db.transaction(() => {
+    Object.assign(p, { statut: 'verification', circuit, soumis: frDate() });
+    delete p.rejet; delete p.soumissionEnAttente;
+    p.historique.push({ t: frDate(), who: qui.who, action: 'dossier soumis au référencement' });
+    auditAppend(qui.uid, qui.who, `Partenaire ${p.id} (${p.raisonSociale}) — dossier soumis au référencement`);
+    partenaireSave(p);
+  })();
+  return null;
+}
+
 r.post('/:id/soumettre', (req, res) => {
   const p = req.partenaire;
   if (!req.titulaire) return err(res, 403, 'PARTNER_NOT_OWNER', 'Seul le partenaire soumet son dossier.');
-  if (!['candidat', 'rejete'].includes(p.statut)) return err(res, 409, 'PARTNER_LOCKED', 'Ce dossier n’est pas à soumettre.');
-  if (!p.raisonSociale || !p.pays || !p.immatriculation) return err(res, 422, 'PARTNER_INCOMPLETE', 'Raison sociale, pays et numéro d’immatriculation sont obligatoires.');
-  const manquantes = vue(p).exigees.filter((e) => e.obligatoire && (e.etat === 'manquante' || e.etat === 'expiree' || e.etat === 'refuse'));
-  if (manquantes.length) return err(res, 422, 'PIECES_MISSING', 'Pièces manquantes, expirées ou refusées : ' + manquantes.map((e) => e.label).join(' ; ') + '.');
-  const rep = F.verifierReponses(p.reponses, true);
-  if (rep.erreur) return err(res, 422, 'PARTNER_INCOMPLETE', rep.erreur);
-  const modele = (kvGet('circuitReferencement') || { value: [] }).value;
-  const circuit = C.appliquerMontant(C.reinitialiser(modele), 0);
-  if (!C.nbRequises(circuit)) return err(res, 409, 'CIRCUIT_EMPTY', 'Le parcours de référencement n’a aucune étape : à configurer dans Paramètres.');
-  db.transaction(() => {
-    Object.assign(p, { statut: 'verification', circuit, soumis: frDate() });
-    delete p.rejet;
-    journal(req, p, 'dossier soumis au référencement');
-    partenaireSave(p);
-  })();
+  const e = soumettreDossier(p, { uid: req.user.id, who: whoLabel(req.user) });
+  if (e) return err(res, e.status, e.code, e.error);
   res.json({ partenaire: vue(p) });
 });
 
@@ -216,3 +229,4 @@ r.post('/:id/statut', (req, res) => {
 
 module.exports = r;
 module.exports.pieceValable = pieceValable;
+module.exports.soumettreDossier = soumettreDossier;

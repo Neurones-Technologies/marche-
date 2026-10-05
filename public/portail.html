@@ -25,7 +25,7 @@
   <section class="pt-texte">
     <span class="pf-badge"><span class="pf-point"></span>Portail des partenaires</span>
     <h1>Devenez partenaire de <span class="pf-degrade" data-org>notre organisation</span></h1>
-    <p class="pf-chapeau">Inscrivez votre entreprise pour constituer votre dossier de référencement, répondre aux appels d’offres et suivre vos commandes, au même endroit.</p>
+    <p class="pf-chapeau">Déposez votre dossier de référencement en ligne. Une fois votre entreprise référencée, vous pourrez être consultée sur les appels d’offres et suivre vos commandes, au même endroit.</p>
     <ul class="pt-atouts">
       <li><span class="pt-ic"><svg viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
         <div><strong>Votre dossier de référencement en ligne</strong><small>Déposez vos pièces administratives une fois, mettez-les à jour quand elles expirent.</small></div></li>
@@ -35,17 +35,25 @@
         <div><strong>Vos commandes et vos livraisons</strong><small>Bons de commande, avenants, réceptions : vous suivez tout, sans relance.</small></div></li>
     </ul>
     <ol class="pt-etapes" aria-label="Les étapes">
-      <li><span>1</span>Créez le compte de votre entreprise</li>
-      <li><span>2</span>Confirmez votre courriel</li>
-      <li><span>3</span>Complétez votre dossier : le service des achats le valide</li>
+      <li><span>1</span>Remplissez le formulaire et joignez vos documents</li>
+      <li><span>2</span>Confirmez votre courriel : votre dossier est transmis</li>
+      <li><span>3</span>Le service des achats l’examine et vous référence</li>
     </ol>
   </section>
 
   <section class="pf-carte pt-carte" aria-labelledby="signup-t">
-    <!-- Le compte reste inactif jusqu'à la vérification du courriel. Le champ « site » est un piège à robots. -->
+    <!-- Formulaire de référencement de l'organisation, en quatre étapes. Les documents partent un par un dans un
+         brouillon ; le compte reste inactif jusqu'à la vérification du courriel. « site » est un piège à robots. -->
     <form id="signup-form" novalidate>
-      <h2 id="signup-t">Inscrire mon entreprise</h2>
-      <fieldset>
+      <h2 id="signup-t">Demande de référencement</h2>
+      <ol class="pt-pas" id="pt-pas" aria-label="Étapes">
+        <li data-pas="0"><span>1</span>Entreprise</li>
+        <li data-pas="1"><span>2</span>Questionnaire</li>
+        <li data-pas="2"><span>3</span>Documents</li>
+        <li data-pas="3"><span>4</span>Compte</li>
+      </ol>
+
+      <fieldset class="pt-etape" data-etape="0">
         <legend>Votre entreprise</legend>
         <label for="su-rs">Raison sociale</label>
         <input id="su-rs" type="text" autocomplete="organization" maxlength="200" required>
@@ -59,21 +67,42 @@
           <option value="CN">Chine</option><option value="FR">France</option><option value="US">États-Unis</option>
         </select>
         <label for="su-immat">Numéro d’immatriculation (RCCM ou équivalent)</label>
-        <input id="su-immat" type="text" maxlength="80">
-      </fieldset>
-      <fieldset>
-        <legend>Votre contact</legend>
-        <label for="su-nom">Nom et prénom</label>
+        <input id="su-immat" type="text" maxlength="80" required>
+        <label for="su-nom">Nom et prénom du contact</label>
         <input id="su-nom" type="text" autocomplete="name" maxlength="120" required>
+        <label for="su-tel">Téléphone (facultatif)</label>
+        <input id="su-tel" type="tel" autocomplete="tel" maxlength="40">
+      </fieldset>
+
+      <fieldset class="pt-etape" data-etape="1" hidden>
+        <legend>Questionnaire</legend>
+        <div id="pt-questions"></div>
+        <div class="pf-aide">Les questions marquées * sont obligatoires.</div>
+      </fieldset>
+
+      <fieldset class="pt-etape" data-etape="2" hidden>
+        <legend>Documents à fournir</legend>
+        <p class="pf-aide pt-aide-docs">PDF, image, Word ou Excel, 10 Mo au plus par document.</p>
+        <div id="pt-docs" class="pt-docs"></div>
+      </fieldset>
+
+      <fieldset class="pt-etape" data-etape="3" hidden>
+        <legend>Votre compte</legend>
         <label for="su-email">Courriel professionnel</label>
         <input id="su-email" type="email" autocomplete="email" required>
         <label for="su-pw">Mot de passe</label>
         <input id="su-pw" type="password" autocomplete="new-password" required>
-        <div class="pf-aide">10 caractères minimum, avec majuscule, minuscule et chiffre.</div>
+        <div class="pf-aide">10 caractères minimum, avec majuscule, minuscule et chiffre. Il vous servira à suivre votre dossier puis à répondre aux appels d’offres.</div>
+        <div id="pt-recap" class="pt-recap"></div>
       </fieldset>
+
       <div class="pf-piege" aria-hidden="true"><label for="su-site">Site web</label><input id="su-site" type="text" tabindex="-1" autocomplete="off"></div>
       <div id="su-err" class="pf-message" role="alert" hidden></div>
-      <button class="btn btn-primary btn-grand pf-envoyer" type="submit" id="su-go">Créer le compte</button>
+      <div class="pt-nav">
+        <button class="btn btn-ghost" type="button" id="pt-prec" hidden>Précédent</button>
+        <button class="btn btn-primary btn-grand" type="button" id="pt-suiv">Continuer</button>
+        <button class="btn btn-primary btn-grand" type="submit" id="su-go" hidden>Envoyer mon dossier</button>
+      </div>
     </form>
     <div id="su-fait" class="pf-fait" hidden>
       <div class="pf-fait-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>

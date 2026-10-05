@@ -30,3 +30,15 @@ async function uploadImpl(doc, name, buf, cookie, pid = 'p1') {
   const res = await fetch(base + `/api/procedures/${pid}/files?doc=` + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: buf });
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
+
+/** Inscription complète sur le portail des partenaires (prestataire ivoirien) : brouillon, documents du formulaire par
+    défaut, réponses obligatoires, puis envoi. Retourne la réponse de l'envoi. */
+async function inscrire(corps) {
+  const b = (await call('POST', '/api/inscription/brouillon', {})).json.brouillon;
+  for (const [doc, expire] of [['registre'], ['fiscal', '2099-12-31'], ['cnps', '2099-12-31']]) {
+    await fetch(base + '/api/inscription/brouillon/pieces?doc=' + doc + (expire ? '&expire=' + expire : ''),
+      { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': doc + '.pdf', 'x-brouillon': b }, body: Buffer.from('%PDF-1.4 test') });
+  }
+  return call('POST', '/api/inscription', { immatriculation: 'CI-ABJ-2026-B-9', reponses: { activite: 'Fournitures' }, ...corps, brouillon: b });
+}
+module.exports.inscrire = inscrire;

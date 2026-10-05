@@ -28,62 +28,81 @@ async function uploadBrut(url, name, buf, cookie) {
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
 
-test('inscription publique : fermée, champ piège, contrôles, pas d’énumération des comptes', async () => {
+/** Brouillon de dossier du portail, et dépôt d'un document dans ce brouillon (sans compte). */
+async function brouillon() { const r = await call('POST', '/api/inscription/brouillon', {}); ok(r, 201); return r.json.brouillon; }
+async function pieceBrouillon(jeton, doc, expire) {
+  const res = await fetch(BASE + '/api/inscription/brouillon/pieces?doc=' + doc + (expire ? '&expire=' + expire : ''),
+    { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(doc + '.pdf'), 'x-brouillon': jeton }, body: PDF });
+  return { status: res.status, json: await res.json().catch(() => ({})) };
+}
+const REPONSES = { activite: 'Mobilier de bureau', effectif: '42', inconnue: 'x' };
+
+test('portail : formulaire de l’organisation, documents en brouillon, dossier complet exigé, pas d’énumération des comptes', async () => {
   admin = await login('administrateur@bal.ci'); achats = await login('y.koffi@bal.ci');
   BASE = require('./_client').base();
   const org = (await getState(admin)).org;
   ok(await patch(admin, { org: { ...org, inscriptionOuverte: false } }));
   refusé(await call('POST', '/api/inscription', INSCRIPTION), 403, 'REGISTRATION_CLOSED');
+  refusé(await call('POST', '/api/inscription/brouillon', {}), 403, 'REGISTRATION_CLOSED');
+  assert.equal((await call('GET', '/api/inscription/formulaire')).json.ouverte, false);
   ok(await patch(admin, { org: { ...org, inscriptionOuverte: true } }));
-  const piege = await call('POST', '/api/inscription', { ...INSCRIPTION, email: 'robot@x.ci', site: 'http://spam' });
+  // le formulaire public : questions, et documents selon le pays (la caution relève d'une offre, pas du référencement)
+  const fm = (await call('GET', '/api/inscription/formulaire?pays=CI')).json;
+  assert.ok(fm.champs.some((c) => c.id === 'activite'));
+  assert.deepEqual(fm.pieces.map((p) => p.id), ['registre', 'fiscal', 'cnps']);
+  assert.ok((await call('GET', '/api/inscription/formulaire?pays=FR')).json.pieces.some((p) => p.id === 'traduction'));
+  // documents déposés dans un brouillon anonyme
+  const jeton = await brouillon();
+  refusé(await pieceBrouillon('faux', 'registre'), 410, 'DRAFT_INVALID');
+  refusé(await pieceBrouillon(jeton, 'caution'), 422, 'PIECE_NOT_REQUIRED');
+  refusé(await pieceBrouillon(jeton, 'fiscal'), 422, 'PIECE_EXPIRY_REQUIRED'); // attestation : date de validité exigée
+  refusé(await pieceBrouillon(jeton, 'fiscal', '2020-01-01'), 422, 'PIECE_EXPIRED');
+  ok(await pieceBrouillon(jeton, 'registre'), 201);
+  ok(await pieceBrouillon(jeton, 'fiscal', '2099-12-31'), 201);
+  const corps = { ...INSCRIPTION, reponses: REPONSES, brouillon: jeton };
+  const piege = await call('POST', '/api/inscription', { ...corps, email: 'robot@x.ci', site: 'http://spam' });
   ok(piege, 202);
   assert.equal(piege.json.lienVerification, undefined, 'champ piège : rien n’est créé');
-  refusé(await call('POST', '/api/inscription', { ...INSCRIPTION, motDePasse: 'court' }), 422);
-  refusé(await call('POST', '/api/inscription', { ...INSCRIPTION, pays: 'Côte d’Ivoire' }), 422);
-  const r = await call('POST', '/api/inscription', INSCRIPTION);
+  refusé(await call('POST', '/api/inscription', { ...corps, motDePasse: 'court' }), 422);
+  refusé(await call('POST', '/api/inscription', { ...corps, pays: 'Côte d’Ivoire' }), 422);
+  refusé(await call('POST', '/api/inscription', { ...corps, reponses: {} }), 422, 'PARTNER_INCOMPLETE');
+  refusé(await call('POST', '/api/inscription', { ...corps, reponses: { activite: 'x', effectif: 'beaucoup' } }), 422, 'PARTNER_INCOMPLETE');
+  refusé(await call('POST', '/api/inscription', corps), 422, 'PIECES_MISSING'); // la CNPS manque (prestataire local)
+  ok(await pieceBrouillon(jeton, 'cnps', '2099-12-31'), 201);
+  ok(await pieceBrouillon(jeton, 'cnps', '2099-06-30'), 201); // remplacée dans le brouillon
+  const r = await call('POST', '/api/inscription', corps);
   ok(r, 202);
   lien = r.json.lienVerification;
   assert.match(lien, /^\/\?verifier=[0-9a-f]{64}$/);
+  refusé(await pieceBrouillon(jeton, 'registre'), 410, 'DRAFT_INVALID'); // brouillon consommé
   // même réponse pour une adresse déjà inscrite, sans nouveau lien
-  const bis = await call('POST', '/api/inscription', { ...INSCRIPTION, raisonSociale: 'Usurpateur' });
+  const j2 = await brouillon();
+  for (const [doc, exp] of [['registre'], ['fiscal', '2099-12-31'], ['cnps', '2099-12-31']]) ok(await pieceBrouillon(j2, doc, exp), 201);
+  const bis = await call('POST', '/api/inscription', { ...corps, raisonSociale: 'Usurpateur', brouillon: j2 });
   ok(bis, 202);
   assert.equal(bis.json.message, r.json.message);
   assert.equal(bis.json.lienVerification, undefined);
   assert.ok((await getState(admin)).emails.some((m) => m.a[0] === 'contact@mobilia.ci' && m.corps.includes(lien)));
 });
 
-test('vérification du courriel : jeton à usage unique, compte inactif avant', async () => {
+test('vérification du courriel : compte activé, dossier transmis au référencement', async () => {
   refusé(await call('POST', '/api/auth/login', { email: INSCRIPTION.email, password: MDP }), 403, 'EMAIL_NOT_VERIFIED');
   refusé(await call('POST', '/api/auth/login', { email: INSCRIPTION.email, password: 'Mauvais2026!x' }), 401);
   refusé(await call('POST', '/api/inscription/verifier', { jeton: 'faux' }), 410, 'TOKEN_INVALID');
   const jeton = lien.split('=')[1];
-  ok(await call('POST', '/api/inscription/verifier', { jeton }));
+  const v = await call('POST', '/api/inscription/verifier', { jeton });
+  ok(v); assert.equal(v.json.transmis, true);
   refusé(await call('POST', '/api/inscription/verifier', { jeton }), 410, 'TOKEN_INVALID');
   mobilia = await connecter(INSCRIPTION.email);
-});
-
-test('dossier : fiche, pièces exigées selon le pays, contrôles du dépôt de pièces', async () => {
   const moi = (await call('GET', '/api/partenaires/moi', null, mobilia)).json.partenaire;
-  assert.equal(moi.statut, 'candidat');
-  assert.deepEqual(moi.exigees.map((e) => e.id), ['registre', 'fiscal', 'cnps'], 'pas la caution : elle est propre à une offre');
+  assert.equal(moi.statut, 'verification');
+  assert.deepEqual(moi.reponses, { activite: 'Mobilier de bureau', effectif: 42 });
+  assert.deepEqual(moi.exigees.map((e) => [e.id, e.etat]), [['registre', 'a_verifier'], ['fiscal', 'a_verifier'], ['cnps', 'a_verifier']]);
+  assert.equal(moi.pieces.cnps.expire, '2099-06-30');
+  // le dossier attend les achats : il apparaît dans leur liste, et il est figé pour le prestataire
+  assert.ok((await call('GET', '/api/partenaires', null, achats)).json.partenaires.some((p) => p.id === moi.id && p.statut === 'verification'));
   refusé(await call('GET', '/api/partenaires', null, mobilia), 403);
   refusé(await call('GET', '/api/partenaires/PRT-0001', null, mobilia), 404); // la fiche d'un autre
-  ok(await call('PUT', `/api/partenaires/${moi.id}`, { adresse: 'Abidjan, Cocody', domaines: ['Mobilier'] }, mobilia));
-  refusé(await call('POST', `/api/partenaires/${moi.id}/soumettre`, {}, mobilia), 422, 'PIECES_MISSING');
-  refusé(await piece(mobilia, moi.id, 'caution'), 422, 'PIECE_NOT_REQUIRED');
-  refusé(await piece(mobilia, moi.id, 'fiscal', '2020-01-01'), 422, 'PIECE_EXPIRED');
-  ok(await piece(mobilia, moi.id, 'registre'), 201);
-  refusé(await piece(mobilia, moi.id, 'fiscal'), 422, 'PIECE_EXPIRY_REQUIRED'); // attestation : date de validité exigée
-  ok(await piece(mobilia, moi.id, 'fiscal', '2099-12-31'), 201);
-  ok(await piece(mobilia, moi.id, 'cnps', '2099-12-31'), 201);
-  // questions du formulaire : contrôlées à la saisie, obligatoires à la soumission
-  assert.ok(moi.questions.some((q) => q.id === 'activite' && q.obligatoire));
-  refusé(await call('PUT', `/api/partenaires/${moi.id}`, { reponses: { effectif: 'beaucoup' } }, mobilia), 422, 'PARTNER_INVALID');
-  refusé(await call('POST', `/api/partenaires/${moi.id}/soumettre`, {}, mobilia), 422, 'PARTNER_INCOMPLETE');
-  const r = await call('PUT', `/api/partenaires/${moi.id}`, { reponses: { activite: 'Mobilier de bureau', effectif: '42', inconnue: 'x' } }, mobilia);
-  ok(r);
-  assert.deepEqual(r.json.partenaire.reponses, { activite: 'Mobilier de bureau', effectif: 42 });
-  ok(await call('POST', `/api/partenaires/${moi.id}/soumettre`, {}, mobilia));
   refusé(await call('PUT', `/api/partenaires/${moi.id}`, { adresse: 'x' }, mobilia), 409, 'PARTNER_LOCKED');
   refusé(await piece(mobilia, moi.id, 'registre'), 409, 'PARTNER_LOCKED');
 });
@@ -96,6 +115,11 @@ test('instruction : rejet motivé, nouvelle soumission, référencement et valid
   const rj = await call('POST', `/api/partenaires/${moi.id}/rejet`, { motif: 'Registre du commerce illisible.' }, achats);
   ok(rj);
   assert.equal(rj.json.partenaire.statut, 'rejete');
+  // le prestataire corrige : contrôles du dépôt de pièces et des réponses depuis sa fiche
+  refusé(await piece(mobilia, moi.id, 'caution'), 422, 'PIECE_NOT_REQUIRED');
+  refusé(await piece(mobilia, moi.id, 'fiscal'), 422, 'PIECE_EXPIRY_REQUIRED');
+  refusé(await call('PUT', `/api/partenaires/${moi.id}`, { reponses: { effectif: 'beaucoup' } }, mobilia), 422, 'PARTNER_INVALID');
+  ok(await call('PUT', `/api/partenaires/${moi.id}`, { adresse: 'Abidjan, Cocody', domaines: ['Mobilier'] }, mobilia));
   ok(await piece(mobilia, moi.id, 'registre'), 201);
   ok(await call('POST', `/api/partenaires/${moi.id}/soumettre`, {}, mobilia));
   ok(await call('POST', `/api/partenaires/${moi.id}/approbations/0`, {}, achats));
@@ -118,7 +142,7 @@ test('dépôt d’offre : réservé aux partenaires référencés en achats priv
   ok(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid));
   const lot = s.cdc.lots[0].id;
   // un second prestataire, inscrit et vérifié, mais pas référencé
-  const r = await call('POST', '/api/inscription', { ...INSCRIPTION, raisonSociale: 'Autre SA', email: 'contact@autre.ci' });
+  const r = await require('./_client').inscrire({ ...INSCRIPTION, raisonSociale: 'Autre SA', email: 'contact@autre.ci' });
   ok(await call('POST', '/api/inscription/verifier', { jeton: r.json.lienVerification.split('=')[1] }));
   autre = await connecter('contact@autre.ci');
   const offre = { name: 'Mobilia SARL', iso: 'CI', devise: 'XOF', montant: 12000000, delai: 30, lots: [lot] };
@@ -161,7 +185,7 @@ test('formulaire de référencement : défini par l’organisation, contrôlé �
   assert.ok(!f.pieces.some((p) => p.id === 'caution'), 'distinct des pièces d’une offre');
   refusé(await patch(admin, { formulaireReferencement: { ...f, champs: [...f.champs, { id: 'x', label: 'Type ?', type: 'couleur', obligatoire: false }] } }), 422, 'FORM_INVALID');
   refusé(await patch(admin, { formulaireReferencement: { ...f, champs: [...f.champs, { id: 'secteur', label: 'Secteur', type: 'choix', options: ['BTP'], obligatoire: true }] } }), 422, 'FORM_INVALID');
-  refusé(await patch(mobilia, { formulaireReferencement: f }), 403);
+  refusé(await call('PATCH', '/api/organisation/state', { changes: { formulaireReferencement: f } }, mobilia), 403);
   const nouveau = { champs: [...f.champs, { id: 'secteur', label: 'Secteur', type: 'choix', options: ['BTP', 'Informatique'], obligatoire: true }],
     pieces: [...f.pieces, { id: 'assurance', label: 'Attestation d’assurance', scope: 'tous', obligatoire: false, expiration: true }] };
   ok(await patch(admin, { formulaireReferencement: nouveau }));
