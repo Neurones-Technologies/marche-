@@ -69,10 +69,13 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
   display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; height: 100dvh; padding: var(--space-4) var(--space-3);
 }
 .brand { display: flex; align-items: center; gap: var(--space-3); font-weight: var(--fw-strong); font-size: var(--fs-title); padding: var(--space-1) var(--space-2) var(--space-5); }
-.brand-mark {
-  width: var(--step); height: var(--step); border-radius: var(--radius-sm); background: var(--color-brand); color: var(--color-on-brand);
-  display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-small); flex: 0 0 auto;
-}
+/* Logo : l'étiquette validée (étiquette de prix et coche), aux couleurs de la palette. */
+.brand-mark, .login-mark { flex: 0 0 auto; width: var(--step); height: var(--step); }
+.logo-forme { fill: var(--color-brand); stroke: var(--color-brand); stroke-width: 4; stroke-linejoin: round; }
+.logo-trou { fill: var(--color-on-brand); }
+.logo-trait { fill: none; stroke: var(--color-on-brand); stroke-width: 11; stroke-linecap: round; stroke-linejoin: round; }
+.logo-mot { letter-spacing: -0.01em; }
+.logo-plus { color: var(--color-brand); font-weight: 900; }
 .navs { display: flex; flex-direction: column; gap: var(--space-half); overflow-y: auto; flex: 1 1 auto; }
 .navgrp { padding: var(--space-4) var(--space-3) var(--space-1); color: var(--color-side-muted); font-size: var(--fs-tiny); }
 /* Procédure courante, en tête du menu : suit les couleurs de la barre latérale (sombre dans « institutionnel »). */

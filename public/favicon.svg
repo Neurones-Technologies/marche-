@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <title>Marché+</title>
+  <path d="M44 16 H100 A10 10 0 0 1 110 26 V94 A10 10 0 0 1 100 104 H44 L10 60 Z" fill="#C2531F" stroke="#C2531F" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="38" cy="60" r="7" fill="#FFFFFF"/>
+  <path d="M56 60 L70 75 L96 45" fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
