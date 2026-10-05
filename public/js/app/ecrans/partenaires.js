@@ -27,8 +27,8 @@ function circuitPartenaire(parent, p, decider){
     add(row,'div','stepnum '+(e.done?'done':(i===fp?'now':'')), e.done?'✓':String(i+1));
     var d=add(row,'div'); d.style.flex='1 1 auto';
     add(d,'strong',null,e.role); add(d,'div','muted',e.who||'');
-    if(e.done) add(row,'span','chip c-green','Franchie le '+e.at);
-    else if(i===fp && decider) decider(row,e,i);
+    if(e.done){ add(row,'span','chip c-green','Franchie le '+e.at); parQui(d,e); }
+    else if(i===fp){ suppleanceNiveau(row,'referencement',p.id,i,e,'Partenaire '+p.id+' — '+p.raisonSociale); if(decider) decider(row,e,i); else add(row,'span','chip c-grey','En cours'); }
     else add(row,'span','chip c-grey', i===fp ? 'En cours' : 'En attente');
   });
 }

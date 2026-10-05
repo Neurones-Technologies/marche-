@@ -5,6 +5,7 @@ const R = require('../public/js/regles.js');
 const P = require('../public/js/profils.js');
 const C = require('../public/js/circuits.js');
 const { seed, frDate, db } = require('./db');
+const SU = require('./suppleance');
 // rôles dont la plateforme a besoin : l'administrateur initial et le compte des prestataires inscrits en ligne
 const ROLES_SYSTEME = ['admin', 'soum'];
 
@@ -23,7 +24,7 @@ const WRITE_PERMS = {
   org: ['params.edit'], seuils: ['params.edit'], docDefs: ['params.edit'],
   mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'], circuitReferencement: ['params.edit'], circuitCommande: ['params.edit'], evaluationPartenaires: ['params.edit'],
   offers: ['params.edit'],
-  roles: ['roles.edit'], users: ['roles.edit'], delegations: ['roles.edit'],
+  roles: ['roles.edit'], users: ['roles.edit'], // délégations et affectations : routes /api/suppleances uniquement
   notifRules: ['notif.manage'],
   qa: ['qa.answer', 'portail.use'],
   additifs: ['qa.answer'],
@@ -203,7 +204,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       for (let i = 0; i < value.length; i++) {
         const a = value[i], b = before[i];
         if (b.requis === undefined) delete a.requis; else a.requis = b.requis;
-        if (!!a.done === !!b.done) { a.by = b.by; a.at = b.at; continue; }
+        if (!!a.done === !!b.done) { a.by = b.by; a.at = b.at; if (b.pour) a.pour = b.pour; else delete a.pour; continue; }
         if (!a.done) {
           if (!retour) return refus(409, 'APPROVAL_FINAL', 'Une approbation donnée ne se retire que par un recours déclaré fondé ou un rejet de l’attribution.');
           delete a.by; delete a.at;
@@ -219,9 +220,11 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         if (C.nbRequises(before) < k.niveauxApprobationMin)
           return refus(422, 'APPROVAL_CIRCUIT_TOO_SHORT', `Le profil réglementaire exige au moins ${k.niveauxApprobationMin} niveau(x) d’approbation.`);
         const s = sod(), ecartes = k.separationFonctions ? s.scorers.concat(s.validators) : [];
-        const err = C.controle(before, i, req.user, ecartes);
+        const sup = SU.sup(req.user, 'attribution', req.pid);
+        const err = C.controle(before, i, req.user, ecartes, sup);
         if (err) return refus(err.status, err.code, err.error);
         value[i].by = uid; value[i].at = frDate();
+        const pour = C.pour(before, i, req.user, sup); if (pour) value[i].pour = pour; else delete value[i].pour;
       }
       break;
     }
@@ -237,12 +240,13 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (!motif || motif.length > 1000) return refus(422, 'REJECTION_REASON_REQUIRED', 'Le rejet de l’attribution doit être motivé (1 000 caractères au plus).');
       if (!stored('evalDone')) return refus(409, 'GATE_EVALUATION_NOT_VALIDATED', 'Rien à rejeter : l’évaluation n’est pas validée.');
       if (C.complet(ap)) return refus(409, 'APPROVAL_FINAL', 'L’attribution est prononcée : elle ne se remet en cause que par un recours.');
-      const i = C.prochaine(ap), k = cadreOf(next), s = sod();
-      const err = C.controle(ap, i, req.user, k.separationFonctions ? s.scorers.concat(s.validators) : []);
+      const i = C.prochaine(ap), k = cadreOf(next), s = sod(), sup = SU.sup(req.user, 'attribution', req.pid);
+      const err = C.controle(ap, i, req.user, k.separationFonctions ? s.scorers.concat(s.validators) : [], sup);
       if (err) return refus(err.status, err.code, err.error);
+      const pourRejet = C.pour(ap, i, req.user, sup);
       if (changes.evalDone !== false || !Array.isArray(changes.approvals) || changes.approvals.some((a) => a.done))
         return refus(409, 'REJECTION_INCOMPLETE', 'Un rejet renvoie la procédure à l’évaluation : évaluation rouverte et circuit remis à zéro dans le même envoi.');
-      value[value.length - 1] = { niveau: i, role: ap[i].role, motif, by: uid, at: frDate() };
+      value[value.length - 1] = Object.assign({ niveau: i, role: ap[i].role, motif, by: uid, at: frDate() }, pourRejet ? { pour: pourRejet } : {});
       break;
     }
     case 'standstill': {

@@ -7,6 +7,7 @@
 const express = require('express');
 const { db, kvGet, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero, proceduresAll, procedureCreate, auditAppend, frDate } = require('../db');
 const { requireAuth, whoLabel } = require('../auth');
+const SU = require('../suppleance');
 const C = require('../../public/js/circuits.js');
 const P = require('../../public/js/profils.js');
 
@@ -96,11 +97,13 @@ r.post('/:id/approbations/:niveau', (req, res) => {
   const b = req.besoin, i = Number(req.params.niveau);
   if (!req.can('besoin.approve')) return err(res, 403, 'FORBIDDEN', 'Valider un besoin exige l’habilitation « Valider un besoin ».');
   if (b.statut !== 'soumis') return err(res, 409, 'NEED_NOT_SUBMITTED', 'Ce besoin n’est pas en attente de validation.');
-  const e = C.controle(b.circuit, i, req.user, [b.par]);
+  const sup = SU.sup(req.user, 'besoin', b.id);
+  const e = C.controle(b.circuit, i, req.user, [b.par], sup);
   if (e) return err(res, e.status, e.code === 'SEPARATION_OF_DUTIES' ? 'NEED_OWN' : e.code, e.code === 'SEPARATION_OF_DUTIES' ? 'Vous ne pouvez pas valider un besoin que vous avez exprimé.' : e.error);
+  const pour = C.pour(b.circuit, i, req.user, sup);
   db.transaction(() => {
-    Object.assign(b.circuit[i], { done: true, by: req.user.id, at: frDate() });
-    journal(req, b, `validé au niveau « ${b.circuit[i].role} »`);
+    Object.assign(b.circuit[i], { done: true, by: req.user.id, at: frDate() }, pour ? { pour } : {});
+    journal(req, b, `validé au niveau « ${b.circuit[i].role} »${SU.mention(pour)}`);
     if (C.complet(b.circuit)) { b.statut = 'valide'; b.valide = frDate(); journal(req, b, 'validé : prêt à devenir une procédure'); }
     besoinSave(b);
   })();
@@ -113,13 +116,14 @@ r.post('/:id/rejet', (req, res) => {
   if (!req.can('besoin.approve')) return err(res, 403, 'FORBIDDEN', 'Rejeter un besoin exige l’habilitation « Valider un besoin ».');
   if (b.statut !== 'soumis') return err(res, 409, 'NEED_NOT_SUBMITTED', 'Ce besoin n’est pas en attente de validation.');
   if (!motif || motif.length > 1000) return err(res, 422, 'REJECTION_REASON_REQUIRED', 'Le rejet doit être motivé (1 000 caractères au plus).');
-  const i = C.prochaine(b.circuit);
-  const e = C.controle(b.circuit, i, req.user, [b.par]);
+  const i = C.prochaine(b.circuit), sup = SU.sup(req.user, 'besoin', b.id);
+  const e = C.controle(b.circuit, i, req.user, [b.par], sup);
   if (e) return err(res, e.status, e.code, e.error);
+  const pour = C.pour(b.circuit, i, req.user, sup);
   db.transaction(() => {
     b.statut = 'rejete';
-    b.rejet = { niveau: i, role: b.circuit[i].role, motif, by: req.user.id, at: frDate() };
-    journal(req, b, `rejeté au niveau « ${b.circuit[i].role} » — motif : ${motif}`);
+    b.rejet = Object.assign({ niveau: i, role: b.circuit[i].role, motif, by: req.user.id, at: frDate() }, pour ? { pour } : {});
+    journal(req, b, `rejeté au niveau « ${b.circuit[i].role} »${SU.mention(pour)} — motif : ${motif}`);
     besoinSave(b);
   })();
   res.json({ besoin: b });

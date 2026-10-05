@@ -11,6 +11,7 @@ const express = require('express');
 const { db, kvGet, partenairesAll, partenaireGet, partenaireSave, partenaireDe, commandesAll, auditAppend, frDate } = require('../db');
 const { requireAuth, whoLabel } = require('../auth');
 const { lireFichier, corpsBrut, diskPath } = require('./files');
+const SU = require('../suppleance');
 const C = require('../../public/js/circuits.js');
 const R = require('../../public/js/regles.js');
 
@@ -152,11 +153,13 @@ r.post('/:id/approbations/:niveau', (req, res) => {
   const p = req.partenaire, i = Number(req.params.niveau);
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Référencer les partenaires » requise.');
   if (p.statut !== 'verification') return err(res, 409, 'PARTNER_NOT_SUBMITTED', 'Ce dossier n’est pas en cours d’instruction.');
-  const e = C.controle(p.circuit, i, req.user, p.comptes || []);
+  const sup = SU.sup(req.user, 'referencement', p.id);
+  const e = C.controle(p.circuit, i, req.user, p.comptes || [], sup);
   if (e) return err(res, e.status, e.code, e.error);
+  const pour = C.pour(p.circuit, i, req.user, sup);
   db.transaction(() => {
-    Object.assign(p.circuit[i], { done: true, by: req.user.id, at: frDate() });
-    journal(req, p, `étape franchie — ${p.circuit[i].role}`);
+    Object.assign(p.circuit[i], { done: true, by: req.user.id, at: frDate() }, pour ? { pour } : {});
+    journal(req, p, `étape franchie — ${p.circuit[i].role}${SU.mention(pour)}`);
     if (C.complet(p.circuit)) {
       p.statut = 'reference'; p.referenceLe = frDate();
       Object.values(p.pieces).forEach((x) => { if (x.statut === 'a_verifier') Object.assign(x, { statut: 'valide', decidePar: req.user.id, decideLe: frDate() }); });
@@ -173,12 +176,13 @@ r.post('/:id/rejet', (req, res) => {
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Référencer les partenaires » requise.');
   if (p.statut !== 'verification') return err(res, 409, 'PARTNER_NOT_SUBMITTED', 'Ce dossier n’est pas en cours d’instruction.');
   if (!motif || motif.length > 1000) return err(res, 422, 'REJECTION_REASON_REQUIRED', 'Le rejet doit être motivé (1 000 caractères au plus).');
-  const i = C.prochaine(p.circuit), e = C.controle(p.circuit, i, req.user, p.comptes || []);
+  const i = C.prochaine(p.circuit), sup = SU.sup(req.user, 'referencement', p.id), e = C.controle(p.circuit, i, req.user, p.comptes || [], sup);
   if (e) return err(res, e.status, e.code, e.error);
+  const pour = C.pour(p.circuit, i, req.user, sup);
   db.transaction(() => {
     p.statut = 'rejete';
-    p.rejet = { niveau: i, role: p.circuit[i].role, motif, by: req.user.id, at: frDate() };
-    journal(req, p, `dossier rejeté (${p.circuit[i].role}) — motif : ${motif}`);
+    p.rejet = Object.assign({ niveau: i, role: p.circuit[i].role, motif, by: req.user.id, at: frDate() }, pour ? { pour } : {});
+    journal(req, p, `dossier rejeté (${p.circuit[i].role})${SU.mention(pour)} — motif : ${motif}`);
     partenaireSave(p);
   })();
   res.json({ partenaire: vue(p) });

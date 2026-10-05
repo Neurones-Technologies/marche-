@@ -413,6 +413,24 @@ bord » était celui d'une procédure, sans vue d'ensemble ni historique. Réorg
   une étape compte plusieurs écrans, « Étape suivante » en pied, et les outils (vue d'ensemble, journal d'audit).
   Un prestataire ou un demandeur, qui ne voient qu'un ou deux écrans de la procédure, y accèdent directement.
 
+### Suppléance des valideurs absents, 05/10/2026
+
+Un niveau de circuit réservé à un rôle restait bloqué quand son seul titulaire était absent. Deux mécanismes, pour
+les cinq circuits (attribution, besoins, commandes, avenants, référencement), décidés par le serveur
+(`server/suppleance.js`, routes `/api/suppleances`) :
+
+- **Délégation pour une période** : le titulaire (menu du compte, « Mes suppléances ») ou l'administration
+  (Utilisateurs et accès › Suppléances) désigne un suppléant, du … au … (180 jours au plus), pour des circuits
+  choisis. Elle commence et finit d'elle-même ; elle peut être arrêtée avant terme.
+- **Affectation d'un dossier** : sur le niveau en attente d'un dossier précis, l'administration le confie à une
+  personne nommée, avec un motif obligatoire.
+
+Règles : la suppléance transfère un niveau, pas une habilitation (le suppléant doit déjà pouvoir valider ce
+circuit) ; elle ne lève jamais la séparation des fonctions ; le titulaire garde son droit. Chaque décision prise en
+suppléance porte « pour X (délégation du … au …) » ou « sur affectation : motif », dans le circuit, le journal
+d'audit et l'historique du dossier. Le suppléant et, le cas échéant, le titulaire sont notifiés personnellement.
+La route générique d'état n'écrit plus ces données. Tests : `server/test/suppleances.test.js`, `circuits.test.js`.
+
 ## 8. Bilan au 02/10/2026
 
 Les cinq modules du cadrage existent, sur le socle (plusieurs procédures, écritures ciblées, interface découpée) et

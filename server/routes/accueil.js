@@ -7,6 +7,7 @@
 const express = require('express');
 const { db, store, proceduresAll, besoinsAll, commandesAll, partenairesAll, partenaireDe, auditList } = require('../db');
 const { requireAuth } = require('../auth');
+const SU = require('../suppleance');
 const C = require('../../public/js/circuits.js');
 const R = require('../../public/js/regles.js');
 const P = require('../../public/js/profils.js');
@@ -72,7 +73,7 @@ r.get('/accueil', requireAuth, (req, res) => {
       if (b.par === moi && b.statut === 'brouillon') tache('Besoins', `Soumettre le besoin ${b.id}`, b.objet, { vue: 'besoins', id: b.id });
       if (b.statut === 'soumis' && can('besoin.approve')) {
         const i = C.prochaine(b.circuit);
-        if (i >= 0 && !C.controle(b.circuit, i, req.user, [b.par])) tache('Besoins', `Valider le besoin ${b.id}`, `${b.objet} — ${b.circuit[i].role}`, { vue: 'besoins', id: b.id });
+        if (i >= 0 && !C.controle(b.circuit, i, req.user, [b.par], SU.sup(req.user, 'besoin', b.id))) tache('Besoins', `Valider le besoin ${b.id}`, `${b.objet} — ${b.circuit[i].role}`, { vue: 'besoins', id: b.id });
       }
       if (b.statut === 'valide' && can('besoin.manage')) tache('Besoins', `Transformer le besoin ${b.id} en procédure`, b.objet, { vue: 'besoins', id: b.id });
     });
@@ -92,7 +93,7 @@ r.get('/accueil', requireAuth, (req, res) => {
       if (ctx.depClosed && !ctx.evalDone && (can('eval.score') || can('eval.validate'))) tache('Appels d’offres', `Évaluer les offres de ${ref}`, can('eval.validate') ? 'Noter puis valider l’évaluation' : 'Noter les critères qualitatifs', L('evaluation'));
       if (ctx.evalDone && !R.allApproved(ctx.approvals) && can('decision.approve')) {
         const i = C.prochaine(ctx.approvals);
-        if (i >= 0 && !C.controle(ctx.approvals, i, req.user, [])) tache('Appels d’offres', `Approuver l’attribution de ${ref}`, ctx.approvals[i].role, L('decision'));
+        if (i >= 0 && !C.controle(ctx.approvals, i, req.user, [], SU.sup(req.user, 'attribution', p.id))) tache('Appels d’offres', `Approuver l’attribution de ${ref}`, ctx.approvals[i].role, L('decision'));
       }
       if (R.allApproved(ctx.approvals) && !ctx.contractSigned && can('contract.sign')) {
         const ss = ctx.standstill || {};
@@ -116,9 +117,9 @@ r.get('/accueil', requireAuth, (req, res) => {
       cloturees: n('cloturee'), enRetard: cmds.filter((c) => ['emise', 'en_reception'].includes(c.statut) && c.dateLivraison < auj).length };
     cmds.forEach((c) => {
       const nom = (c.numero || 'Brouillon') + ' — ' + c.titulaire.nom, L = { vue: 'commandes', id: c.id };
-      if (c.statut === 'validation' && can('commande.approve')) { const i = C.prochaine(c.circuit); if (i >= 0 && !C.controle(c.circuit, i, req.user, [c.creePar])) tache('Commandes', `Valider la commande ${nom}`, c.circuit[i].role, L); }
+      if (c.statut === 'validation' && can('commande.approve')) { const i = C.prochaine(c.circuit); if (i >= 0 && !C.controle(c.circuit, i, req.user, [c.creePar], SU.sup(req.user, 'commande', c.id))) tache('Commandes', `Valider la commande ${nom}`, c.circuit[i].role, L); }
       (c.avenants || []).forEach((a) => {
-        if (a.statut === 'validation' && can('commande.approve')) { const i = C.prochaine(a.circuit); if (i >= 0 && !C.controle(a.circuit, i, req.user, [a.creePar])) tache('Commandes', `Valider l’avenant n° ${a.n} de ${nom}`, a.motif, L); }
+        if (a.statut === 'validation' && can('commande.approve')) { const i = C.prochaine(a.circuit); if (i >= 0 && !C.controle(a.circuit, i, req.user, [a.creePar], SU.sup(req.user, 'avenant', c.id + '#' + a.n))) tache('Commandes', `Valider l’avenant n° ${a.n} de ${nom}`, a.motif, L); }
         if (a.statut === 'validee' && can('commande.manage')) tache('Commandes', `Émettre l’avenant n° ${a.n} de ${nom}`, a.motif, L);
       });
       if (c.statut === 'validee' && can('commande.manage')) tache('Commandes', `Émettre la commande ${nom}`, c.procedure.ref, L);

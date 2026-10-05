@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { db, kvGet, store, proceduresAll, partenaireDe, partenairesAll, partenaireGet, partenaireSave, commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero, auditAppend, frDate } = require('../db');
 const { requireAuth, whoLabel } = require('../auth');
+const SU = require('../suppleance');
 const C = require('../../public/js/circuits.js');
 const R = require('../../public/js/regles.js');
 const P = require('../../public/js/profils.js');
@@ -172,11 +173,13 @@ r.post('/:id/approbations/:niveau', (req, res) => {
   const c = req.commande, i = Number(req.params.niveau);
   if (!valide(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Valider un bon de commande » requise.');
   if (c.statut !== 'validation') return err(res, 409, 'ORDER_NOT_SUBMITTED', 'Cette commande n’est pas en attente de validation.');
-  const e = C.controle(c.circuit, i, req.user, [c.creePar]);
+  const sup = SU.sup(req.user, 'commande', c.id);
+  const e = C.controle(c.circuit, i, req.user, [c.creePar], sup);
   if (e) return err(res, e.status, e.code === 'SEPARATION_OF_DUTIES' ? 'ORDER_OWN' : e.code, e.code === 'SEPARATION_OF_DUTIES' ? 'Vous ne pouvez pas valider une commande que vous avez établie.' : e.error);
+  const pour = C.pour(c.circuit, i, req.user, sup);
   db.transaction(() => {
-    Object.assign(c.circuit[i], { done: true, by: req.user.id, at: frDate() });
-    journal(req, c, `validée au niveau « ${c.circuit[i].role} »`);
+    Object.assign(c.circuit[i], { done: true, by: req.user.id, at: frDate() }, pour ? { pour } : {});
+    journal(req, c, `validée au niveau « ${c.circuit[i].role} »${SU.mention(pour)}`);
     if (C.complet(c.circuit)) { c.statut = 'validee'; journal(req, c, 'validée : prête à être émise'); }
     commandeSave(c);
   })();
@@ -188,11 +191,12 @@ r.post('/:id/rejet', (req, res) => {
   if (!valide(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Valider un bon de commande » requise.');
   if (c.statut !== 'validation') return err(res, 409, 'ORDER_NOT_SUBMITTED', 'Cette commande n’est pas en attente de validation.');
   if (!motif || motif.length > 1000) return err(res, 422, 'REJECTION_REASON_REQUIRED', 'Le rejet doit être motivé (1 000 caractères au plus).');
-  const i = C.prochaine(c.circuit), e = C.controle(c.circuit, i, req.user, [c.creePar]);
+  const i = C.prochaine(c.circuit), sup = SU.sup(req.user, 'commande', c.id), e = C.controle(c.circuit, i, req.user, [c.creePar], sup);
   if (e) return err(res, e.status, e.code, e.error);
+  const pour = C.pour(c.circuit, i, req.user, sup);
   db.transaction(() => {
-    c.statut = 'rejete'; c.rejet = { niveau: i, role: c.circuit[i].role, motif, by: req.user.id, at: frDate() };
-    journal(req, c, `rejetée (${c.circuit[i].role}) — motif : ${motif}`);
+    c.statut = 'rejete'; c.rejet = Object.assign({ niveau: i, role: c.circuit[i].role, motif, by: req.user.id, at: frDate() }, pour ? { pour } : {});
+    journal(req, c, `rejetée (${c.circuit[i].role})${SU.mention(pour)} — motif : ${motif}`);
     commandeSave(c);
   })();
   res.json({ commande: vue(c) });
@@ -282,12 +286,14 @@ r.post('/:id/avenants/:n/approbations/:niveau', (req, res) => {
   if (!a) return;
   if (!valide(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Valider un bon de commande » requise.');
   if (a.statut !== 'validation') return err(res, 409, 'AMENDMENT_NOT_SUBMITTED', 'Cet avenant n’est pas en attente de validation.');
-  const e = C.controle(a.circuit, i, req.user, [a.creePar]);
+  const sup = SU.sup(req.user, 'avenant', c.id + '#' + req.params.n);
+  const e = C.controle(a.circuit, i, req.user, [a.creePar], sup);
   if (e) return err(res, e.status, e.code === 'SEPARATION_OF_DUTIES' ? 'ORDER_OWN' : e.code, e.code === 'SEPARATION_OF_DUTIES' ? 'Vous ne pouvez pas valider un avenant que vous avez établi.' : e.error);
+  const pour = C.pour(a.circuit, i, req.user, sup);
   db.transaction(() => {
-    Object.assign(a.circuit[i], { done: true, by: req.user.id, at: frDate() });
+    Object.assign(a.circuit[i], { done: true, by: req.user.id, at: frDate() }, pour ? { pour } : {});
     if (C.complet(a.circuit)) a.statut = 'validee';
-    journal(req, c, `avenant n° ${a.n} validé au niveau « ${a.circuit[i].role} »`);
+    journal(req, c, `avenant n° ${a.n} validé au niveau « ${a.circuit[i].role} »${SU.mention(pour)}`);
     commandeSave(c);
   })();
   res.json({ commande: vue(c) });
@@ -299,11 +305,12 @@ r.post('/:id/avenants/:n/rejet', (req, res) => {
   if (!valide(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Valider un bon de commande » requise.');
   if (a.statut !== 'validation') return err(res, 409, 'AMENDMENT_NOT_SUBMITTED', 'Cet avenant n’est pas en attente de validation.');
   if (!motif || motif.length > 1000) return err(res, 422, 'REJECTION_REASON_REQUIRED', 'Le rejet doit être motivé (1 000 caractères au plus).');
-  const i = C.prochaine(a.circuit), e = C.controle(a.circuit, i, req.user, [a.creePar]);
+  const i = C.prochaine(a.circuit), sup = SU.sup(req.user, 'avenant', c.id + '#' + req.params.n), e = C.controle(a.circuit, i, req.user, [a.creePar], sup);
   if (e) return err(res, e.status, e.code, e.error);
+  const pour = C.pour(a.circuit, i, req.user, sup);
   db.transaction(() => {
-    a.statut = 'rejete'; a.rejet = { niveau: i, role: a.circuit[i].role, motif, by: req.user.id, at: frDate() };
-    journal(req, c, `avenant n° ${a.n} rejeté (${a.circuit[i].role}) — motif : ${motif}`);
+    a.statut = 'rejete'; a.rejet = Object.assign({ niveau: i, role: a.circuit[i].role, motif, by: req.user.id, at: frDate() }, pour ? { pour } : {});
+    journal(req, c, `avenant n° ${a.n} rejeté (${a.circuit[i].role})${SU.mention(pour)} — motif : ${motif}`);
     commandeSave(c);
   })();
   res.json({ commande: vue(c) });

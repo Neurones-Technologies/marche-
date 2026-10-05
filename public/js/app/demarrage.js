@@ -2,7 +2,7 @@
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
-var ROUTER={accueil:vAccueil, dashboard:vDashboard, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, envois:vEnvois, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
+var ROUTER={accueil:vAccueil, dashboard:vDashboard, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, envois:vEnvois, suppleances:vSuppleances, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit, journal:vJournal};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
@@ -33,7 +33,11 @@ function vueDEntree(){
   return 'dashboard';
 }
 /* Cloche de la barre du haut : ouvre les notifications ; pastille du nombre de non lues. */
+/* « Mes suppléances » dans le menu du compte : pour qui valide au moins un circuit. */
+document.getElementById('btn-suppleances').addEventListener('click',function(){ var m=document.getElementById('acct-menu'); if(m) m.hidden=true; ouvrirMesSuppleances(); });
 function renderCloche(){
+  var bs=document.getElementById('btn-suppleances');
+  if(bs) bs.hidden = !['decision.approve','besoin.approve','commande.approve','partenaires.manage'].some(can);
   var b=document.getElementById('cloche'); if(!b) return;
   b.textContent=''; icon(b,'bell');
   var n = 0; try{ n = nonLues().length; }catch(e){}

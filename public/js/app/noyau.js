@@ -102,9 +102,9 @@ var state = null;
 var UI = { q:'', sort:'nom' };
 /* Clés partagées avec le serveur ; view / offerIndex / draft restent propres à chaque session. */
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
-  'notifRules','notifs','emails','qa','additifs','clarifs','coi','delegations','recours','standstill','contractSigned','infructueux',
+  'notifRules','notifs','emails','qa','additifs','clarifs','coi','recours','standstill','contractSigned','infructueux',
   'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','circuitCommande','evaluationPartenaires'];
-var SERVER_ONLY = ['audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres','courriels'];
+var SERVER_ONLY = ['delegations','affectations','audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres','courriels'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
 var TARGETED = ['quality','justif','confirmed','excluded'];
@@ -420,7 +420,7 @@ function notify(evId, titre, corps){
 }
 function notifsPourMoi(){
   var r=me().role;
-  return state.notifs.filter(function(nn){ return nn.roles.indexOf(r)>=0; });
+  return state.notifs.filter(function(nn){ return nn.roles.indexOf(r)>=0 || (nn.ids||[]).indexOf(state.me)>=0; });
 }
 function nonLues(){
   var uid=state.me;
@@ -528,6 +528,7 @@ var VIEWS=[
   {id:'audit',      label:"Journal d'audit", grp:'Procédure', perm:'audit.read'},
   {id:'comptes',    label:'Comptes', grp:'Administration', perm:'roles.edit', famille:'acces'},
   {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit', famille:'acces'},
+  {id:'suppleances', label:'Suppléances', grp:'Administration', perm:'roles.edit', famille:'acces'},
   {id:'journal',    label:'Audit', grp:'Administration', perm:'audit.read'},
   {id:'params',     label:'Paramètres', grp:'Administration', perm:'params.edit'},
   {id:'regles',     label:'Règles', grp:'Administration', perm:'notif.manage', famille:'alertes'},
@@ -545,7 +546,7 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['accueil','envois','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
+var SANS_PROCEDURE = ['accueil','envois','suppleances','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
 /* Familles d'écrans : une seule entrée de menu, et des onglets en tête de page pour passer de l'un à l'autre. */
 var FAMILLES = { acces:{ lab:'Utilisateurs et accès', icone:'users' }, alertes:{ lab:'Alertes', icone:'ring' } };
 function familleDe(id){ var v=VIEWS.filter(function(x){ return x.id===id; })[0]; return v && v.famille || null; }

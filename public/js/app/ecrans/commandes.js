@@ -180,9 +180,11 @@ function vCommandes(m){
       add(row,'div','stepnum '+(e.done?'done':(i===fp?'now':'')), e.done?'✓':String(i+1));
       var d=add(row,'div'); d.style.flex='1 1 auto'; add(d,'strong',null,e.role); add(d,'div','muted',e.who||'');
       if(Number(e.seuil)>0) add(d,'div','muted','à partir de '+xof(Number(e.seuil)));
-      if(e.done) add(row,'span','chip c-green','Validé le '+e.at);
+      if(e.done){ add(row,'span','chip c-green','Validé le '+e.at); parQui(d,e); }
       else if(!MPCircuits.requise(e)) add(row,'span','chip c-grey','Non requis pour ce montant');
+      else if(i===fp && can('roles.edit') && !can('commande.approve')) suppleanceNiveau(row,'commande',c.id,i,e,'Commande '+(c.numero||c.id));
       else if(i===fp && can('commande.approve')){
+        suppleanceNiveau(row,'commande',c.id,i,e,'Commande '+(c.numero||c.id));
         var ba=add(row,'button','btn btn-primary btn-sm','Valider'); fk(ba,'cmd-val-'+i);
         ba.addEventListener('click',function(){ ask('Cette validation engage l’organisation pour '+montantDevise(c.total,c.devise)+'.',function(){ agir('POST',enc(c.id)+'/approbations/'+i,{},'Commande validée au niveau « '+e.role+' ».'); },'Valider au titre « '+e.role+' » ?','Valider'); });
         var br=add(row,'button','btn btn-ghost btn-sm','Rejeter'); fk(br,'cmd-rej-'+i);
@@ -221,6 +223,7 @@ function vCommandes(m){
       var st=ST[a.statut]||[a.statut,'c-grey']; add(row,'span','chip '+st[1],st[0]);
       if(a.statut==='validation' && can('commande.approve')){
         var i=MPCircuits.prochaine(a.circuit), e=a.circuit[i];
+        suppleanceNiveau(row,'avenant',c.id+'#'+a.n,i,e,'Commande '+(c.numero||c.id)+', avenant n° '+a.n);
         var bv=add(row,'button','btn btn-primary btn-sm','Valider ('+e.role+')'); fk(bv,'av-val-'+a.n);
         bv.addEventListener('click',function(){ ask('L’avenant porte la commande à '+montantDevise(a.nouveauTotal,c.devise)+'.',function(){ agir('POST',enc(c.id)+'/avenants/'+a.n+'/approbations/'+i,{},'Avenant validé.'); },'Valider l’avenant n° '+a.n+' ?','Valider'); });
         var br=add(row,'button','btn btn-ghost btn-sm','Rejeter'); fk(br,'av-rej-'+a.n);

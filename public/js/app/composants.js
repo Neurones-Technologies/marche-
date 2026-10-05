@@ -60,7 +60,7 @@ function icon(parent, name){
 /* Icône de chaque écran du menu. */
 var NAV_ICONS = { accueil:'home', dashboard:'info', envois:'chat', procedures:'folder', besoins:'clipboard', referencement:'badge', partenaires:'users', commandes:'cart', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
   reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
-  recours:'scale', pv:'stamp', audit:'list', journal:'list', roles:'key', comptes:'users', params:'cog', regles:'ring' };
+  recours:'scale', pv:'stamp', audit:'list', journal:'list', roles:'key', comptes:'users', suppleances:'clock', params:'cog', regles:'ring' };
 
 /* Pastille de statut : kind = ok | blocked | pending | draft | info. */
 function chip(parent, kind, text, ic){ var c=add(parent,'span','chip chip-'+kind); if(ic) icon(c,ic); c.appendChild(document.createTextNode(text)); return c; }

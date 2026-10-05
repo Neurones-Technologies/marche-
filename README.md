@@ -65,6 +65,11 @@ première est ouverte au départ). Un bouton « haut de page » apparaît dès q
 
 Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
 
+- **Suppléance des valideurs absents** : délégation pour une période (par le titulaire ou l'administration) ou
+  affectation d'un niveau de dossier à une personne nommée (administration, motif obligatoire). Le suppléant doit
+  déjà être habilité à valider le circuit ; la séparation des fonctions s'applique toujours ; chaque décision
+  porte la mention « pour X » ou « sur affectation » (voir docs/CADRAGE.md).
+
 - **Évaluation des partenaires** : à la réception définitive, chaque commande reçoit une note sur 100 (délais,
   conformité, complétude à la date prévue, qualité appréciée par le réceptionnaire, pondérés par l'organisation) ; la
   note du partenaire est la moyenne de ses commandes. Sous le seuil, une alerte est consignée, sans suspension

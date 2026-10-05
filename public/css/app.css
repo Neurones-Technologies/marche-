@@ -202,6 +202,13 @@ input:disabled, select:disabled, textarea:disabled { color: var(--color-text-2);
 .journal-chaine.info { background: var(--color-surface-2); border-color: var(--color-border); }
 .journal-chaine.info .journal-ic { color: var(--color-text-2); }
 .envoi-corps { padding: var(--space-3) var(--space-4); background: var(--color-surface-2); border: var(--border-w) solid var(--color-border); border-radius: var(--radius-sm); font-size: var(--fs-small); }
+/* Suppléances */
+.dl-circuits { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2); }
+.dl-circuit { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: var(--border-w) solid var(--color-border); border-radius: var(--radius-sm); font-size: var(--fs-table); cursor: pointer; }
+.dl-circuit input { width: auto; }
+.dl-circuit[hidden] { display: none; }
+.dl-circuit:has(input:disabled) { color: var(--color-text-2); cursor: not-allowed; }
+.stepline > .chip + .icon-btn, .dt-table td .chip + .icon-btn { margin-left: var(--space-1); }
 /* Lien de retour à la liste, en tête d'un détail. */
 .retour { display: inline-flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-3); padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1); background: none; border: none; border-radius: var(--radius-sm); font: inherit; font-size: var(--fs-table); font-weight: var(--fw-strong); color: var(--color-brand-text); cursor: pointer; }
 .retour:hover { background: var(--color-brand-soft); }

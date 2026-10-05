@@ -40,24 +40,42 @@
   /**
    * Peut-on franchir l'étape i ? Retourne null si oui, sinon { status, code, error }.
    * user : { id, role } ; intervenants : identifiants des personnes à écarter (séparation des fonctions).
+   * sup (facultatif) : suppléance de l'utilisateur pour ce dossier —
+   *   { roles: { roleId: { id, nom, du, au } } }  rôles qu'il tient par délégation d'un titulaire absent ;
+   *   { affectes: { niveau: { motif, par } } }    niveaux de ce dossier qui lui sont affectés.
+   * Une suppléance ouvre un niveau réservé à un rôle ; elle ne lève jamais la séparation des fonctions.
    */
-  function controle(circuit, i, user, intervenants) {
+  function controle(circuit, i, user, intervenants, sup) {
     var e = (circuit || [])[i];
     if (!e) return { status: 404, code: 'STEP_UNKNOWN', error: 'Étape introuvable dans le circuit.' };
     if (!requise(e)) return { status: 409, code: 'STEP_NOT_REQUIRED', error: 'Cette étape n’est pas requise pour ce montant.' };
     if (e.done) return { status: 409, code: 'APPROVAL_ALREADY_GIVEN', error: 'Ce niveau est déjà approuvé.' };
     if (prochaine(circuit) !== i) return { status: 409, code: 'APPROVAL_ORDER', error: 'Les niveaux d’approbation se franchissent dans l’ordre.' };
-    if (e.roleId && user.role !== e.roleId) return { status: 403, code: 'STEP_ROLE', error: 'Ce niveau est réservé à un autre rôle.' };
+    if (e.roleId && user.role !== e.roleId && !pour(circuit, i, user, sup))
+      return { status: 403, code: 'STEP_ROLE', error: 'Ce niveau est réservé à un autre rôle.' };
     if ((intervenants || []).indexOf(user.id) >= 0)
       return { status: 403, code: 'SEPARATION_OF_DUTIES', error: 'Vous avez noté ou validé l’évaluation de cette procédure : vous ne pouvez pas en approuver l’attribution.' };
     return null;
+  }
+
+  /**
+   * À quel titre l'utilisateur franchit l'étape i : null s'il agit de son propre droit, sinon
+   * { via: 'affectation', motif } ou { via: 'delegation', id, nom, du, au } (le titulaire qu'il remplace).
+   */
+  function pour(circuit, i, user, sup) {
+    var e = (circuit || [])[i];
+    if (!e || !sup) return null;
+    if (sup.affectes && sup.affectes[i]) return { via: 'affectation', motif: sup.affectes[i].motif, par: sup.affectes[i].par };
+    if (!e.roleId || user.role === e.roleId) return null;
+    var d = sup.roles && sup.roles[e.roleId];
+    return d ? { via: 'delegation', id: d.id, nom: d.nom, du: d.du, au: d.au } : null;
   }
 
   /** Remet le circuit à zéro (rejet, recours fondé) : la configuration reste, les décisions s'effacent. */
   function reinitialiser(circuit) {
     return (circuit || []).map(function (e) {
       var out = {};
-      for (var k in e) if (Object.prototype.hasOwnProperty.call(e, k) && ['done', 'by', 'at', 'requis'].indexOf(k) < 0) out[k] = e[k];
+      for (var k in e) if (Object.prototype.hasOwnProperty.call(e, k) && ['done', 'by', 'at', 'requis', 'pour'].indexOf(k) < 0) out[k] = e[k];
       out.done = false;
       return out;
     });
@@ -69,5 +87,5 @@
   }
 
   return { requise: requise, appliquerMontant: appliquerMontant, nbRequises: nbRequises, complet: complet,
-    prochaine: prochaine, controle: controle, reinitialiser: reinitialiser, forme: forme };
+    prochaine: prochaine, controle: controle, pour: pour, reinitialiser: reinitialiser, forme: forme };
 });

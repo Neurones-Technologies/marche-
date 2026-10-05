@@ -28,8 +28,12 @@ function buildState(req) {
   // notifications et courriels : chacun ne reçoit que ce qui le concerne (l'administration et l'audit voient tout)
   const toutVoir = req.can('notif.manage') || req.can('audit.read');
   if (!toutVoir) {
-    st.notifs = (st.notifs || []).filter((n) => (n.roles || []).includes(req.user.role));
+    st.notifs = (st.notifs || []).filter((n) => (n.roles || []).includes(req.user.role) || (n.ids || []).includes(req.user.id));
     st.emails = (st.emails || []).filter((e) => (e.ids || []).includes(req.user.id));
+  }
+  if (!req.can('roles.edit')) {
+    st.delegations = (st.delegations || []).filter((d) => d.de === req.user.id || d.a === req.user.id);
+    st.affectations = (st.affectations || []).filter((a) => a.a === req.user.id);
   }
   st.courriels = { mode: mail.actif() ? 'microsoft365' : 'simulation', expediteur: mail.actif() ? mail.expediteur() : null };
   // évaluation des partenaires (module 5) : montrée aux lecteurs des offres, jamais intégrée au classement

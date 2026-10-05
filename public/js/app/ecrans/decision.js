@@ -37,9 +37,12 @@ function vDecision(m){
       }},
       {lab:'Statut', rendu:function(x,td){
         var a=x.a;
-        if(a.done) chipCellule(td,'Approuvé'+(a.at?' le '+a.at:''),'c-green');
+        if(a.done){ chipCellule(td,'Approuvé'+(a.at?' le '+a.at:''),'c-green'); parQui(td,a); }
         else if(!MPCircuits.requise(a)) chipCellule(td,'Non requis pour ce montant','c-grey');
-        else chipCellule(td, x.i===fp ? 'À approuver' : 'En attente', x.i===fp ? 'c-amber' : 'c-grey');
+        else {
+          chipCellule(td, x.i===fp ? 'À approuver' : 'En attente', x.i===fp ? 'c-amber' : 'c-grey');
+          if(x.i===fp) suppleanceNiveau(td,'attribution',MP.pid(),x.i,a,REF());
+        }
       }}
     ],
     actions:function(x,td){
@@ -76,7 +79,9 @@ function vDecision(m){
         }, 'Rejeter l’attribution au titre « '+a.role+' » ?', 'Rejeter', 'Motif du rejet');
       },'rej-'+i);
       guard('decision.approve',rj);
-      if(a.roleId && me().role!==a.roleId){
+      var sup=supClient('attribution',MP.pid()), titre=MPCircuits.pour(state.approvals,i,{id:state.me,role:me().role},sup);
+      if(titre){ btn.textContent='Approuver ('+mentionPour(titre)+')'; }
+      if(a.roleId && me().role!==a.roleId && !titre){
         var res='Niveau réservé au rôle « '+((state.roles[a.roleId]||{}).lab||a.roleId)+' ».';
         [btn,rj].forEach(function(z){ z.disabled=true; z.title=res; });
       }

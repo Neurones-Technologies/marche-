@@ -90,3 +90,21 @@ test('après le rejet : nouvelle validation, circuit complet sans le niveau non 
   const s = await getState(approb);
   ok(await patch(approb, { standstill: { ...s.standstill, startedAt: 1 } })); // attribution prononcée : notification possible
 });
+
+test('suppléance : ouvre un niveau réservé, sans jamais lever la séparation des fonctions', () => {
+  const MPC = require('../../public/js/circuits.js');
+  const circuit = [{ role: 'Comité', who: 'Comité', roleId: 'approb' }];
+  const suppleant = { id: 'u9', role: 'controle' };
+  assert.equal(MPC.controle(circuit, 0, suppleant, []).code, 'STEP_ROLE');
+  const parDelegation = { roles: { approb: { id: 'u4', nom: 'A. Diomandé', du: '2026-10-01', au: '2026-10-10' } } };
+  assert.equal(MPC.controle(circuit, 0, suppleant, [], parDelegation), null);
+  assert.deepEqual(MPC.pour(circuit, 0, suppleant, parDelegation), { via: 'delegation', id: 'u4', nom: 'A. Diomandé', du: '2026-10-01', au: '2026-10-10' });
+  assert.equal(MPC.controle(circuit, 0, suppleant, ['u9'], parDelegation).code, 'SEPARATION_OF_DUTIES');
+  const parAffectation = { affectes: { 0: { motif: 'Absence', par: 'Administrateur' } } };
+  assert.equal(MPC.controle(circuit, 0, suppleant, [], parAffectation), null);
+  assert.equal(MPC.pour(circuit, 0, suppleant, parAffectation).via, 'affectation');
+  // le titulaire agit de son propre droit : pas de mention
+  assert.equal(MPC.pour(circuit, 0, { id: 'u4', role: 'approb' }, parDelegation), null);
+  // la remise à zéro efface la mention
+  assert.equal(MPC.reinitialiser([{ ...circuit[0], done: true, pour: { via: 'affectation' } }])[0].pour, undefined);
+});

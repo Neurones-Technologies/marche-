@@ -134,9 +134,11 @@ function vBesoins(m){
         var d=add(row,'div'); d.style.flex='1 1 auto';
         add(d,'strong',null,e.role); add(d,'div','muted',e.who||'');
         if(Number(e.seuil)>0) add(d,'div','muted','à partir de '+xof(Number(e.seuil)));
-        if(e.done) add(row,'span','chip c-green','Validé le '+e.at);
+        if(e.done){ add(row,'span','chip c-green','Validé le '+e.at); parQui(d,e); }
         else if(!MPCircuits.requise(e)) add(row,'span','chip c-grey','Non requis pour ce montant');
+        else if(i===fp && can('roles.edit') && !(can('besoin.approve') && !mien)) suppleanceNiveau(row,'besoin',b.id,i,e,'Besoin '+b.id);
         else if(i===fp && can('besoin.approve') && !mien){
+          suppleanceNiveau(row,'besoin',b.id,i,e,'Besoin '+b.id);
           var ba=add(row,'button','btn btn-primary btn-sm','Valider'); fk(ba,'bes-val-'+i);
           ba.addEventListener('click',function(){
             ask('Cette validation est horodatée, nominative et consignée à la piste d’audit.', function(){
