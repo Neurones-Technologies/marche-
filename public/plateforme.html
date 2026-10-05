@@ -4,79 +4,209 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Marché+ — Créer votre espace</title>
+<meta name="description" content="Marché+ : demandes d’achat, appels d’offres, évaluation, bons de commande et suivi d’exécution, pour les acheteurs publics et privés d’Afrique de l’Ouest.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/css/tokens.css">
 <link rel="stylesheet" href="/css/plateforme.css">
 </head>
 <body>
+<a class="pf-saut" href="#creer">Aller à la création d’espace</a>
+
 <header class="pf-tete">
-  <div class="pf-marque">
+  <a class="pf-marque" href="#haut" aria-label="Marché+, haut de page">
     <svg class="pf-logo" viewBox="0 0 120 120" aria-hidden="true"><path class="logo-forme" d="M44 16 H100 A10 10 0 0 1 110 26 V94 A10 10 0 0 1 100 104 H44 L10 60 Z"/><circle class="logo-trou" cx="38" cy="60" r="7"/><path class="logo-trait" d="M56 60 L70 75 L96 45"/></svg>
     <span>Marché<span class="pf-plus">+</span></span>
+  </a>
+  <nav class="pf-nav" aria-label="Sections">
+    <a href="#parcours">Le parcours</a>
+    <a href="#atouts">Atouts</a>
+    <a href="#creer">Démarrer</a>
+  </nav>
+  <div class="pf-tete-actions">
+    <form class="pf-connexion" id="pf-aller" novalidate>
+      <label for="pf-aller-slug" class="pf-sr">Adresse de votre espace</label>
+      <span class="pf-adresse-mini"><input id="pf-aller-slug" type="text" placeholder="votre-espace" autocomplete="off" spellcheck="false"><span class="pf-suffixe" data-domaine></span></span>
+      <button class="btn btn-ghost btn-sm" type="submit">Se connecter</button>
+    </form>
+    <a class="btn btn-primary btn-sm" href="#creer">Créer mon espace</a>
   </div>
-  <form class="pf-connexion" id="pf-aller" novalidate>
-    <label for="pf-aller-slug">Déjà un espace ?</label>
-    <span class="pf-adresse-mini"><input id="pf-aller-slug" type="text" placeholder="votre-entreprise" autocomplete="off" spellcheck="false"><span class="pf-suffixe" data-domaine></span></span>
-    <button class="btn btn-ghost btn-sm" type="submit">Se connecter</button>
-  </form>
 </header>
 
-<main class="pf-corps">
-  <section class="pf-intro">
-    <h1>Vos achats, de la demande d’achat à la réception.</h1>
-    <p>Marché+ réunit les demandes d’achat, les appels d’offres et leur évaluation, les bons de commande et le suivi d’exécution, avec le référencement et l’évaluation de vos partenaires. Chaque entreprise a son espace, ses circuits de validation et ses prestataires.</p>
-    <ul class="pf-points">
-      <li><strong>Prêt en quelques minutes</strong> : votre espace, à votre adresse, avec des circuits et des rôles par défaut.</li>
-      <li><strong>Vos règles</strong> : marchés publics (cadre UEMOA, Côte d’Ivoire) ou achats privés.</li>
-      <li><strong>Vos prestataires</strong> : ils s’inscrivent dans votre espace, vous les référencez.</li>
-    </ul>
+<main id="haut">
+  <!-- ═══ Héros ═══ -->
+  <section class="pf-heros">
+    <div class="pf-heros-texte">
+      <span class="pf-badge"><span class="pf-point"></span>Acheteurs publics et privés · Afrique de l’Ouest</span>
+      <h1>Achetez mieux.<br><span class="pf-degrade">Prouvez chaque décision.</span></h1>
+      <p class="pf-chapeau">De la demande d’achat à la réception, Marché+ conduit vos appels d’offres, vos validations et vos commandes, et garde la trace de tout ce qui a été décidé, par qui et pourquoi.</p>
+      <div class="pf-cta">
+        <a class="btn btn-primary btn-grand" href="#creer">Créer mon espace gratuitement
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn btn-clair btn-grand" id="pf-demo-lien" href="#">Voir la démonstration</a>
+      </div>
+      <ul class="pf-garanties">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Prêt en 3 minutes</li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Vos données dans votre espace</li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Sans carte bancaire</li>
+      </ul>
+    </div>
+
+    <!-- aperçu du produit, dessiné en HTML -->
+    <div class="pf-apercu" aria-hidden="true">
+      <div class="pf-fenetre">
+        <div class="pf-fenetre-barre"><span></span><span></span><span></span><em>bal.tenders.neuronestech.com</em></div>
+        <div class="pf-fenetre-corps">
+          <div class="pf-mini-menu">
+            <i class="on"></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="pf-mini-contenu">
+            <div class="pf-mini-titre">AO-2026-014 · Réseau des agences</div>
+            <div class="pf-frise">
+              <span class="ok">✓</span><b></b><span class="ok">✓</span><b></b><span class="ok">✓</span><b></b><span class="ok">✓</span><b class="demi"></b><span class="now">5</span><b class="vide"></b><span>6</span>
+            </div>
+            <div class="pf-tuiles">
+              <div><small>Offres reçues</small><strong>8</strong></div>
+              <div><small>Conformes</small><strong>6 / 8</strong></div>
+              <div><small>Économie</small><strong class="vert">−11 %</strong></div>
+            </div>
+            <div class="pf-barres">
+              <div><span>SOTRAP Ingénierie</span><i style="--l:91%"></i><em>90,7</em></div>
+              <div><span>NovaTech Systems</span><i style="--l:89%"></i><em>89,5</em></div>
+              <div><span>Téranga Réseaux</span><i style="--l:87%"></i><em>87,8</em></div>
+              <div><span>Ivoire Netcom</span><i style="--l:83%"></i><em>83,2</em></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pf-flottant f1"><span class="ic vert">✓</span><div><strong>Attribution approuvée</strong><small>3 niveaux sur 3 · comité</small></div></div>
+      <div class="pf-flottant f2"><span class="ic orange">IA</span><div><strong>16 valeurs lues</strong><small>relues et confirmées</small></div></div>
+      <div class="pf-flottant f3"><span class="ic">#</span><div><strong>BC-2026-0001 émis</strong><small>84 660 000 XOF</small></div></div>
+    </div>
   </section>
 
-  <section class="pf-carte" aria-labelledby="pf-titre">
-    <div id="pf-message" class="pf-message" role="alert" hidden></div>
-    <form id="pf-form" novalidate>
-      <h2 id="pf-titre">Créer votre espace</h2>
-      <fieldset>
-        <legend>Votre entreprise</legend>
-        <label for="pf-nom">Raison sociale</label>
-        <input id="pf-nom" type="text" maxlength="120" autocomplete="organization" required>
-        <label for="pf-pays">Pays</label>
-        <select id="pf-pays">
-          <option>Côte d’Ivoire</option><option>Sénégal</option><option>Burkina Faso</option><option>Mali</option>
-          <option>Bénin</option><option>Togo</option><option>Niger</option><option>Guinée-Bissau</option><option>Autre</option>
-        </select>
-        <span class="pf-lab" id="pf-profil-lab">Type d’acheteur</span>
-        <div class="pf-choix" role="radiogroup" aria-labelledby="pf-profil-lab">
-          <label class="pf-option"><input type="radio" name="profil" value="uemoa-ci" checked><span><strong>Marchés publics</strong><small>Code des marchés, cadre UEMOA, délai de recours</small></span></label>
-          <label class="pf-option"><input type="radio" name="profil" value="prive"><span><strong>Achats privés</strong><small>Vos propres règles, sans contrainte réglementaire</small></span></label>
-        </div>
-        <label for="pf-slug">Adresse de votre espace</label>
-        <div class="pf-adresse"><input id="pf-slug" type="text" maxlength="30" autocomplete="off" spellcheck="false" required><span class="pf-suffixe" data-domaine></span></div>
-        <div id="pf-dispo" class="pf-aide" aria-live="polite"></div>
-      </fieldset>
-      <fieldset>
-        <legend>L’administrateur</legend>
-        <label for="pf-admin">Nom et prénom</label>
-        <input id="pf-admin" type="text" maxlength="120" autocomplete="name" required>
-        <label for="pf-email">Courriel professionnel</label>
-        <input id="pf-email" type="email" autocomplete="email" required>
-        <label for="pf-mdp">Mot de passe</label>
-        <input id="pf-mdp" type="password" autocomplete="new-password" required>
-        <div class="pf-aide">10 caractères minimum, avec majuscule, minuscule et chiffre.</div>
-      </fieldset>
-      <div class="pf-piege" aria-hidden="true"><label for="pf-site">Site</label><input id="pf-site" type="text" tabindex="-1" autocomplete="off"></div>
-      <button class="btn btn-primary pf-envoyer" type="submit" id="pf-go">Créer mon espace</button>
-    </form>
-    <div id="pf-fait" class="pf-fait" hidden>
-      <div class="pf-fait-ic" aria-hidden="true">✓</div>
-      <h2>Vérifiez votre courriel</h2>
-      <p id="pf-fait-texte"></p>
-      <a id="pf-confirmer" class="btn btn-primary" hidden>Confirmer et ouvrir mon espace</a>
-      <p id="pf-demo" class="pf-aide" hidden>Les courriels ne sont pas encore envoyés sur cette plateforme : le lien de confirmation vous est donné directement.</p>
+  <!-- ═══ Le parcours ═══ -->
+  <section class="pf-section" id="parcours">
+    <div class="pf-section-tete">
+      <span class="pf-surtitre">Le parcours complet</span>
+      <h2>Un seul outil, de l’intention à la livraison</h2>
+      <p>Chaque étape passe la main à la suivante, avec ses validations, ses pièces et sa trace.</p>
+    </div>
+    <ol class="pf-etapes">
+      <li><span class="pf-etape-ic"><svg viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg></span><strong>Demande d’achat</strong><small>Exprimée, budgétée, validée par le circuit</small></li>
+      <li><span class="pf-etape-ic"><svg viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg></span><strong>Appel d’offres</strong><small>Cahier des charges, DAO, publication</small></li>
+      <li><span class="pf-etape-ic"><svg viewBox="0 0 24 24"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z"/><path d="m20 20-4-4"/></svg></span><strong>Dépouillement</strong><small>Offres lues par l’IA, confirmées par vous</small></li>
+      <li><span class="pf-etape-ic"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/></svg></span><strong>Évaluation & décision</strong><small>Grille pondérée, circuit d’approbation</small></li>
+      <li><span class="pf-etape-ic"><svg viewBox="0 0 24 24"><path d="M2 6h12v10H2zM14 10h4l3 3v3h-7"/><circle cx="6" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></span><strong>Commande & réception</strong><small>Bon de commande, avenants, réserves</small></li>
+      <li><span class="pf-etape-ic"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg></span><strong>Évaluation du partenaire</strong><small>Note automatique à chaque réception</small></li>
+    </ol>
+  </section>
+
+  <!-- ═══ Atouts ═══ -->
+  <section class="pf-section pf-atouts" id="atouts">
+    <div class="pf-section-tete">
+      <span class="pf-surtitre">Pourquoi Marché+</span>
+      <h2>Rigoureux pour l’auditeur, simple pour l’équipe</h2>
+    </div>
+    <div class="pf-grille">
+      <article class="pf-atout">
+        <span class="pf-atout-ic"><svg viewBox="0 0 24 24"><path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7"/></svg></span>
+        <h3>Vos circuits de validation</h3>
+        <p>Niveaux, seuils, rôles réservés : chaque demande, attribution ou commande suit le chemin que vous avez défini. Suppléance prévue pour les absents.</p>
+      </article>
+      <article class="pf-atout">
+        <span class="pf-atout-ic"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <h3>Une trace infalsifiable</h3>
+        <p>Chaque action est horodatée, nominative, avec son adresse IP, dans un journal chaîné : la moindre modification après coup se voit.</p>
+      </article>
+      <article class="pf-atout">
+        <span class="pf-atout-ic"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg></span>
+        <h3>L’IA qui lit, vous qui décidez</h3>
+        <p>Les montants, délais et garanties sont extraits des offres ; toute valeur incertaine attend votre confirmation, et tout écart avec l’IA se justifie.</p>
+      </article>
+      <article class="pf-atout">
+        <span class="pf-atout-ic"><svg viewBox="0 0 24 24"><path d="M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="8" r="4"/><path d="M22 20v-1a4 4 0 0 0-3-3.9M16 4.1a4 4 0 0 1 0 7.8"/></svg></span>
+        <h3>Vos prestataires, référencés</h3>
+        <p>Ils s’inscrivent dans votre espace, déposent leurs pièces, répondent à vos appels d’offres et suivent leurs commandes. Vous les notez à chaque réception.</p>
+      </article>
+      <article class="pf-atout">
+        <span class="pf-atout-ic"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M5 7h14"/><path d="M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/></svg></span>
+        <h3>Marchés publics ou privés</h3>
+        <p>Cadre UEMOA et code ivoirien des marchés publics (préférence communautaire, délai de recours), ou vos propres règles d’achat.</p>
+      </article>
+      <article class="pf-atout">
+        <span class="pf-atout-ic"><svg viewBox="0 0 24 24"><path d="M6 11h12v10H6z"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        <h3>Séparation des fonctions</h3>
+        <p>Celui qui note ne valide pas son propre travail : les cumuls d’habilitations sont signalés, les conflits d’intérêts déclarés.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══ Création d'espace ═══ -->
+  <section class="pf-creer" id="creer">
+    <div class="pf-creer-texte">
+      <span class="pf-surtitre clair">Votre espace en 3 minutes</span>
+      <h2>Commencez aujourd’hui, gratuitement</h2>
+      <ol class="pf-trois">
+        <li><span>1</span><div><strong>Décrivez votre entreprise</strong><small>Raison sociale, pays, type d’acheteur.</small></div></li>
+        <li><span>2</span><div><strong>Choisissez votre adresse</strong><small>Votre espace à <em data-exemple></em>.</small></div></li>
+        <li><span>3</span><div><strong>Confirmez votre courriel</strong><small>Vous entrez dans votre espace, prêt à l’emploi, et vous invitez votre équipe et vos prestataires.</small></div></li>
+      </ol>
+    </div>
+
+    <div class="pf-carte" aria-labelledby="pf-titre">
+      <div id="pf-message" class="pf-message" role="alert" hidden></div>
+      <form id="pf-form" novalidate>
+        <h2 id="pf-titre">Créer votre espace</h2>
+        <fieldset>
+          <legend>Votre entreprise</legend>
+          <label for="pf-nom">Raison sociale</label>
+          <input id="pf-nom" type="text" maxlength="120" autocomplete="organization" required>
+          <label for="pf-pays">Pays</label>
+          <select id="pf-pays">
+            <option>Côte d’Ivoire</option><option>Sénégal</option><option>Burkina Faso</option><option>Mali</option>
+            <option>Bénin</option><option>Togo</option><option>Niger</option><option>Guinée-Bissau</option><option>Autre</option>
+          </select>
+          <span class="pf-lab" id="pf-profil-lab">Type d’acheteur</span>
+          <div class="pf-choix" role="radiogroup" aria-labelledby="pf-profil-lab">
+            <label class="pf-option"><input type="radio" name="profil" value="uemoa-ci" checked><span><strong>Marchés publics</strong><small>Code des marchés, cadre UEMOA</small></span></label>
+            <label class="pf-option"><input type="radio" name="profil" value="prive"><span><strong>Achats privés</strong><small>Vos propres règles</small></span></label>
+          </div>
+          <label for="pf-slug">Adresse de votre espace</label>
+          <div class="pf-adresse"><input id="pf-slug" type="text" maxlength="30" autocomplete="off" spellcheck="false" required><span class="pf-suffixe" data-domaine></span></div>
+          <div id="pf-dispo" class="pf-aide" aria-live="polite"></div>
+        </fieldset>
+        <fieldset>
+          <legend>L’administrateur</legend>
+          <label for="pf-admin">Nom et prénom</label>
+          <input id="pf-admin" type="text" maxlength="120" autocomplete="name" required>
+          <label for="pf-email">Courriel professionnel</label>
+          <input id="pf-email" type="email" autocomplete="email" required>
+          <label for="pf-mdp">Mot de passe</label>
+          <input id="pf-mdp" type="password" autocomplete="new-password" required>
+          <div class="pf-aide">10 caractères minimum, avec majuscule, minuscule et chiffre.</div>
+        </fieldset>
+        <div class="pf-piege" aria-hidden="true"><label for="pf-site">Site</label><input id="pf-site" type="text" tabindex="-1" autocomplete="off"></div>
+        <button class="btn btn-primary btn-grand pf-envoyer" type="submit" id="pf-go">Créer mon espace</button>
+        <p class="pf-mention">Gratuit pendant le lancement. Vos données restent dans votre espace.</p>
+      </form>
+      <div id="pf-fait" class="pf-fait" hidden>
+        <div class="pf-fait-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+        <h2>Vérifiez votre courriel</h2>
+        <p id="pf-fait-texte"></p>
+        <a id="pf-confirmer" class="btn btn-primary btn-grand" hidden>Confirmer et ouvrir mon espace</a>
+        <p id="pf-demo" class="pf-aide" hidden>Les courriels ne sont pas encore envoyés sur cette plateforme : le lien de confirmation vous est donné directement.</p>
+      </div>
     </div>
   </section>
 </main>
-<footer class="pf-pied">Marché+ — une solution Neurones Technologies</footer>
+
+<footer class="pf-pied">
+  <div class="pf-marque petite">
+    <svg class="pf-logo" viewBox="0 0 120 120" aria-hidden="true"><path class="logo-forme" d="M44 16 H100 A10 10 0 0 1 110 26 V94 A10 10 0 0 1 100 104 H44 L10 60 Z"/><circle class="logo-trou" cx="38" cy="60" r="7"/><path class="logo-trait" d="M56 60 L70 75 L96 45"/></svg>
+    <span>Marché<span class="pf-plus">+</span></span>
+  </div>
+  <span>Une solution Neurones Technologies</span>
+</footer>
 <script src="/js/plateforme.js"></script>
 </body>
 </html>

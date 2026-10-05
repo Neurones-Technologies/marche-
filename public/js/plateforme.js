@@ -5,6 +5,8 @@
   var domaine = location.hostname, port = location.port ? ':' + location.port : '';
   document.querySelectorAll('[data-domaine]').forEach(function (e) { e.textContent = '.' + domaine; });
   var adresse = function (slug) { return location.protocol + '//' + slug + '.' + domaine + port; };
+  document.querySelectorAll('[data-exemple]').forEach(function (e) { e.textContent = 'votre-entreprise.' + domaine; });
+  $('pf-demo-lien').href = adresse('demo') + '/';
 
   function message(texte, ok) { var m = $('pf-message'); m.hidden = !texte; m.textContent = texte || ''; m.className = 'pf-message' + (ok ? ' ok' : ''); }
   var q = new URLSearchParams(location.search).get('confirmation');
