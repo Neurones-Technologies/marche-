@@ -189,8 +189,4 @@ function vCDC(m){
   add(pv,'h4',null,'Pièces exigées');
   var u3=add(pv,'ul');
   DOCS().forEach(function(d){ add(u3,'li',null, d.label+' — '+(d.scope==='tous'?'tous soumissionnaires':(d.scope==='local'?'soumissionnaires locaux':'soumissionnaires hors UEMOA'))); });
-
-  var n=add(m,'div','note');
-  add(n,'strong',null,'Ce module produit un projet, pas un acte juridique. ');
-  n.appendChild(document.createTextNode("Le dossier généré doit être relu par le juriste de l'autorité contractante et mis en conformité avec le code des marchés publics applicable et, le cas échéant, les procédures du bailleur de fonds, qui priment sur tout gabarit logiciel."));
 }
