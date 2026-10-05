@@ -153,3 +153,5 @@ body.cs { min-height: 100vh; }
   .cs-deux, .cs-dl.deux, .cs-mini-chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cs-deux { grid-template-columns: 1fr; }
 }
+
+.cs-fixe { padding: 8px 4px; border-bottom: 1px dashed var(--color-border-strong); color: var(--color-text-2); }

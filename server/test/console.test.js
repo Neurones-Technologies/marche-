@@ -126,3 +126,22 @@ test('opérateurs : ajout, désactivation, mot de passe ; tout entre au journal'
     assert.ok(j.some((a) => m.test(a)), 'journal : ' + m);
   }
 });
+
+test('modification d’un espace : registre et organisation de l’espace mis à jour, adresse inchangée', async () => {
+  const op2 = (await req(PLAT, 'POST', '/api/console/connexion', { email: OP.email, motDePasse: 'Nouveau+2026x' })).cookie;
+  assert.equal((await req(PLAT, 'PATCH', '/api/console/espaces/teranga', { nom: '' }, op2)).status, 422);
+  assert.equal((await req(PLAT, 'PATCH', '/api/console/espaces/teranga', { profil: 'inconnu' }, op2)).status, 422);
+  assert.equal((await req(PLAT, 'PATCH', '/api/console/espaces/teranga', { nom: 'X' })).status, 401);
+  const r = await req(PLAT, 'PATCH', '/api/console/espaces/teranga', { nom: 'Téranga Distribution SA', pays: 'Côte d’Ivoire', profil: 'uemoa-ci', adminEmail: 'achats@teranga.sn' }, op2);
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.espace.nom, 'Téranga Distribution SA');
+  assert.equal(r.json.espace.adresse.split('//')[1].split('.')[0], 'teranga');
+  // l'organisation de l'espace suit
+  const l = await req(hote('teranga'), 'POST', '/api/auth/login', { email: 'fatou@teranga.sn', password: 'Achats+2026x' });
+  const st = (await req(hote('teranga'), 'GET', '/api/organisation/state', null, l.cookie)).json.state;
+  assert.equal(st.org.nom, 'Téranga Distribution SA');
+  assert.equal(st.org.profilDefaut, 'uemoa-ci');
+  assert.equal((await req(hote('teranga'), 'GET', '/api/espace')).json.nom, 'Téranga Distribution SA');
+  const j = (await req(PLAT, 'GET', '/api/console/journal', null, op2)).json.journal.map((x) => x.action);
+  assert.ok(j.some((a) => /Espace teranga modifié — raison sociale/.test(a)));
+});

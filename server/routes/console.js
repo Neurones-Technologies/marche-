@@ -13,7 +13,7 @@ const E = require('../espaces');
 const mail = require('../mail');
 const cfg = require('../config');
 const { bcrypt } = require('../auth');
-const { auditAppend } = require('../db');
+const { auditAppend, kvGet, kvSet } = require('../db');
 
 const r = express.Router();
 const COOKIE = 'mp_console';
@@ -149,6 +149,34 @@ r.post('/espaces', (req, res) => {
 });
 
 const espaceDe = (req, res) => { const e = E.espace(String(req.params.slug || '')); if (!e) err(res, 404, 'SPACE_UNKNOWN', 'Espace introuvable.'); return e; };
+
+/** Modification d'un espace : raison sociale, pays, type d'acheteur (repris dans l'organisation de l'espace) et
+    courriel de contact (registre). L'adresse ne change pas : liens et sessions des utilisateurs en dépendent. */
+r.patch('/espaces/:slug', (req, res) => {
+  const e = espaceDe(req, res); if (!e) return;
+  const b = req.body || {};
+  const nom = String(b.nom != null ? b.nom : e.nom).trim(), pays = String(b.pays != null ? b.pays : e.pays || '').trim();
+  const profil = String(b.profil != null ? b.profil : e.profil || P.DEFAUT), email = String(b.adminEmail != null ? b.adminEmail : e.admin_email || '').trim().toLowerCase();
+  if (!nom || nom.length > 120) return err(res, 422, 'SPACE_NAME', 'La raison sociale est obligatoire (120 caractères au plus).');
+  if (pays.length > 60) return err(res, 422, 'SPACE_COUNTRY', 'Pays trop long.');
+  if (!P.existe(profil)) return err(res, 422, 'SPACE_PROFILE', 'Type d’acheteur inconnu.');
+  if (email && !courrielValide(email)) return err(res, 422, 'SPACE_EMAIL', 'Courriel invalide.');
+  const changes = [];
+  if (nom !== e.nom) changes.push(`raison sociale : ${e.nom} → ${nom}`);
+  if (pays !== (e.pays || '')) changes.push(`pays : ${e.pays || '—'} → ${pays || '—'}`);
+  if (profil !== (e.profil || P.DEFAUT)) changes.push(`type d’acheteur : ${P.profil(e.profil || P.DEFAUT).lab} → ${P.profil(profil).lab}`);
+  if (email !== (e.admin_email || '')) changes.push(`contact : ${e.admin_email || '—'} → ${email || '—'}`);
+  if (!changes.length) return res.json({ ok: true, espace: vueEspace(e) });
+  reg().prepare('UPDATE espaces SET nom=?, pays=?, profil=?, admin_email=? WHERE slug=?').run(nom, pays, profil, email || null, e.slug);
+  // l'organisation de l'espace suit : nom affiché, pays, profil des nouvelles procédures
+  E.dans(e, () => {
+    const org = (kvGet('org') || { value: {} }).value;
+    kvSet('org', { ...org, nom, pays, profilDefaut: profil }, 'console');
+    auditAppend(null, qui(req), 'Organisation modifiée depuis la console de la plateforme — ' + changes.join(' ; '));
+  });
+  E.journaliser(qui(req), `Espace ${e.slug} modifié — ${changes.join(' ; ')}`);
+  res.json({ ok: true, espace: vueEspace(E.espace(e.slug)) });
+});
 
 r.post('/espaces/:slug/suspendre', (req, res) => {
   const e = espaceDe(req, res); if (!e) return;

@@ -13,6 +13,7 @@
     lien: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     oeil: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    crayon: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
     recherche: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
     attente: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     espace: '<path d="M4 20V8l8-4 8 4v12"/><path d="M9 20v-6h6v6"/>',
@@ -178,6 +179,7 @@
           '<td>' + depuis(a.derniereConnexion) + '</td><td>' + date(e.creeLe) + '</td>' +
           '<td class="cs-actions">' +
             '<a class="cs-icone" href="' + esc(e.adresse) + '/" target="_blank" rel="noopener" title="Ouvrir l’espace" aria-label="Ouvrir l’espace ' + esc(e.nom) + '">' + ic('lien') + '</a>' +
+            '<button class="cs-icone" data-action="modifier" data-slug="' + esc(e.slug) + '" title="Modifier" aria-label="Modifier ' + esc(e.nom) + '">' + ic('crayon') + '</button>' +
             (e.actif
               ? (e.initial ? '' : '<button class="cs-icone" data-action="suspendre" data-slug="' + esc(e.slug) + '" title="Suspendre" aria-label="Suspendre ' + esc(e.nom) + '">' + ic('pause') + '</button>')
               : '<button class="cs-icone" data-action="reactiver" data-slug="' + esc(e.slug) + '" title="Réactiver" aria-label="Réactiver ' + esc(e.nom) + '">' + ic('lecture') + '</button>' +
@@ -239,7 +241,7 @@
         '<div><dt>Dernière connexion</dt><dd>' + depuis(a.derniereConnexion) + '</dd></div>' +
         '<div><dt>Volume</dt><dd>' + taille(a.octets) + '</dd></div>' +
       '</dl>' +
-      '<div class="cs-pied-fen">' + (e.actif
+      '<div class="cs-pied-fen"><button class="btn btn-ghost" data-action="modifier" data-slug="' + esc(e.slug) + '">' + ic('crayon') + 'Modifier</button>' + (e.actif
         ? (e.initial ? '<span class="cs-muet">L’espace de démonstration ne peut être ni suspendu ni supprimé.</span>' : '<button class="btn btn-ghost" data-action="suspendre" data-slug="' + esc(e.slug) + '">' + ic('pause') + 'Suspendre</button>')
         : '<button class="btn btn-ghost danger" data-action="supprimer" data-slug="' + esc(e.slug) + '">' + ic('poubelle') + 'Supprimer</button><button class="btn btn-primary" data-action="reactiver" data-slug="' + esc(e.slug) + '">' + ic('lecture') + 'Réactiver</button>') + '</div>');
   }
@@ -281,6 +283,27 @@
         'Motif de la suspension (visible dans la console)', 'Suspendre l’espace', 'btn-danger', function (m) {
           api('POST', '/espaces/' + e.slug + '/suspendre', { motif: m }).then(function () { fermer(); toast('Espace ' + e.slug + ' suspendu.'); charger(); }).catch(function (x) { erreurFenetre(x.message); });
         });
+    },
+    modifier: function (b) {
+      var e = espaceDe(b.dataset.slug); if (!e) return;
+      var PAYS = ['Côte d’Ivoire', 'Sénégal', 'Burkina Faso', 'Mali', 'Bénin', 'Togo', 'Niger', 'Guinée-Bissau', 'Autre'];
+      if (e.pays && PAYS.indexOf(e.pays) < 0) PAYS.unshift(e.pays);
+      ouvrir('Modifier ' + e.nom, '<form class="cs-form" novalidate>' + MSG +
+        '<label for="me-nom">Raison sociale</label><input id="me-nom" type="text" maxlength="120" value="' + esc(e.nom) + '">' +
+        '<div class="cs-deux"><div><label for="me-pays">Pays</label><select id="me-pays">' + PAYS.map(function (p) { return '<option' + (p === e.pays ? ' selected' : '') + '>' + esc(p) + '</option>'; }).join('') + '</select></div>' +
+        '<div><label for="me-profil">Type d’acheteur</label><select id="me-profil">' + Object.keys(PROFILS).map(function (p) { return '<option value="' + p + '"' + (p === (e.profil || 'uemoa-ci') ? ' selected' : '') + '>' + esc(PROFILS[p]) + '</option>'; }).join('') + '</select></div></div>' +
+        '<label for="me-email">Courriel de contact de l’administrateur</label><input id="me-email" type="email" value="' + esc(e.adminEmail || '') + '">' +
+        '<label>Adresse</label><div class="cs-adresse cs-fixe">' + esc(e.adresse.replace(/^https?:\/\//, '')) + '</div>' +
+        '<div class="pf-aide">L’adresse ne se modifie pas : les liens et les sessions des utilisateurs en dépendent. Raison sociale, pays et type d’acheteur sont aussi mis à jour dans les paramètres de l’espace (pour les nouvelles procédures).</div>' +
+        '<div class="cs-pied-fen"><button type="button" class="btn btn-ghost" data-action="fermer">Annuler</button><button class="btn btn-primary" type="submit">Enregistrer</button></div></form>', function (c) {
+        c.querySelector('form').addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var go = c.querySelector('button[type=submit]'); go.disabled = true;
+          api('PATCH', '/espaces/' + e.slug, { nom: $('me-nom').value.trim(), pays: $('me-pays').value, profil: $('me-profil').value, adminEmail: $('me-email').value.trim() })
+            .then(function () { fermer(); toast('Espace ' + e.slug + ' modifié.'); charger(); })
+            .catch(function (x) { erreurFenetre(x.message); go.disabled = false; });
+        });
+      });
     },
     reactiver: function (b) {
       var e = espaceDe(b.dataset.slug); if (!e) return;
