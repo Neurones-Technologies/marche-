@@ -7,7 +7,7 @@ var STATUTS_BESOIN = {
   brouillon: ['Brouillon','c-grey'], soumis: ['En validation','c-amber'], valide: ['Validé','c-teal'],
   rejete: ['Rejeté','c-red'], transforme: ['Procédure créée','c-green']
 };
-UI.besoin = null; UI.besoinNouveau = false;
+UI.besoin = null;
 
 function vBesoins(m){
   var h=add(m,'div','head'); var l=add(h,'div');
@@ -34,14 +34,13 @@ function vBesoins(m){
         ],
         recherche:function(b){ return [b.id, b.objet, b.parNom, b.service].join(' '); },
         filtres:[{ lab:'Statut', options:Object.keys(STATUTS_BESOIN).map(function(k){ return [k, STATUTS_BESOIN[k][0]]; }), test:function(b,v){ return b.statut===v; } }],
-        nouveau: can('besoin.create') ? { lab:'Nouveau besoin', action:function(){ UI.besoinNouveau=true; UI.besoin=null; charger(); } } : null,
+        nouveau: can('besoin.create') ? { lab:'Nouveau besoin', action:function(){ creation(r.regles); } } : null,
         actions:function(b,td){
-          boutonCellule(td, UI.besoin===b.id ? 'Affiché' : 'Ouvrir', function(){ UI.besoin=b.id; UI.besoinNouveau=false; charger(); }, 'bes-open-'+b.id).disabled = UI.besoin===b.id;
+          boutonCellule(td, UI.besoin===b.id ? 'Affiché' : 'Ouvrir', function(){ UI.besoin=b.id; charger(); }, 'bes-open-'+b.id).disabled = UI.besoin===b.id;
         }
       });
       var cur=liste_.filter(function(b){ return b.id===UI.besoin; })[0];
       if(cur) fiche(detail,cur,r.regles);
-      if(can('besoin.create') && UI.besoinNouveau){ creation(formulaire,r.regles); formulaire.scrollIntoView({block:'nearest'}); }
     }).catch(function(e){ zoneListe.textContent=''; add(zoneListe,'p','muted',e.message); });
   }
   function agir(method, path, body, message){
@@ -79,24 +78,23 @@ function vBesoins(m){
     };
   }
 
-  function creation(parent, regles){
-    var k=add(parent,'div','card');
-    add(k,'div','panel-head','Exprimer un nouveau besoin');
-    var b=add(k,'div','pad');
-    var lire=champs(b,{},true,regles);
-    var foot=add(k,'div','panel-foot');
-    add(foot,'span','muted','Le besoin est d’abord enregistré en brouillon ; vous le soumettez ensuite à validation.');
-    var an=add(foot,'button','btn btn-ghost','Annuler'); fk(an,'bes-annuler');
-    an.addEventListener('click',function(){ UI.besoinNouveau=false; charger(); });
-    var go_=add(foot,'button','btn btn-primary','Enregistrer le brouillon'); fk(go_,'bes-creer');
-    go_.addEventListener('click',function(){
-      go_.disabled=true;
-      MP.api('POST','/api/besoins',lire()).then(function(r){ toast('Besoin '+r.besoin.id+' enregistré.'); UI.besoin=r.besoin.id; UI.besoinNouveau=false; charger(); })
-        .catch(function(e){ toast(e.message); go_.disabled=false; });
-    });
+  /* Fenêtre « Nouveau besoin ». */
+  function creation(regles){
+    ouvrirFenetre('Exprimer un nouveau besoin', function(c,foot){
+      var lire=champs(c,{},true,regles);
+      add(foot,'span','muted','Enregistré en brouillon ; vous le soumettez ensuite à validation.');
+      var an=add(foot,'button','btn btn-ghost','Annuler'); fk(an,'bes-annuler'); an.addEventListener('click',fermerFenetre);
+      var go_=add(foot,'button','btn btn-primary','Enregistrer le brouillon'); fk(go_,'bes-creer');
+      go_.addEventListener('click',function(){
+        go_.disabled=true;
+        MP.api('POST','/api/besoins',lire()).then(function(r){ toast('Besoin '+r.besoin.id+' enregistré.'); fermerFenetre(); UI.besoin=r.besoin.id; charger(); })
+          .catch(function(e){ toast(e.message); go_.disabled=false; });
+      });
+    }, { large:true });
   }
 
   function fiche(parent, b, regles){
+    retourListe(parent,'Tous les besoins',function(){ UI.besoin=null; charger(); },'bes-retour');
     var k=add(parent,'div','card');
     var ph=add(k,'div','panel-head'); add(ph,'span',null,b.id+' — '+b.objet);
     var st=STATUTS_BESOIN[b.statut]||[b.statut,'c-grey']; add(ph,'span','chip '+st[1],st[0]);

@@ -198,7 +198,8 @@ function vPartenaires(m){
     if(cur) fiche(cur);
   }
   function fiche(p){
-    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var rt=retourListe(zone,'Tous les partenaires',function(){ UI.partenaire=null; charger(); },'prt-retour'); rt.style.marginTop='18px';
+    var k=add(zone,'div','card');
     var ph=add(k,'div','panel-head'); add(ph,'span',null,p.id+' — '+p.raisonSociale); chipStatutPartenaire(ph,p.statut);
     var b=add(k,'div','pad');
     [['Pays',p.pays],['Immatriculation',p.immatriculation],['Adresse',p.adresse],['Contact',[(p.contact||{}).nom,(p.contact||{}).email,(p.contact||{}).tel].filter(Boolean).join(' · ')],

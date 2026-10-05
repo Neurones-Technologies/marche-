@@ -1,89 +1,113 @@
-/* Marché+ — Écrans Comptes et Rôles.
-   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
+/* Marché+ — « Utilisateurs et accès » : deux onglets, Comptes et Rôles.
+   Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
+   Comptes : un tableau (avatar, rôle, statut, dernière connexion) ; création et modification en fenêtre.
+   Rôles : une carte par rôle (membres, habilitations, cumuls incompatibles) ; les habilitations se règlent en
+   fenêtre, par interrupteurs groupés. */
 "use strict";
 
-/* ============ Rôles et habilitations ============ */
-UI.compteNouveau = false;
+function initialesNom(nom){ return String(nom||'?').split(/[\s.\-]+/).filter(Boolean).slice(0,2).map(function(x){ return x[0]; }).join('').toUpperCase(); }
+function avatar(parent, nom, grand){ var a=add(parent,'span','av'+(grand?' av-lg':''),initialesNom(nom)); a.setAttribute('aria-hidden','true'); return a; }
+
+/* ============ Comptes ============ */
 function vComptes(m){
   if(!can('roles.edit')) return denyBox(m,'roles.edit');
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,'Comptes utilisateurs');
+  add(l,'h1',null,'Utilisateurs et accès');
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
-  var formulaire=add(m,'div');
   var me0=state.me;
-  function msg(t){ toast(t); }
   function majUtilisateurs(){ return MP.api('GET',MP.url('/state')).then(function(p){ state.users=p.state.users; synced.users=JSON.stringify(p.state.users); }); }
   function charger(){
     MP.api('GET','/api/auth/users').then(function(list){
-      zone.textContent=''; formulaire.textContent='';
+      zone.textContent='';
+      var actifs=list.filter(function(u){ return u.active; }).length;
+      var res=add(zone,'div','acces-resume');
+      resume(res,'users',list.length,'compte'+(list.length>1?'s':''));
+      resume(res,'check',actifs,'actif'+(actifs>1?'s':''));
+      resume(res,'key',Object.keys(state.roles).length,'rôles');
       tableau(zone,{ cle:'comptes', lignes:list, vide:'Aucun compte.',
         colonnes:[
-          {lab:'Nom', val:function(u){ return u.nom; }},
-          {lab:'Courriel', val:function(u){ return u.email; }},
-          {lab:'Rôle', rendu:function(u,td){
-            var sel=add(td,'select'); sel.setAttribute('aria-label','Rôle de '+u.nom); fk(sel,'cpt-role-'+u.id);
-            Object.keys(state.roles).forEach(function(r){ var o=add(sel,'option',null,state.roles[r].lab); o.value=r; });
-            sel.value=u.role; sel.disabled = u.id===me0;
-            sel.addEventListener('change',function(){
-              MP.api('PATCH','/api/auth/users/'+u.id,{role:sel.value}).then(function(){ msg('Rôle modifié — '+u.nom); return majUtilisateurs(); })
-                .then(charger).catch(function(e){ msg(e.message); charger(); });
-            });
-          }},
-          {lab:'Statut', rendu:function(u,td){ chipCellule(td, u.active?'Actif':'Désactivé', u.active?'c-green':'c-grey'); }},
-          {lab:'Dernière connexion', val:function(u){ return u.last_login ? u.last_login.replace('T',' ')+' UTC' : 'Jamais'; }}
+          {lab:'Utilisateur', rendu:function(u,td){ var w=add(td,'div','qui'); avatar(w,u.nom); var t=add(w,'div'); add(t,'strong',null,u.nom); add(t,'div','muted',u.email); if(u.id===me0) chipCellule(t,'Vous','c-teal'); }},
+          {lab:'Rôle', rendu:function(u,td){ chipCellule(td,(state.roles[u.role]||{}).lab||u.role,'c-grey'); }},
+          {lab:'Statut', rendu:function(u,td){ var s=add(td,'span','etat-point '+(u.active?'on':'off'),u.active?'Actif':'Désactivé'); s.title=u.active?'Peut se connecter':'Accès coupé'; }},
+          {lab:'Dernière connexion', val:function(u){ return u.last_login ? u.last_login.replace('T',' ').slice(0,16)+' UTC' : 'Jamais'; }}
         ],
         recherche:function(u){ return u.nom+' '+u.email+' '+((state.roles[u.role]||{}).lab||u.role); },
         filtres:[
           { lab:'Rôle', options:Object.keys(state.roles).map(function(r){ return [r, state.roles[r].lab]; }), test:function(u,v){ return u.role===v; } },
           { lab:'Statut', options:[['1','Actif'],['0','Désactivé']], test:function(u,v){ return String(u.active?1:0)===v; } }
         ],
-        nouveau:{ lab:'Nouveau compte', action:function(){ UI.compteNouveau=true; charger(); } },
-        actions:function(u,td){
-          var tg=boutonCellule(td, u.active?'Désactiver':'Réactiver', function(){
-            ask(u.active?u.nom+" perdra immédiatement l'accès à la plateforme.":u.nom+' retrouvera son accès.', function(){
-              MP.api('PATCH','/api/auth/users/'+u.id,{active:!u.active}).then(function(){ msg(u.active?'Compte désactivé.':'Compte réactivé.'); charger(); }).catch(function(e){ msg(e.message); });
-            }, u.active?'Désactiver ce compte ?':'Réactiver ce compte ?', u.active?'Désactiver':'Réactiver');
-          }, 'cpt-actif-'+u.id);
-          tg.disabled = u.id===me0;
-          var rp=boutonCellule(td, 'Mot de passe', function(){
-            demander('Saisissez un mot de passe provisoire (10 caractères minimum), à transmettre à '+u.nom+' par un canal sûr.', function(pw){
-              MP.api('PATCH','/api/auth/users/'+u.id,{password:pw}).then(function(){ msg('Mot de passe réinitialisé — à transmettre à '+u.nom+' par un canal sûr.'); }).catch(function(e){ msg(e.message); });
-            }, 'Réinitialiser le mot de passe de '+u.nom+' ?', 'Réinitialiser', 'Mot de passe provisoire');
-          }, 'cpt-mdp-'+u.id);
-          rp.setAttribute('aria-label','Réinitialiser le mot de passe de '+u.nom);
-        }
+        nouveau:{ lab:'Nouveau compte', action:function(){ nouveauCompte(); } },
+        actions:function(u,td){ boutonIcone(td,'edit','Modifier le compte de '+u.nom,function(){ modifierCompte(u); },'cpt-modifier-'+u.id); }
       });
-      if(UI.compteNouveau) creation();
     }).catch(function(e){ zone.textContent=''; add(zone,'p','muted',e.message); });
   }
-  function creation(){
-    var k2=add(formulaire,'div','card'); k2.style.marginTop='18px';
-    add(k2,'div','panel-head','Nouveau compte');
-    var f=add(add(k2,'div','pad'),'div','frm');
-    function champ(lab,type,ph){ var w=add(f,'div'); var id='c'+Math.random().toString(36).slice(2,8); add(w,'label',null,lab).setAttribute('for',id); var i=add(w,'input'); i.id=id; i.type=type; if(ph) i.placeholder=ph; return i; }
-    var nom=champ('Nom','text','Ex. K. Yao'), mail=champ('Courriel','email','prenom.nom'+(state.mailSuffix||'@exemple.ci')), pw=champ('Mot de passe initial','password','10 caractères minimum');
-    var rw=add(f,'div'); add(rw,'label',null,'Rôle').setAttribute('for','nc-role'); var rs=add(rw,'select'); rs.id='nc-role';
-    Object.keys(state.roles).forEach(function(r){ var o=add(rs,'option',null,state.roles[r].lab); o.value=r; });
-    if(state.roles.audit) rs.value='audit'; /* moindre privilège par défaut */
-    var ft=add(k2,'div','panel-foot');
-    add(ft,'span','muted','Le titulaire doit changer ce mot de passe à sa première connexion (menu du compte, en haut à droite).');
-    var an=add(ft,'button','btn btn-ghost','Annuler'); an.addEventListener('click',function(){ UI.compteNouveau=false; charger(); });
-    var go=add(ft,'button','btn btn-primary','Créer le compte');
-    go.addEventListener('click',function(){
-      go.disabled=true;
-      MP.api('POST','/api/auth/users',{nom:nom.value.trim(), email:mail.value.trim(), role:rs.value, password:pw.value}).then(function(u){
-        msg('Compte créé — '+u.nom); UI.compteNouveau=false; return majUtilisateurs();
-      }).then(charger).catch(function(e){ msg(e.message); go.disabled=false; });
+  function resume(p, ic, n, lab){ var d=add(p,'div','acces-chiffre'); icon(add(d,'span','acces-ic'),ic); var t=add(d,'div'); add(t,'strong',null,String(n)); add(t,'span',null,' '+lab); }
+
+  function champ(parent, lab, id, type, ph){
+    var d=add(parent,'div','fen-champ'); var lb=add(d,'label','fen-lab',lab); lb.htmlFor=id;
+    var i=add(d, type==='select'?'select':'input'); i.id=id; fk(i,id); if(type!=='select'){ i.type=type; if(ph) i.placeholder=ph; }
+    return i;
+  }
+  function selectRoles(sel, val){ Object.keys(state.roles).forEach(function(r){ var o=add(sel,'option',null,state.roles[r].lab); o.value=r; }); sel.value=val; }
+
+  function nouveauCompte(){
+    ouvrirFenetre('Nouveau compte', function(c,p){
+      var nom=champ(c,'Nom','nc-nom','text','Ex. K. Yao');
+      var mail=champ(c,'Courriel','nc-mail','email','prenom.nom'+(state.mailSuffix||'@exemple.ci'));
+      var rs=champ(c,'Rôle','nc-role','select'); selectRoles(rs, state.roles.audit ? 'audit' : Object.keys(state.roles)[0]); /* moindre privilège par défaut */
+      var pw=champ(c,'Mot de passe initial','nc-pw','password','10 caractères minimum');
+      add(c,'p','muted','Le titulaire change ce mot de passe à sa première connexion (menu du compte, en haut à droite).').style.marginTop='12px';
+      var an=add(p,'button','btn btn-ghost','Annuler'); an.addEventListener('click',fermerFenetre);
+      var go_=add(p,'button','btn btn-primary','Créer le compte'); fk(go_,'nc-creer');
+      go_.addEventListener('click',function(){
+        go_.disabled=true;
+        MP.api('POST','/api/auth/users',{nom:nom.value.trim(), email:mail.value.trim(), role:rs.value, password:pw.value}).then(function(u){
+          toast('Compte créé — '+u.nom); fermerFenetre(); return majUtilisateurs();
+        }).then(charger).catch(function(e){ toast(e.message); go_.disabled=false; });
+      });
     });
-    k2.scrollIntoView({block:'nearest'});
+  }
+
+  function modifierCompte(u){
+    var moi = u.id===me0;
+    ouvrirFenetre(u.nom, function(c,p){
+      var tete=add(c,'div','qui qui-lg'); avatar(tete,u.nom,true); var t=add(tete,'div'); add(t,'strong',null,u.nom); add(t,'div','muted',u.email);
+      var rs=champ(c,'Rôle','cpt-role-'+u.id,'select'); selectRoles(rs,u.role); rs.disabled=moi;
+      if(moi) add(c,'p','muted','Vous ne pouvez pas modifier votre propre rôle ni désactiver votre compte.').style.marginTop='8px';
+      var sec=add(c,'div','fen-section'); add(sec,'h3',null,'Sécurité');
+      var lg=add(sec,'div','acces-ligne');
+      var tl=add(lg,'div'); add(tl,'strong',null,'Mot de passe'); add(tl,'div','muted','Un mot de passe provisoire, à transmettre par un canal sûr.');
+      var rp=add(lg,'button','btn btn-ghost btn-sm','Réinitialiser'); fk(rp,'cpt-mdp-'+u.id);
+      rp.addEventListener('click',function(){
+        demander('Saisissez un mot de passe provisoire (10 caractères minimum), à transmettre à '+u.nom+' par un canal sûr.', function(pw){
+          MP.api('PATCH','/api/auth/users/'+u.id,{password:pw}).then(function(){ toast('Mot de passe réinitialisé — à transmettre à '+u.nom+' par un canal sûr.'); }).catch(function(e){ toast(e.message); });
+        }, 'Réinitialiser le mot de passe de '+u.nom+' ?', 'Réinitialiser', 'Mot de passe provisoire');
+      });
+      var la=add(sec,'div','acces-ligne');
+      var ta=add(la,'div'); add(ta,'strong',null,'Accès à la plateforme'); add(ta,'div','muted', u.active ? 'Le compte peut se connecter.' : 'Le compte est désactivé.');
+      var tg=add(la,'button','btn btn-sm '+(u.active?'btn-danger':'btn-ghost'), u.active?'Désactiver':'Réactiver'); fk(tg,'cpt-actif-'+u.id); tg.disabled=moi;
+      tg.addEventListener('click',function(){
+        ask(u.active?u.nom+" perdra immédiatement l'accès à la plateforme.":u.nom+' retrouvera son accès.', function(){
+          MP.api('PATCH','/api/auth/users/'+u.id,{active:!u.active}).then(function(){ toast(u.active?'Compte désactivé.':'Compte réactivé.'); fermerFenetre(); charger(); }).catch(function(e){ toast(e.message); });
+        }, u.active?'Désactiver ce compte ?':'Réactiver ce compte ?', u.active?'Désactiver':'Réactiver');
+      });
+      var an=add(p,'button','btn btn-ghost','Fermer'); an.addEventListener('click',fermerFenetre);
+      var ok=add(p,'button','btn btn-primary','Enregistrer le rôle'); fk(ok,'cpt-enregistrer-'+u.id); ok.disabled=moi;
+      ok.addEventListener('click',function(){
+        if(rs.value===u.role){ fermerFenetre(); return; }
+        MP.api('PATCH','/api/auth/users/'+u.id,{role:rs.value}).then(function(){ toast('Rôle modifié — '+u.nom); fermerFenetre(); return majUtilisateurs(); })
+          .then(charger).catch(function(e){ toast(e.message); });
+      });
+    });
   }
   charger();
 }
 
+/* ============ Rôles ============ */
 function vRoles(m){
   if(!can('roles.edit')) return denyBox(m,'roles.edit');
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,'Rôles et habilitations');
+  add(l,'h1',null,'Utilisateurs et accès');
 
   var rk=Object.keys(state.roles);
   var confl=[];
@@ -91,67 +115,61 @@ function vRoles(m){
   if(confl.length){
     var w=add(m,'div','warn'); w.style.marginBottom='18px';
     add(w,'strong',null,confl.length+' cumul(s) incompatible(s) détecté(s). ');
-    confl.forEach(function(cc){
-      add(w,'div','muted','« '+state.roles[cc.r].lab+' » : '+cc.x[2]);
-    });
+    confl.forEach(function(cc){ add(w,'div','muted','« '+state.roles[cc.r].lab+' » : '+cc.x[2]); });
   }
 
-  var grp=null;
-  var card=add(m,'div','card');
-  var ph=add(card,'div','panel-head');
-  add(ph,'span',null,'Matrice des permissions');
-  add(ph,'span','chip c-grey',rk.length+' rôles · '+PERMS.length+' permissions');
-  var sx=add(card,'div','scroll-x'); var t=add(sx,'table'); t.style.minWidth='820px';
-  t.classList.add('mx');
-  var tr=add(add(t,'thead'),'tr');
-  add(tr,'th',null,'Permission');
-  rk.forEach(function(r){ add(tr,'th',null,state.roles[r].lab); });
-  var tb=add(t,'tbody');
-  PERMS.forEach(function(pp){
-    if(pp.grp!==grp){
-      grp=pp.grp;
-      var gr=add(tb,'tr'); var gtd=add(gr,'td'); gtd.colSpan=rk.length+1;
-      gtd.style.cssText='background:var(--surface-2);font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em';
-      gtd.textContent=grp;
+  var g=add(m,'div','roles-grille');
+  rk.forEach(function(r){
+    var R_=state.roles[r], membres=state.users.filter(function(u){ return u.role===r; });
+    var nb=PERMS.filter(function(pp){ return R_.perms[pp.id]; }).length, inc=incompatOf(R_.perms).length;
+    var k=add(g,'article','card role-carte');
+    var t=add(k,'div','role-tete');
+    icon(add(t,'span','role-ic'),'key');
+    var tt=add(t,'div'); add(tt,'h3',null,R_.lab); add(tt,'div','muted',nb+' habilitation'+(nb>1?'s':'')+' sur '+PERMS.length);
+    var jauge=add(k,'div','role-jauge'); var jr=add(jauge,'span'); jr.style.width=Math.round(100*nb/PERMS.length)+'%';
+    jauge.setAttribute('role','img'); jauge.setAttribute('aria-label',nb+' habilitations sur '+PERMS.length);
+    var mb=add(k,'div','role-membres');
+    if(!membres.length) add(mb,'span','muted','Aucun membre');
+    else {
+      var pile=add(mb,'div','av-pile'); membres.slice(0,5).forEach(function(u){ avatar(pile,u.nom).title=u.nom; });
+      add(mb,'span','muted', membres.length===1 ? membres[0].nom : membres.length+' membres');
     }
-    var row=add(tb,'tr');
-    add(row,'td',null,pp.lab).style.fontWeight='600';
-    rk.forEach(function(r){
-      var td=add(row,'td'); td.style.textAlign='center';
-      var on=!!state.roles[r].perms[pp.id];
-      var b=add(td,'button','pill'+(on?' on':''), on?'✓':'—');
-      b.style.cssText+=';min-width:52px;justify-content:center';
-      b.setAttribute('aria-pressed', on?'true':'false');
-      b.setAttribute('aria-label',(on?'Retirer':'Accorder')+' « '+pp.lab+' » au rôle '+state.roles[r].lab);
-      fk(b,'perm-'+r+'-'+pp.id);
-      b.addEventListener('click',function(){
-        state.roles[r].perms[pp.id]=!on;
-        var cf=incompatOf(state.roles[r].perms);
-        logit('Habilitation '+(on?'retirée':'accordée')+' — '+state.roles[r].lab+' : '+pp.lab);
+    if(inc) chipCellule(k, inc+' cumul incompatible','c-red');
+    var pied=add(k,'div','role-pied');
+    var b=add(pied,'button','btn btn-ghost btn-sm','Habilitations'); fk(b,'role-'+r);
+    b.addEventListener('click',function(){ ouvrirHabilitations(r); });
+  });
+
+  var nb2=add(m,'div','note'); nb2.style.marginTop='18px';
+  add(nb2,'strong',null,'Pourquoi la séparation des fonctions compte ici. ');
+  nb2.appendChild(document.createTextNode("Un même agent qui note les offres et approuve l'attribution rend la procédure indéfendable en cas de recours : il n'existe plus de contrôle croisé à opposer au soumissionnaire évincé. L'outil signale ces cumuls sans les interdire, parce que dans une petite structure ils sont parfois inévitables — mais ils doivent alors être assumés et documentés."));
+}
+
+/* Fenêtre des habilitations d'un rôle : un interrupteur par permission, rangées par groupe. */
+function ouvrirHabilitations(r){
+  ouvrirFenetre(function(){ return 'Habilitations — '+((state.roles[r]||{}).lab||r); }, function(c){
+    var R_=state.roles[r]; if(!R_) return false;
+    var inc=incompatOf(R_.perms);
+    if(inc.length){ var w=add(c,'div','warn'); w.style.marginBottom='14px'; inc.forEach(function(x){ add(w,'div',null,x[2]); }); }
+    // permissions rangées par groupe (PERMS n'est pas trié : un groupe peut y revenir plus loin)
+    var groupes=[]; PERMS.forEach(function(pp){ if(groupes.indexOf(pp.grp)<0) groupes.push(pp.grp); });
+    var ordre=[]; groupes.forEach(function(g){ PERMS.forEach(function(pp){ if(pp.grp===g) ordre.push(pp); }); });
+    var grp=null, bloc=null;
+    ordre.forEach(function(pp){
+      if(pp.grp!==grp){ grp=pp.grp; var s=add(c,'div','perm-groupe'); add(s,'div','fen-lab',grp); bloc=add(s,'div','perm-liste'); }
+      var on=!!R_.perms[pp.id];
+      var row=add(bloc,'div','perm-ligne');
+      add(row,'span',null,pp.lab);
+      var sw=add(row,'button','interrupteur'+(on?' on':'')); sw.type='button';
+      sw.setAttribute('role','switch'); sw.setAttribute('aria-checked', on?'true':'false');
+      sw.setAttribute('aria-label',pp.lab+' — '+R_.lab); fk(sw,'perm-'+r+'-'+pp.id);
+      sw.addEventListener('click',function(){
+        R_.perms[pp.id]=!on;
+        logit('Habilitation '+(on?'retirée':'accordée')+' — '+R_.lab+' : '+pp.lab);
+        var cf=incompatOf(R_.perms);
         save(); render();
         if(!on && cf.length) toast('Attention : ce cumul crée une incompatibilité de séparation des fonctions.');
       });
     });
-  });
-  labelize(t);
-
-  var c2=add(m,'div','card'); c2.style.marginTop='18px';
-  add(c2,'div','panel-head','Utilisateurs et affectation');
-  var b2=add(c2,'div','pad');
-  state.users.forEach(function(u){
-    var row=add(b2,'div','docline');
-    var lf=add(row,'div');
-    add(lf,'div',null,u.nom).style.fontWeight='600';
-    add(lf,'div','muted', mailAdr(u));
-    var sel=add(row,'select'); sel.setAttribute('aria-label','Rôle de '+u.nom); fk(sel,'user-'+u.id);
-    rk.forEach(function(r){ var op=add(sel,'option',null,state.roles[r].lab); op.value=r; });
-    sel.value=u.role;
-    sel.addEventListener('change',function(){
-      u.role=sel.value; logit('Affectation modifiée — '+u.nom+' : '+roleLab(u.role)); save(); render();
-    });
-  });
-
-  var nb=add(m,'div','note');
-  add(nb,'strong',null,'Pourquoi la séparation des fonctions compte ici. ');
-  nb.appendChild(document.createTextNode("Un même agent qui note les offres et approuve l'attribution rend la procédure indéfendable en cas de recours : il n'existe plus de contrôle croisé à opposer au soumissionnaire évincé. L'outil signale ces cumuls sans les interdire, parce que dans une petite structure ils sont parfois inévitables — mais ils doivent alors être assumés et documentés."));
+  }, { large:false });
 }

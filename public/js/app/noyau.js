@@ -519,8 +519,9 @@ var VIEWS=[
   {id:'recours',    label:'Recours et signature', grp:'Procédure', perm:'offres.read'},
   {id:'pv',         label:'Procès-verbal', grp:'Procédure', perm:'pv.read'},
   {id:'audit',      label:"Journal d'audit", grp:'Procédure', perm:'audit.read'},
-  {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit'},
-  {id:'comptes',    label:'Comptes', grp:'Administration', perm:'roles.edit'},
+  {id:'comptes',    label:'Comptes', grp:'Administration', perm:'roles.edit', famille:'acces'},
+  {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit', famille:'acces'},
+  {id:'journal',    label:'Audit', grp:'Administration', perm:'audit.read'},
   {id:'params',     label:'Paramètres', grp:'Administration', perm:'params.edit'},
   {id:'regles',     label:'Alertes', grp:'Administration', perm:'notif.manage'}
 ];
@@ -536,7 +537,10 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['accueil','notifs','procedures','besoins','referencement','partenaires','commandes','comptes','roles','regles'];
+var SANS_PROCEDURE = ['accueil','notifs','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
+/* Familles d'écrans : une seule entrée de menu, et des onglets en tête de page pour passer de l'un à l'autre. */
+var FAMILLES = { acces:{ lab:'Utilisateurs et accès', icone:'users' } };
+function familleDe(id){ var v=VIEWS.filter(function(x){ return x.id===id; })[0]; return v && v.famille || null; }
 function avecProcedure(){ return !!(state && state.procedure); }
 /* Un écran est visible si l'une de ses habilitations est accordée (perm, ou perms pour plusieurs), et, sans
    procédure ouverte, s'il ne dépend pas d'une procédure. */
@@ -555,7 +559,19 @@ function renderNav(){
   // les écrans de la procédure ne figurent pas dans le menu : on ouvre un appel d'offres depuis le registre, et
   // « Appels d'offres » reste l'entrée active pendant qu'on est dans son détail
   var vis=VIEWS.filter(vueVisible).filter(function(v){ return v.grp!=='Procédure'; });
+  var famillesPosees={};
   vis.forEach(function(v){
+    if(v.famille){
+      if(famillesPosees[v.famille]) return;
+      famillesPosees[v.famille]=true;
+      if(v.grp!==grp){ grp=v.grp; add(box,'div','navgrp',grp); }
+      var F=FAMILLES[v.famille], bf=el('button','navb');
+      icon(bf,F.icone); bf.appendChild(document.createTextNode(F.lab)); fk(bf,'nav-'+v.famille);
+      if(familleDe(state.view)===v.famille) bf.setAttribute('aria-current','page');
+      bf.addEventListener('click',function(){ closeMenu(); go(v.id); });
+      box.appendChild(bf);
+      return;
+    }
     if(v.grp!==grp){
       grp=v.grp;
       add(box,'div','navgrp',grp);

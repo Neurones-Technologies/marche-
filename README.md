@@ -47,7 +47,11 @@ Organisation de l'interface (menu) :
   sont en tableaux (recherche, filtres, pagination, bouton « + ») et le détail d'une ligne s'ouvre dans une fenêtre :
   question et réponse, pli reçu, vérification d'une offre, pièces et signaux d'un soumissionnaire, clarification,
   notation, recours. Un tableau vide n'affiche ni recherche, ni filtres, ni pagination.
-- **Administration** : comptes, rôles, paramètres, alertes.
+- **Administration** : « Utilisateurs et accès » (onglets Comptes et Rôles), « Audit » (journal de toute l'instance :
+  date, auteur, action, procédure, adresse IP, avec l'état de la chaîne d'empreintes), paramètres, alertes.
+
+Le bouton « + » d'un tableau ouvre le formulaire de création dans une fenêtre. Un détail (besoin, commande,
+partenaire, appel d'offres) commence par un lien de retour à la liste.
 
 Dans le détail d’une procédure, la barre du haut affiche le titre de l’écran et la référence (« Cahier des charges
 — AO-2026-014 »). Les écrans longs (cahier des charges, paramètres…) ont, à droite, un sommaire qui reste visible

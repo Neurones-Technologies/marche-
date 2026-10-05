@@ -12,7 +12,6 @@ function statutProcedure(p){
   if(p.publie) return ['Publiée','c-amber'];
   return ['En préparation','c-grey'];
 }
-UI.procedureNouvelle = false;
 /* Registre des appels d'offres : toutes les procédures visibles, passées et en cours, avec leur phase, le titulaire
    et le montant attribués, le besoin d'origine et les commandes ; filtres par phase, année et recherche. */
 function vProcedures(m){
@@ -57,7 +56,7 @@ function vProcedures(m){
         { lab:'Phase', options:Object.keys(phases).sort(function(a,b){ return phases[a].rang-phases[b].rang; }).map(function(id){ return [id, phases[id].lab]; }), test:function(p,v){ return p.phase.id===v; } },
         { lab:'Année', options:annees.map(function(a){ return [a,a]; }), test:function(p,v){ return String(p.publieeLe||p.creee||'').indexOf(v)>=0; } }
       ],
-      nouveau: can('cdc.edit') ? { lab:'Nouvelle procédure', action:function(){ UI.procedureNouvelle=true; render(); } } : null,
+      nouveau: can('cdc.edit') ? { lab:'Nouvelle procédure', action:nouvelleProcedure } : null,
       actions:function(p,td){
         // le détail de l'appel d'offres s'ouvre d'ici (il n'a plus d'entrée dans le menu)
         var b=boutonIcone(td,'eye','Ouvrir le détail de '+p.ref,function(){
@@ -69,33 +68,31 @@ function vProcedures(m){
       }
     });
   }
+}
 
-  if(!can('cdc.edit') || !UI.procedureNouvelle) return;
-  var k3=add(m,'div','card'); k3.style.marginTop='18px';
-  add(k3,'div','panel-head','Nouvelle procédure');
-  var b3=add(k3,'div','pad');
-  var f=add(b3,'div','frm');
-  function champ(lab,id,type){
-    var w=add(f,'div'); add(w,'label',null,lab).setAttribute('for',id);
-    var i=add(w,type==='textarea'?'textarea':'input'); i.id=id; fk(i,id);
-    if(type==='textarea'){ i.rows=2; w.style.gridColumn='1/-1'; } else i.type='text';
-    return i;
-  }
-  var ir=champ('Référence','np-ref'); ir.maxLength=40; ir.placeholder='AO-2026-020';
-  var io=champ('Objet du marché','np-objet','textarea'); io.maxLength=500;
-  var w=add(f,'div'); add(w,'label',null,'Profil réglementaire').setAttribute('for','np-profil');
-  var sp=add(w,'select'); sp.id='np-profil'; fk(sp,'np-profil');
-  Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(sp,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
-  sp.value=(state.org && state.org.profilDefaut) || MPProfils.DEFAUT;
-  var foot=add(k3,'div','panel-foot');
-  add(foot,'span','muted','Le dossier part du cahier des charges modèle, de la grille de critères par défaut et du circuit d’approbation par défaut. Il reste à compléter avant publication.');
-  var an=add(foot,'button','btn btn-ghost','Annuler'); fk(an,'np-annuler'); an.addEventListener('click',function(){ UI.procedureNouvelle=false; render(); });
-  var bc=add(foot,'button','btn btn-primary','Créer la procédure'); fk(bc,'np-go');
-  bc.addEventListener('click',function(){
-    bc.disabled=true;
-    MP.api('POST','/api/procedures',{ ref:ir.value.trim(), objet:io.value.trim(), profil:sp.value })
-      .then(function(r){ return MP.refreshProcs().then(function(){ return r.id; }); })
-      .then(function(id){ toast('Procédure '+ir.value.trim()+' créée.'); UI.procedureNouvelle=false; ouvrirProcedure(id,'cdc'); })
-      .catch(function(e){ toast(e.message); bc.disabled=false; });
+/* Fenêtre « Nouvelle procédure » : référence, objet, profil réglementaire. */
+function nouvelleProcedure(){
+  ouvrirFenetre('Nouvelle procédure', function(c,p){
+    function champ(lab,id,type){
+      var d=add(c,'div','fen-champ'); add(d,'label','fen-lab',lab).htmlFor=id;
+      var i=add(d,type==='textarea'?'textarea':(type==='select'?'select':'input')); i.id=id; fk(i,id);
+      if(type==='textarea') i.rows=3; else if(type!=='select') i.type='text';
+      return i;
+    }
+    var ir=champ('Référence','np-ref'); ir.maxLength=40; ir.placeholder='AO-2026-020';
+    var io=champ('Objet du marché','np-objet','textarea'); io.maxLength=500;
+    var sp=champ('Profil réglementaire','np-profil','select');
+    Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(sp,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
+    sp.value=(state.org && state.org.profilDefaut) || MPProfils.DEFAUT;
+    add(c,'p','muted','Le dossier part du cahier des charges modèle, de la grille de critères par défaut et du circuit d’approbation par défaut. Il reste à compléter avant publication.').style.marginTop='12px';
+    var an=add(p,'button','btn btn-ghost','Annuler'); fk(an,'np-annuler'); an.addEventListener('click',fermerFenetre);
+    var bc=add(p,'button','btn btn-primary','Créer la procédure'); fk(bc,'np-go');
+    bc.addEventListener('click',function(){
+      bc.disabled=true;
+      MP.api('POST','/api/procedures',{ ref:ir.value.trim(), objet:io.value.trim(), profil:sp.value })
+        .then(function(r){ return MP.refreshProcs().then(function(){ return r.id; }); })
+        .then(function(id){ toast('Procédure '+ir.value.trim()+' créée.'); fermerFenetre(); ouvrirProcedure(id,'cdc'); })
+        .catch(function(e){ toast(e.message); bc.disabled=false; });
+    });
   });
 }

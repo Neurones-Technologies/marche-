@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const contexte = require('./contexte');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const cfg = require('./config');
@@ -69,6 +70,8 @@ function addColumn(table, col, def) {
   if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
 }
 ['offers', 'receipts', 'files', 'audit'].forEach((t) => addColumn(t, 'procedure_id', 'TEXT'));
+// 05/10/2026 : l'adresse IP de l'auteur est consignée avec chaque entrée du journal.
+addColumn('audit', 'ip', 'TEXT');
 // 02/10/2026 : module 1. Un compte de soumissionnaire est rattaché à sa fiche partenaire ; une pièce de référencement
 // appartient à la fiche ; un compte créé par inscription publique reste inactif tant que son courriel n'est pas vérifié.
 addColumn('users', 'partenaire_id', 'TEXT');
@@ -143,16 +146,18 @@ function store(pid) {
 
 /* ---- journal d'audit chaîné (SHA-256) ----
    Une entrée rattachée à une procédure inclut son identifiant dans l'empreinte : on ne peut pas la déplacer
-   d'une procédure à l'autre sans casser la chaîne. Les entrées d'organisation gardent la formule d'origine. */
+   d'une procédure à l'autre sans casser la chaîne. L'adresse IP de l'auteur, quand la requête la fournit, entre
+   aussi dans l'empreinte. Les entrées antérieures (sans procédure ni adresse) gardent la formule d'origine. */
 const GENESIS = '0'.repeat(64);
-const auditHash = (prev, t, uid, who, action, pid) =>
-  crypto.createHash('sha256').update([prev, t, uid || '', who, action].concat(pid ? [pid] : []).join('|')).digest('hex');
+const auditHash = (prev, t, uid, who, action, pid, ip) =>
+  crypto.createHash('sha256').update([prev, t, uid || '', who, action].concat(pid ? [pid] : []).concat(ip ? ['ip:' + ip] : []).join('|')).digest('hex');
 function auditAppend(uid, who, action, pid = null) {
   const last = db.prepare('SELECT hash FROM audit ORDER BY seq DESC LIMIT 1').get();
   const prev = last ? last.hash : GENESIS;
   const t = frDate();
-  const hash = auditHash(prev, t, uid, who, action, pid);
-  db.prepare('INSERT INTO audit(t,uid,who,action,prev,hash,procedure_id) VALUES(?,?,?,?,?,?,?)').run(t, uid || null, who, action, prev, hash, pid);
+  const ip = contexte.ip();
+  const hash = auditHash(prev, t, uid, who, action, pid, ip);
+  db.prepare('INSERT INTO audit(t,uid,who,action,prev,hash,procedure_id,ip) VALUES(?,?,?,?,?,?,?,?)').run(t, uid || null, who, action, prev, hash, pid, ip);
   bumpRev();
   return { t, who, a: action };
 }
@@ -161,10 +166,14 @@ function auditList(limit = 200, pid = null) {
   if (!pid) return db.prepare('SELECT t,who,action AS a FROM audit ORDER BY seq DESC LIMIT ?').all(limit);
   return db.prepare('SELECT t,who,action AS a FROM audit WHERE procedure_id=? OR procedure_id IS NULL ORDER BY seq DESC LIMIT ?').all(pid, limit);
 }
+/** Journal complet de l'instance, le plus récent d'abord : date, auteur, action, procédure, adresse IP. */
+function auditJournal(limit = 2000) {
+  return db.prepare('SELECT seq, t, who, action AS a, procedure_id AS pid, ip, hash FROM audit ORDER BY seq DESC LIMIT ?').all(limit);
+}
 function auditVerify() {
   let prev = GENESIS, n = 0;
   for (const r of db.prepare('SELECT * FROM audit ORDER BY seq').iterate()) {
-    if (r.prev !== prev || r.hash !== auditHash(prev, r.t, r.uid, r.who, r.action, r.procedure_id)) return { ok: false, brokenAt: r.seq, entries: n };
+    if (r.prev !== prev || r.hash !== auditHash(prev, r.t, r.uid, r.who, r.action, r.procedure_id, r.ip)) return { ok: false, brokenAt: r.seq, entries: n };
     prev = r.hash; n++;
   }
   return { ok: true, entries: n, head: prev };
@@ -456,7 +465,7 @@ function resetDemo(uid, who) {
 
 module.exports = {
   db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
-  auditAppend, auditList, auditVerify, offersAll, offerInsert, offersReplace,
+  auditAppend, auditList, auditJournal, auditVerify, offersAll, offerInsert, offersReplace,
   commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero,
   partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, jetonCreer, jetonUtiliser,
   proceduresAll, procedureGet, procedureCreate, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero,

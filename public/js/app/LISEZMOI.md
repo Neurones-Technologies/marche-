@@ -40,6 +40,10 @@ Avant eux, `profils.js`, `regles.js` (partagés avec le serveur) et `api.js` (co
 - Une étape terminée (ou une procédure archivée) passe en consultation seule : le rendu appelle `figer` sur l’écran
   et sur ses fenêtres. Un bouton qui ne fait que consulter (fenêtre de détail, navigation) porte `data-consult`.
 - Les tableaux des registres n’ont pas de titre (il est dans la barre du haut) ; ceux des écrans de procédure en ont.
+- Le bouton « Nouveau » d’un tableau ouvre une **fenêtre** de formulaire (jamais un formulaire dans la page).
+- Un détail commence par `retourListe(parent, libellé, action)` : lien de retour à la liste.
+- Deux écrans d’une même `famille` (`VIEWS`, `FAMILLES` dans `noyau.js`) n’ont qu’une entrée de menu ; le rendu pose
+  leurs onglets en tête de page (`ongletsFamille`).
 - Le rendu appelle `organiserSections` : un écran d’au moins quatre sections reçoit le sommaire collé à droite. Une section
   est une carte posée directement dans le contenu, qui commence par un `.panel-head`. Un titre « N · Titre »
   donne la pastille N (le texte de l’en-tête reste « N · Titre ») ; sans numéro, la pastille porte le rang.

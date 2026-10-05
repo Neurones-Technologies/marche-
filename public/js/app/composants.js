@@ -42,6 +42,7 @@ var ICONS = {
   chevR:'m9 6 6 6-6 6',
   plus:'M12 5v14M5 12h14',
   x:'M6 6l12 12M18 6 6 18',
+  edit:'M4 20h4L19 9l-4-4L4 16z|M13.5 6.5l4 4',
   archive:'M3 4h18v4H3z|M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8|M10 12h4',
   eye:'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z|M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   clipboard:'M9 4h6v3H9z|M9 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-3|M9 12h6M9 16h4'
@@ -58,7 +59,7 @@ function icon(parent, name){
 /* Icône de chaque écran du menu. */
 var NAV_ICONS = { accueil:'home', dashboard:'info', notifs:'bell', procedures:'folder', besoins:'clipboard', referencement:'badge', partenaires:'users', commandes:'cart', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
   reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
-  recours:'scale', pv:'stamp', audit:'list', roles:'key', comptes:'users', params:'cog', regles:'ring' };
+  recours:'scale', pv:'stamp', audit:'list', journal:'list', roles:'key', comptes:'users', params:'cog', regles:'ring' };
 
 /* Pastille de statut : kind = ok | blocked | pending | draft | info. */
 function chip(parent, kind, text, ic){ var c=add(parent,'span','chip chip-'+kind); if(ic) icon(c,ic); c.appendChild(document.createTextNode(text)); return c; }
@@ -142,6 +143,7 @@ function avecCadreProcedure(){ return VIEWS.filter(function(v){ return v.grp==='
 function cadreProcedureHaut(m){
   // la référence de la procédure figure dans la barre du haut, à côté du titre (placerTitre)
   var cur=MP.current();
+  if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
   var autres=MP.procs().filter(function(p){ return !p.archive || p.id===MP.pid(); });
   if(autres.length>1){
     var hd=add(m,'div','proc-head');
@@ -466,6 +468,25 @@ function figer(zone){
     if(e.closest('.dt-outils')){ e.style.display='none'; return; }
     e.disabled=true;
     if(e.tagName==='BUTTON' && !e.title) e.title='Étape terminée : consultation seule.';
+  });
+}
+/* Lien « ← Liste » en tête d'un détail, pour revenir au registre. */
+function retourListe(parent, lab, action, fkey){
+  var b=add(parent,'button','retour'); b.type='button'; icon(b,'chevL'); b.appendChild(document.createTextNode(lab));
+  b.setAttribute('aria-label','Revenir à la liste : '+lab); if(fkey) fk(b,fkey);
+  b.setAttribute('data-consult','');
+  b.addEventListener('click',function(){ action(); window.scrollTo({top:0}); });
+  return b;
+}
+/* Onglets d'une famille d'écrans (ex. Comptes | Rôles), en tête de page. */
+function ongletsFamille(m){
+  var f=familleDe(state.view); if(!f) return;
+  var bar=add(m,'div','onglets'); bar.setAttribute('role','tablist');
+  VIEWS.filter(function(v){ return v.famille===f && vueVisible(v); }).forEach(function(v){
+    var b=add(bar,'button','onglet'+(v.id===state.view?' on':'')); b.type='button'; b.setAttribute('role','tab');
+    b.setAttribute('aria-selected', v.id===state.view?'true':'false'); fk(b,'onglet-'+v.id);
+    icon(b, NAV_ICONS[v.id]); b.appendChild(document.createTextNode(v.label));
+    b.addEventListener('click',function(){ go(v.id); });
   });
 }
 /* Bouton-icône (imprimer, exporter…) : libellé au survol (title) et pour les lecteurs d'écran (aria-label). */

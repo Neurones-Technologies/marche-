@@ -3,7 +3,7 @@
 "use strict";
 
 var ROUTER={accueil:vAccueil, dashboard:vDashboard, notifs:vNotifs, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, cdc:vCDC, dao:vDAO, criteres:vCriteres, portail:vPortail, reception:vReception,
-  depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit};
+  depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit, journal:vJournal};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
 /* Ouvre une autre procédure : les saisies en attente partent d'abord, l'écran courant est conservé s'il existe. */
@@ -76,6 +76,7 @@ function render(){
       var na=add(m,'div','note'); add(na,'strong',null,'Procédure archivée. ');
       na.appendChild(document.createTextNode('Elle se consulte mais ne se modifie plus.'));
     }
+    ongletsFamille(m);
     (ROUTER[state.view]||vDashboard)(m);
     organiserSections(m, state.view);
   }

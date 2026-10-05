@@ -1,4 +1,4 @@
-/* Marché+ — Accueil de l'organisation : indicateurs, « À faire pour moi », appels d'offres par phase, activité.
+/* Marché+ — Accueil de l'organisation : indicateurs, « À faire pour moi », appels d'offres par phase.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
    Les données viennent de /api/accueil, calculées par le serveur selon les habilitations de l'utilisateur. */
 "use strict";
@@ -63,17 +63,6 @@ function vAccueil(m){
     });
     if(c.procedures && c.procedures.parPhase) barresPhases(add(g,'div'), c.procedures.parPhase);
 
-    /* 3. Activité récente (journal), pour ceux qui y ont accès. */
-    if(r.activite && r.activite.length){
-      var ka=add(zone,'div','card'); ka.style.marginTop='18px';
-      add(ka,'div','panel-head','Activité récente');
-      var ba=add(ka,'div','pad');
-      r.activite.forEach(function(e){
-        var row=add(ba,'div','log');
-        add(row,'time',null,e.t);
-        var d=add(row,'div'); d.style.flex='1 1 240px'; add(d,'div',null,e.a); add(d,'div','muted',e.who);
-      });
-    }
   }
 }
 
