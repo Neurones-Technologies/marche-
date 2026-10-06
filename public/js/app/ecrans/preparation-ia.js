@@ -1,68 +1,97 @@
-/* Marché+ — Préparer le cahier des charges avec l'IA : à partir d'un document chargé (PDF, Word) ou d'une idée
-   décrite en quelques lignes. Le serveur rédige une proposition (server/ia.js) ; l'acheteur la relit dans une
-   fenêtre et choisit, section par section, ce qu'il reprend dans le formulaire. Rien n'est écrit sans son accord.
+/* Marché+ — Renseigner le cahier des charges : on choisit d'abord comment (saisir le formulaire, importer un
+   document, décrire son besoin), puis seul ce qu'exige ce mode s'affiche. Avec un document ou une idée, le serveur
+   rédige une proposition (server/ia.js) ; l'acheteur la relit dans une fenêtre et choisit, section par section, ce
+   qu'il reprend ; l'écran passe alors au formulaire pour la relecture. Rien n'est écrit sans son accord.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
 UI.ia = null;
 function etatIA(){
   var pid=state.procedure;
-  if(!UI.ia || UI.ia.pid!==pid) UI.ia={ pid:pid, actif:null, onglet:'idee', tache:null, depuis:0, erreur:null, proposition:null, source:'', choix:{} };
+  if(!UI.ia || UI.ia.pid!==pid) UI.ia={ pid:pid, actif:null, mode:lireModeCdc(pid), tache:null, depuis:0, erreur:null, proposition:null, source:'', choix:{} };
   return UI.ia;
 }
+/* Le mode choisi est mémorisé par procédure dans ce navigateur. */
+function lireModeCdc(pid){ try{ return localStorage.getItem('marcheplus.cdcmode.'+pid) || null; }catch(e){ return null; } }
+function choisirModeCdc(mode){
+  var ia=etatIA(); ia.mode=mode; ia.erreur=null;
+  try{ localStorage.setItem('marcheplus.cdcmode.'+ia.pid, mode); }catch(e){}
+  render();
+}
 
-/* Carte « Préparer avec l'IA », en tête du cahier des charges tant qu'il n'est pas publié. */
-function vCdcIA(m){
+var MODES_CDC=[
+  ['formulaire','Saisir le formulaire','Vous renseignez vous-même chaque section du cahier des charges.', false],
+  ['document','Importer un document','Un ancien dossier, des termes de référence, une note de besoin (PDF ou Word) : l’IA en reprend les informations.', true],
+  ['idee','Décrire votre besoin','En quelques phrases : l’IA rédige un cahier des charges complet.', true]
+];
+
+/* Choix du mode, en tête du cahier des charges tant qu'il n'est pas publié. Retourne vrai si le formulaire doit
+   s'afficher (mode « formulaire »). */
+function vCdcModes(m){
   var ia=etatIA();
   if(ia.actif===null){
     ia.actif=false;
     MP.api('GET',MP.url('/ia')).then(function(r){ ia.actif=!!r.actif; render(); }).catch(function(){});
-    return;
   }
+  var mode=ia.mode;
+  if(!ia.actif && mode && mode!=='formulaire') mode=null; // IA indisponible : seul le formulaire reste possible
   // carte enveloppée : elle reste hors du sommaire et de la numérotation des sections du cahier des charges
   var k=add(add(m,'div'),'div','card'); k.style.marginBottom='18px';
-  var ph=add(k,'div','panel-head'); add(ph,'span',null,'Préparer avec l’IA');
-  add(ph,'span','chip c-violet','Proposition à relire');
   var b=add(k,'div','pad');
-  if(!ia.actif){
-    add(b,'p','muted','L’IA n’est pas configurée sur ce serveur : la clé ANTHROPIC_API_KEY manque dans sa configuration. Le formulaire ci-dessous reste disponible.');
-    return;
+  if(!mode){
+    add(b,'h2','cdc-modes-titre','Comment voulez-vous renseigner le cahier des charges ?');
+    var seg=add(b,'div','consult-modes cdc-modes');
+    MODES_CDC.forEach(function(x){
+      var o=add(seg,'button','consult-mode'); o.type='button'; fk(o,'cdc-mode-'+x[0]);
+      o.disabled = x[3] && !ia.actif;
+      add(o,'strong',null,x[1]); add(o,'span',null, o.disabled ? 'Indisponible : l’IA n’est pas configurée sur ce serveur.' : x[2]);
+      o.addEventListener('click',function(){ choisirModeCdc(x[0]); });
+    });
+    return false;
   }
-  var seg=add(b,'div','consult-modes');
-  [['idee','Décrire votre besoin','En quelques phrases : l’IA rédige un cahier des charges complet.'],
-   ['document','Importer un document','Un ancien dossier, des termes de référence, une note de besoin (PDF ou Word) : l’IA en reprend les informations.']].forEach(function(x){
-    var o=add(seg,'button','consult-mode'+(ia.onglet===x[0]?' on':'')); o.type='button'; fk(o,'ia-'+x[0]);
-    o.setAttribute('aria-pressed',ia.onglet===x[0]?'true':'false'); o.disabled=!!ia.tache;
-    add(o,'strong',null,x[1]); add(o,'span',null,x[2]);
-    o.addEventListener('click',function(){ ia.onglet=x[0]; ia.erreur=null; render(); });
+  // mode choisi : une barre compacte pour en changer, puis ce qu'il demande
+  var barre=add(b,'div','cdc-mode-barre');
+  add(barre,'span','muted','Mode de saisie');
+  MODES_CDC.forEach(function(x){
+    var o=add(barre,'button','pill'+(mode===x[0]?' on':''), x[1]); o.type='button'; fk(o,'cdc-mode-'+x[0]);
+    o.setAttribute('aria-pressed',mode===x[0]?'true':'false');
+    o.disabled = !!ia.tache || (x[3] && !ia.actif);
+    o.addEventListener('click',function(){ if(mode!==x[0]) choisirModeCdc(x[0]); });
   });
+  if(mode==='formulaire') return true;
+  var z=add(b,'div','cdc-mode-corps');
   if(ia.tache){
-    var p=add(b,'p',null,(ia.source==='document'?'Lecture du document et rédaction de la proposition…':'Rédaction du cahier des charges…')+' '+ia.depuis+' s');
+    var p=add(z,'p',null,(ia.source==='document'?'Lecture du document et rédaction de la proposition…':'Rédaction du cahier des charges…')+' '+ia.depuis+' s');
     p.setAttribute('role','status');
-    add(b,'p','muted','Cela prend en général une à deux minutes. Vous pouvez continuer à travailler : la proposition s’ouvrira ici.');
-    return;
+    add(z,'p','muted','Cela prend en général une à deux minutes. Vous pouvez continuer à travailler : la proposition s’ouvrira ici.');
+    return false;
   }
-  if(ia.erreur){ var e=add(b,'div','warn'); add(e,'strong',null,'Proposition impossible. '); e.appendChild(document.createTextNode(ia.erreur)); e.style.marginBottom='12px'; }
-  if(ia.onglet==='idee'){
-    var lb=add(b,'label',null,'Votre besoin'); lb.setAttribute('for','ia-idee');
-    var t=add(b,'textarea'); t.id='ia-idee'; t.rows=4; fk(t,'ia-idee-txt'); t.value=ia.idee||''; t.style.width='100%';
+  if(ia.erreur){ var e=add(z,'div','warn'); add(e,'strong',null,'Proposition impossible. '); e.appendChild(document.createTextNode(ia.erreur)); e.style.marginBottom='12px'; }
+  if(mode==='idee'){
+    var lb=add(z,'label',null,'Votre besoin'); lb.setAttribute('for','ia-idee');
+    var t=add(z,'textarea'); t.id='ia-idee'; t.rows=5; fk(t,'ia-idee-txt'); t.value=ia.idee||''; t.style.width='100%';
     t.placeholder='Ex. : renouveler le parc informatique du siège, 40 postes et 5 imprimantes réseau, installation et maintenance 3 ans, livraison avant mars.';
     t.addEventListener('input',function(){ ia.idee=t.value; });
-    var go=add(add(b,'div','panel-foot'),'button','btn btn-primary','Rédiger le cahier des charges'); fk(go,'ia-rediger');
+    var go=add(add(z,'div','cdc-mode-actions'),'button','btn btn-primary','Rédiger le cahier des charges'); fk(go,'ia-rediger');
     go.addEventListener('click',function(){
       var v=String(ia.idee||'').trim();
       if(v.length<15){ toast('Décrivez votre besoin en quelques phrases.'); return; }
       lancerIA('idee', MP.api('POST',MP.url('/ia/idee'),{ idee:v }));
     });
   } else {
-    var lf=add(b,'label',null,'Document (PDF ou Word .docx)'); lf.setAttribute('for','ia-doc');
-    var f=add(b,'input'); f.id='ia-doc'; f.type='file'; f.accept='.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    var lf=add(z,'label',null,'Document (PDF ou Word .docx)'); lf.setAttribute('for','ia-doc');
+    var f=add(z,'input'); f.id='ia-doc'; f.type='file'; f.accept='.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     f.addEventListener('change',function(){
       var fichier=f.files && f.files[0]; if(!fichier) return;
       lancerIA('document', MP.upload(MP.url('/ia/document'), fichier));
     });
   }
-  add(b,'p','muted','La proposition s’affiche pour relecture : vous choisissez ce que vous reprenez. Le texte transmis est traité par le service d’IA d’Anthropic.').style.marginTop='10px';
+  add(z,'p','muted','La proposition s’affiche pour relecture : vous choisissez ce que vous reprenez, puis vous relisez le formulaire. Le texte transmis est traité par le service d’IA d’Anthropic.').style.marginTop='12px';
+  if(ia.proposition){
+    var rv=add(z,'button','btn btn-ghost btn-sm','Revoir la dernière proposition'); rv.style.marginTop='8px';
+    rv.addEventListener('click',ouvrirPropositionIA);
+  }
+  return false;
 }
 
 /* Demande lancée : le serveur répond tout de suite avec une tâche, dont on suit l'état. */
@@ -153,6 +182,7 @@ function appliquerIA(p, choix){
   });
   if(!faites.length){ toast('Aucune section cochée.'); return; }
   logit('Cahier des charges complété à partir de la proposition de l’IA — '+faites.join(', '));
-  fermerFenetre(); save(); render();
+  fermerFenetre(); save();
+  choisirModeCdc('formulaire'); // relecture dans le formulaire
   toast('Proposition reprise : relisez le formulaire avant de publier.');
 }

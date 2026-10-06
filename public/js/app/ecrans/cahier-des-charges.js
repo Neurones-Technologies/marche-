@@ -16,7 +16,8 @@ function vCDC(m){
       save(); render();
     }, 'Publier le cahier des charges ?', 'Publier');
   });
-  if(can('cdc.edit') && !c.cdcPublie) vCdcIA(m); // proposition par l'IA, à partir d'un document ou d'une idée
+  // mode de saisie (formulaire, document, idée) : seul ce qu'exige le mode choisi s'affiche
+  if(can('cdc.edit') && !c.cdcPublie && !vCdcModes(m)) return;
 
   /* Identification */
   var k1=add(m,'div','card'); add(k1,'div','panel-head','1 · Identification de la procédure');
