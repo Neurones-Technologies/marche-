@@ -43,8 +43,7 @@ async function inscrire(corps) {
 }
 module.exports.inscrire = inscrire;
 
-/** Remplit le cahier des charges et la grille d'une procédure neuve, qui naît vide (équivalent du bouton « Générer des
-    données fictives ») ; retourne l'état. */
+/** Remplit le cahier des charges et la grille d'une procédure neuve, qui naît vide ; retourne l'état. */
 async function remplir(cookie, pid) {
   const seed = require('../seed/seed.json');
   const s = (await call('GET', `/api/procedures/${pid}/state`, null, cookie)).json.state;
