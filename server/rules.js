@@ -416,6 +416,8 @@ function validateChange(key, value, req, changes = { [key]: value }) {
     }
     case 'docDefs': {
       if (!Array.isArray(value) || value.some((d) => !isObj(d) || !d.id)) return 'Liste de pièces invalide.';
+      if (value.some((d) => d.referencement !== undefined && (typeof d.referencement !== 'string' || d.referencement.length > 41)))
+        return 'Pièce de référencement correspondante invalide.';
       const ids = new Set(value.map((d) => d.id));
       const manquantes = cadreOf(next).piecesImposees.filter((id) => !ids.has(id));
       if (manquantes.length) {

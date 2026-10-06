@@ -132,6 +132,15 @@
     return Math.max(0, Math.ceil(s.days - ecoule));
   }
 
+  /* Pièce du référencement qui couvre une pièce d'offre : celle que le paramétrage désigne (referencement), sinon
+     celle de même identifiant ; null si aucune. Une pièce validée au référencement, non expirée, dispense alors le
+     partenaire référencé de la joindre à son offre. */
+  function pieceReferencement(docDef, piecesRef) {
+    var ids = (piecesRef || []).map(function (p) { return p.id; });
+    if (docDef.referencement !== undefined) return docDef.referencement && ids.indexOf(docDef.referencement) >= 0 ? docDef.referencement : null;
+    return ids.indexOf(docDef.id) >= 0 ? docDef.id : null;
+  }
+
   /* Ce qui manque au dossier pour être publié : liste de libellés, vide quand il est prêt. Le contexte porte aussi
      consultes (partenaires consultés). */
   function cdcManquants(ctx) {
@@ -149,7 +158,7 @@
   }
 
   return {
-    cdcManquants: cdcManquants,
+    cdcManquants: cdcManquants, pieceReferencement: pieceReferencement,
     profilId: profilId, cadre: cadre, prefTaux: prefTaux,
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,

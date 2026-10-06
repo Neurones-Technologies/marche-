@@ -41,12 +41,15 @@ function buildDAO(){
       "Une visite de site est organisée sur trois agences représentatives du parc : une agence du district d'Abidjan, une agence de ville secondaire et une agence isolée alimentée par groupe électrogène. La visite est obligatoire ; l'attestation de visite délivrée à cette occasion est une pièce du dossier de candidature.",
       "L'autorité contractante peut publier des additifs modifiant le dossier jusqu'à cinq (5) jours avant la date limite. Si un additif est de nature à modifier substantiellement la préparation des offres, la date limite de dépôt est reportée d'une durée au moins égale au délai restant à courir."
     ]),
-    A('2.4',"Pièces du dossier de candidature",'admin',[
+    A('2.4',"Pièces du dossier de candidature",'admin',(function(){
+      var pr=(state.formulaireReferencement||{}).pieces||[], couv=DOCS().filter(function(d){ return !!R.pieceReferencement(d,pr); });
+      return couv.length ? ["Un soumissionnaire référencé auprès de l'autorité contractante est dispensé de produire les pièces déjà validées lors de son référencement et en cours de validité : "+couv.map(function(d){ return d.label.toLowerCase(); }).join(' ; ')+"."] : [];
+    })().concat([
       "Tout soumissionnaire produit : le registre du commerce ou un document équivalent du pays d'établissement ; une attestation de régularité fiscale de moins de trois mois ; la caution de soumission ; les états financiers certifiés des trois derniers exercices ; la liste des marchés similaires exécutés au cours des cinq dernières années, appuyée d'attestations de bonne exécution.",
       "Les soumissionnaires établis en Côte d'Ivoire produisent en outre une attestation de l'organisme de prévoyance sociale de moins de trois mois.",
       "Les soumissionnaires établis hors de l'espace UEMOA produisent en outre : la traduction française certifiée de leurs pièces, la légalisation consulaire ou l'apostille de leurs documents officiels, la contre-garantie bancaire mentionnée à l'article 2.2, et un engagement de représentation locale précisant l'identité du représentant, l'adresse du domicile élu en Côte d'Ivoire et l'étendue de son mandat pendant la durée du marché et de la garantie.",
       "L'absence d'une pièce essentielle entraîne le rejet de l'offre. L'autorité contractante peut toutefois inviter un soumissionnaire à compléter une pièce purement formelle, dans un délai qu'elle fixe, dès lors que cette régularisation n'a pas pour effet de modifier le contenu de l'offre ni d'avantager son auteur."
-    ]),
+    ])),
     A('2.5',"Évaluation des offres",'admin',[
       "L'évaluation se déroule en trois temps : examen de la conformité administrative, examen de la conformité technique au regard des spécifications minimales du CCTP, puis notation des offres techniquement conformes selon la grille pondérée annexée.",
       "La grille de notation en vigueur pour la présente consultation est la suivante : "+state.criteria.map(function(x){return x.label+" ("+x.weight+" %)";}).join(" ; ")+".",

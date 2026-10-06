@@ -335,11 +335,12 @@ r.post('/offers', (req, res) => {
   // pièces exigées selon le pays du soumissionnaire et le profil réglementaire (zone de préférence, pays local)
   const exigees = new Set(R.requiredDocs({ org, cdc, cadre: req.store.get('cadre'), docDefs }, { iso: d.iso }).map((x) => x.id));
   // une pièce validée au référencement (et non expirée) tient lieu de pièce du dossier, sauf si une autre est jointe
-  const parRef = (doc) => !byDoc.has(doc) && partenaire && partenaire.statut === 'reference' && pieceValable(partenaire.pieces[doc]);
+  const piecesRef = require('../formulaire').formulaire().pieces, refDe = (x) => R.pieceReferencement(x, piecesRef);
+  const parRef = (x) => !byDoc.has(x.id) && partenaire && partenaire.statut === 'reference' && !!refDe(x) && pieceValable(partenaire.pieces[refDe(x)]);
   const docs = {}, missing = [];
   docDefs.forEach((x) => {
     const need = exigees.has(x.id);
-    docs[x.id] = need ? (byDoc.has(x.id) || parRef(x.id)) : true; // pièce non exigée pour ce profil : considérée fournie
+    docs[x.id] = need ? (byDoc.has(x.id) || parRef(x)) : true; // pièce non exigée pour ce profil : considérée fournie
     if (need && !docs[x.id]) missing.push(x.label);
   });
   if (missing.length) return res.status(422).json({ error: 'Pièces manquantes : ' + missing.join(' ; ') + '.' });
@@ -361,8 +362,8 @@ r.post('/offers', (req, res) => {
   let receipt;
   db.transaction(() => {
     offer.pieces = pending.filter((f) => docs[f.doc_id] === true).map((f) => ({ id: f.id, doc: f.doc_id, name: f.name, size: f.size, sha256: f.sha256 }))
-      .concat(docDefs.filter((x) => exigees.has(x.id) && parRef(x.id)).map((x) => {
-        const pc = partenaire.pieces[x.id];
+      .concat(docDefs.filter((x) => exigees.has(x.id) && parRef(x)).map((x) => {
+        const pc = partenaire.pieces[refDe(x)];
         return { id: pc.fichier, doc: x.id, name: pc.nom, size: pc.taille, sha256: pc.sha256, referencement: partenaire.id, expire: pc.expire };
       }));
     if (partenaire) offer.partenaire = partenaire.id;

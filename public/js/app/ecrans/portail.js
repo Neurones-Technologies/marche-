@@ -103,7 +103,7 @@ function vPortail(m){
   // pièces validées au référencement : elles tiennent lieu de pièce du dossier (le serveur les reprend au dépôt)
   var mp=state.monPartenaire, couvertes=(mp && mp.statut==='reference' && mp.piecesValables) || {};
   req.forEach(function(doc){
-    var meta=(d.files||{})[doc.id], on=!!meta, cov=couvertes[doc.id];
+    var meta=(d.files||{})[doc.id], on=!!meta, cov=couvertes[R.pieceReferencement(doc,(state.formulaireReferencement||{}).pieces)];
     var row=add(b3,'div','docline');
     var lf=add(row,'div');
     add(lf,'div',null,doc.label).style.fontWeight='600';

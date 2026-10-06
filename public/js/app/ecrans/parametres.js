@@ -72,6 +72,13 @@ function vParams(m){
     });
     se.value=d.scope;
     se.addEventListener('change',function(){ d.scope=se.value; logit('Pièce « '+d.label+' » : profil concerné modifié'); save(); render(); });
+    // pièce déjà fournie au référencement : le partenaire référencé n'a pas à la joindre à son offre
+    var pr=(state.formulaireReferencement||{}).pieces||[];
+    var sr=add(row,'select'); sr.setAttribute('aria-label','Pièce du référencement qui la couvre'); fk(sr,'doc-ref-'+d.id);
+    add(sr,'option',null,'À joindre à chaque offre').value='';
+    pr.forEach(function(p){ var op=add(sr,'option',null,'Fournie au référencement : '+p.label); op.value=p.id; });
+    sr.value=R.pieceReferencement(d,pr)||'';
+    sr.addEventListener('change',function(){ d.referencement=sr.value; logit('Pièce « '+d.label+' » : '+(sr.value?'couverte par le référencement':'à joindre à chaque offre')); save(); render(); });
     var del=add(row,'button','icon-btn','×'); del.setAttribute('aria-label','Supprimer la pièce '+d.label);
     if(CADRE().piecesImposees.indexOf(d.id)>=0){ del.disabled=true; del.title='Pièce exigée par le profil réglementaire'; }
     del.addEventListener('click',function(){
@@ -81,7 +88,7 @@ function vParams(m){
     });
   });
   var f4b=add(k4,'div','panel-foot');
-  add(f4b,'span','muted','Pièces du dossier de candidature à chaque appel d\u2019offres : le contrôle de conformité et le dépôt des offres suivent ce référentiel. Les pièces du référencement des partenaires se règlent à la section 10.');
+  add(f4b,'span','muted','Une pièce « fournie au référencement » n’est pas redemandée au partenaire référencé dont la pièce est validée et en cours de validité ; les autres entreprises la joignent à leur offre. Les pièces du référencement se règlent à la section 10.');
   add(f4b,'button','btn btn-ghost btn-sm','+ Ajouter une pièce').addEventListener('click',function(){
     state.docDefs.push({id:'d'+Date.now(), label:'Nouvelle pièce exigée', scope:'tous'});
     SEED_OFFERS.forEach(function(oo){ oo.docs['d'+0]=true; });

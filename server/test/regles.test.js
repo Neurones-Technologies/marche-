@@ -74,3 +74,12 @@ test('champs à faible confiance restants et délai de recours', () => {
   assert.equal(R.standstillRemaining({ days: 15, startedAt: t0 }, t0 + 16 * 86400000), 0);
   assert.equal(R.allApproved([]), false);
 });
+
+test('pièce d’offre couverte par le référencement : lien réglé, sinon même identifiant', () => {
+  const ref = [{ id: 'registre' }, { id: 'fiscal' }];
+  assert.equal(R.pieceReferencement({ id: 'registre' }, ref), 'registre'); // par défaut : même identifiant
+  assert.equal(R.pieceReferencement({ id: 'caution' }, ref), null); // propre à chaque offre
+  assert.equal(R.pieceReferencement({ id: 'registre', referencement: '' }, ref), null); // à joindre à chaque offre
+  assert.equal(R.pieceReferencement({ id: 'd123', referencement: 'fiscal' }, ref), 'fiscal'); // pièce ajoutée, reliée
+  assert.equal(R.pieceReferencement({ id: 'd124', referencement: 'inconnue' }, ref), null); // pièce de référencement retirée
+});
