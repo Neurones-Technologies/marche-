@@ -20,6 +20,7 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       imgSrc: ["'self'", 'data:'],
       connectSrc: ["'self'"],
+      frameSrc: ["'self'", 'blob:'], // dossier d'appel d'offres en PDF, généré dans le navigateur
       frameAncestors: ["'none'"],
     },
   },
@@ -76,6 +77,8 @@ app.use((req, res, next) => {
   const page = /^\/console(\/|$)/.test(req.path) ? 'console.html' : 'plateforme.html';
   res.sendFile(path.join(__dirname, '..', 'public', page));
 });
+// génération du dossier d'appel d'offres en PDF dans le navigateur (pdfmake), servie par l'application elle-même
+app.use('/vendor/pdfmake', express.static(path.join(__dirname, '..', 'node_modules', 'pdfmake', 'build'), { index: false, maxAge: '7d' }));
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'], setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 // Portail des partenaires : inscription d'une entreprise prestataire, à part de la page de connexion.
 app.get('/portail-partenaires', (req, res) => {

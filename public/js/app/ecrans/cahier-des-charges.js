@@ -13,7 +13,7 @@ function vCDC(m){
   var manque=R.cdcManquants({ cdc:c, org:state.org, cadre:state.cadre, criteria:state.criteria, consultes:state.consultes, docDefs:state.docDefs });
   if(!manque.length){
     var ap=add(h,'button','btn btn-ghost','Aperçu du dossier'); fk(ap,'cdc-apercu');
-    ap.addEventListener('click',ouvrirDossier);
+    ap.addEventListener('click',ouvrirDossierPdf);
   }
   var pb=manque.length ? null : add(h,'button','btn btn-primary','Publier le cahier des charges');
   if(pb) guard('cdc.publish',pb);

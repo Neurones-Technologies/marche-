@@ -937,3 +937,24 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
   .crit-ligne { grid-template-columns: minmax(0, 1fr) var(--control-h); }
   .crit-poids { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* Dossier publié : vignette de la page de garde, et document PDF dans une fenêtre */
+.dossier-scene { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: var(--space-8); align-items: center; }
+.dossier-garde { display: flex; flex-direction: column; gap: 6px; padding: 22px 22px 18px; background: #fff; border: var(--border-w) solid var(--color-border); border-radius: 4px; box-shadow: 0 6px 22px rgba(60, 40, 20, .14); font: inherit; color: var(--color-text); text-align: left; cursor: pointer; aspect-ratio: 210 / 297; transition: transform .15s ease, box-shadow .15s ease; }
+.dossier-garde:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(60, 40, 20, .18); }
+.dossier-garde:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
+.dg-entete { display: flex; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 2px solid var(--color-accent); font-size: 9px; color: var(--color-text-2); }
+.dg-entete strong { display: block; font-size: 10.5px; color: var(--color-text); }
+.dg-ref { white-space: nowrap; }
+.dg-titre { margin-top: 18px; text-align: center; font-size: 15px; font-weight: var(--fw-strong); letter-spacing: .1em; text-transform: uppercase; }
+.dg-objet { text-align: center; font-size: 10.5px; color: var(--color-text-2); line-height: 1.35; }
+.dg-illu { margin: 10px auto 0; width: 88%; }
+.dg-illu svg { width: 100%; height: auto; display: block; }
+.dg-theme { text-align: center; font-size: 8.5px; letter-spacing: .08em; color: var(--color-accent); text-transform: uppercase; }
+.dg-infos { margin-top: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 8px; background: var(--color-surface-2); border-radius: 4px; font-size: 8px; }
+.dg-infos span { display: block; color: var(--color-text-2); text-transform: uppercase; letter-spacing: .05em; }
+.dg-infos strong { font-size: 9px; }
+.dossier-cote { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); max-width: 420px; color: var(--color-text-2); }
+.dossier-cote .btn { min-width: 220px; justify-content: center; }
+.dossier-pdf { display: block; width: 100%; height: 76vh; border: none; border-radius: var(--radius-sm); background: var(--color-surface-2); }
+@media (max-width: 760px) { .dossier-scene { grid-template-columns: 1fr; } .dossier-garde { max-width: 340px; margin: 0 auto; } }

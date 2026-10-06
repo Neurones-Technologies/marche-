@@ -1,4 +1,4 @@
-/* Marché+ — Générateur du dossier d’appel d’offres et sa mise en page (affichée par l'écran Cahier des charges).
+/* Marché+ — Générateur du contenu du dossier d’appel d’offres (pièces et articles) ; sa mise en page en PDF est dans dossier-pdf.js.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
@@ -372,60 +372,4 @@ function buildDAO(){
   ]});
 
   return P;
-}
-
-/* ============ Dossier d'appel d'offres mis en page ============
-   Le dossier se présente comme un document (même présentation que le procès-verbal). L'écran « Cahier des charges »
-   l'affiche une fois le dossier publié, en lecture seule pour tous, soumissionnaires compris ; avant publication, il
-   s'ouvre en aperçu dans une fenêtre. */
-function remplirDossier(pv){
-  var c=state.cdc, org=state.org||{}, P=buildDAO();
-  var et=add(pv,'header','pvd-entete');
-  var eg=add(et,'div'); add(eg,'div','pvd-org',c.autorite||org.nom); add(eg,'div',null,[org.ville,org.pays].filter(Boolean).join(' · '));
-  var ed=add(et,'div','pvd-ref'); var r1=add(ed,'div'); r1.appendChild(document.createTextNode('Réf. ')); add(r1,'strong',null,REF());
-  add(ed,'div',null, c.cdcPublie ? 'Dossier publié' : 'Aperçu — non publié');
-
-  var ti=add(pv,'div','pvd-titre');
-  add(ti,'h2',null,'Dossier d’appel d’offres');
-  add(ti,'p',null,c.objet);
-
-  var dl=add(pv,'dl','pvd-meta');
-  [['Autorité contractante',c.autorite],['Procédure',c.procedure],['Date limite de dépôt',c.ouverture],['Langue de soumission',c.langue],
-   ['Devise de soumission',c.deviseSoumission],['Allotissement',(c.lots||[]).length+' lot(s)']].forEach(function(x){
-    var d=add(dl,'div'); add(d,'dt',null,x[0]); add(d,'dd',null,x[1]||'—');
-  });
-
-  var so=add(pv,'section','pvd-sec'); add(so,'h3',null,'Sommaire');
-  var ul=add(so,'ul'); P.forEach(function(pi){ add(ul,'li',null,pi.titre); });
-
-  P.forEach(function(pi,i){
-    var s=add(pv,'section','pvd-sec');
-    var h3=add(s,'h3'); add(h3,'span','pvd-n',String(i+1)); h3.appendChild(document.createTextNode(pi.titre.replace(/^Pièce \d+ — /,'')));
-    pi.arts.forEach(function(a){
-      add(s,'h4','pvd-art','Article '+a.n+' — '+a.t);
-      a.p.forEach(function(x){ var p=add(s,'p',null,x); if(x.indexOf('SPÉCIFICATION MINIMALE')===0) p.className='pvd-encadre'; });
-    });
-  });
-  add(pv,'div','pvd-pied',(c.autorite||org.nom||'')+' — dossier d’appel d’offres '+REF());
-}
-
-/* Le dossier entier, dans une fenêtre large : aperçu avant publication, lecture après. */
-function ouvrirDossier(){
-  ouvrirFenetre((state.cdc.cdcPublie?'Dossier d’appel d’offres — ':'Aperçu du dossier — ')+REF(), function(corps){
-    remplirDossier(add(add(corps,'div','doc-scene'),'article','pv-doc'));
-  }, { large:true });
-}
-
-/* Dossier publié : le document, en lecture seule, imprimable. */
-function vDossierPublie(m){
-  var carte=add(m,'section','card doc-carte'); carte.setAttribute('aria-label','Dossier d’appel d’offres');
-  var barre=add(carte,'div','doc-barre');
-  add(barre,'span','doc-barre-lab','Dossier d’appel d’offres — '+REF());
-  chipCellule(barre,'Publié','c-green');
-  boutonIcone(barre,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'dossier-imprimer');
-  var voir=boutonIcone(barre,'agrandir','Voir le dossier en entier',ouvrirDossier,'dossier-voir'); voir.setAttribute('data-consult','');
-  // aperçu : le haut du document ; le dossier entier s'ouvre en fenêtre (l'impression reste complète)
-  var scene=add(carte,'div','doc-scene doc-apercu');
-  remplirDossier(add(scene,'article','pv-doc doc-imprimable'));
-  add(scene,'div','doc-suite').setAttribute('aria-hidden','true'); // fondu vers le bas
 }
