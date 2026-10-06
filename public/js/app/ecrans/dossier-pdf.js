@@ -15,7 +15,7 @@ function chargerPdfmake(){
   return PDFMAKE_PRET;
 }
 
-var COUL = { accent:'#B4471B', doux:'#FDF0E7', encre:'#1F2430', gris:'#5C6371', trait:'#E6E1DA', fond:'#F7F4F0' };
+var COUL_PDF = { accent:'#B4471B', doux:'#FDF0E7', encre:'#1F2430', gris:'#5C6371', trait:'#E6E1DA', fond:'#F7F4F0' };
 function dateLongue(iso){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||''))) return iso||'—';
   var d=new Date(iso+'T12:00:00'); return d.toLocaleDateString('fr-FR',{ day:'numeric', month:'long', year:'numeric' });
@@ -32,9 +32,9 @@ function definitionDossier(){
   contenu.push(
     { columns:[
       { stack:[{ text:c.autorite||org.nom||'', style:'garOrg' },{ text:lieu, style:'garPetit' }] },
-      { stack:[{ text:[{ text:'Réf. ', color:COUL.gris },{ text:REF(), bold:true }], alignment:'right', fontSize:10 },{ text:c.cdcPublie?'Dossier publié':'Projet — non publié', style:'garPetit', alignment:'right' }] }
+      { stack:[{ text:[{ text:'Réf. ', color:COUL_PDF.gris },{ text:REF(), bold:true }], alignment:'right', fontSize:10 },{ text:c.cdcPublie?'Dossier publié':'Projet — non publié', style:'garPetit', alignment:'right' }] }
     ] },
-    { canvas:[{ type:'line', x1:0, y1:8, x2:495, y2:8, lineWidth:2, lineColor:COUL.accent }], margin:[0,0,0,34] },
+    { canvas:[{ type:'line', x1:0, y1:8, x2:495, y2:8, lineWidth:2, lineColor:COUL_PDF.accent }], margin:[0,0,0,34] },
     { text:'DOSSIER D’APPEL D’OFFRES', style:'garTitre' },
     { text:c.objet||'', style:'garObjet' },
     { svg:illu.svg, width:400, alignment:'center', margin:[0,22,0,8] },
@@ -43,7 +43,7 @@ function definitionDossier(){
       [cleValeur('Autorité contractante',c.autorite),cleValeur('Type de procédure',c.procedure)],
       [cleValeur('Date limite de dépôt des offres',dateLongue(c.ouverture)+' à 10 h 00'),cleValeur('Langue de soumission',c.langue)],
       [cleValeur('Devise de soumission',c.deviseSoumission),cleValeur('Allotissement',(c.lots||[]).length+' lot(s)')]
-    ] }, layout:{ fillColor:function(){ return COUL.fond; }, hLineWidth:function(){ return 0; }, vLineWidth:function(){ return 0; },
+    ] }, layout:{ fillColor:function(){ return COUL_PDF.fond; }, hLineWidth:function(){ return 0; }, vLineWidth:function(){ return 0; },
       paddingLeft:function(){ return 12; }, paddingRight:function(){ return 12; }, paddingTop:function(){ return 8; }, paddingBottom:function(){ return 8; } },
       margin:[0,22,0,0] },
     { text:'Document établi le '+auj+' — Marché+', style:'garPetit', alignment:'center', margin:[0,30,0,0], pageBreak:'after' }
@@ -55,16 +55,16 @@ function definitionDossier(){
   /* Informations clés */
   contenu.push({ text:'Informations clés', style:'h1', tocItem:true, tocStyle:{ bold:true }, tocMargin:[0,8,0,0] });
   contenu.push({ text:'Allotissement et estimations', style:'h3' });
-  contenu.push(tableau(['Lot','Intitulé','Montant estimatif'],[80,'*',110],(c.lots||[]).map(function(l,i){ return [String(i+1),l.nom||'',{ text:l.montant||'—', alignment:'right' }]; })));
+  contenu.push(tableauPdf(['Lot','Intitulé','Montant estimatif'],[80,'*',110],(c.lots||[]).map(function(l,i){ return [String(i+1),l.nom||'',{ text:l.montant||'—', alignment:'right' }]; })));
   contenu.push({ text:'Calendrier', style:'h3' });
-  contenu.push(tableau(['Étape','Date'],['*',170],[['Date limite de dépôt et ouverture des plis',dateLongue(c.ouverture)+' à 10 h 00']]));
+  contenu.push(tableauPdf(['Étape','Date'],['*',170],[['Date limite de dépôt et ouverture des plis',dateLongue(c.ouverture)+' à 10 h 00']]));
   contenu.push({ text:'Critères d’évaluation', style:'h3' });
-  contenu.push(tableau(['Critère','Mode de notation','Pondération'],['*',180,80],(state.criteria||[]).map(function(x){
+  contenu.push(tableauPdf(['Critère','Mode de notation','Pondération'],['*',180,80],(state.criteria||[]).map(function(x){
     return [x.label, x.kind==='auto'?'Calculé selon la formule du règlement':'Noté par la commission', { text:x.weight+' %', alignment:'right' }]; })));
   var pieces=(DOCS()||[]).map(function(d){ return [d.label, PORTEE_PIECE[d.scope]||d.scope||'—']; });
-  if(pieces.length){ contenu.push({ text:'Pièces exigées du dossier de candidature', style:'h3' }); contenu.push(tableau(['Pièce','Soumissionnaires concernés'],['*',190],pieces)); }
+  if(pieces.length){ contenu.push({ text:'Pièces exigées du dossier de candidature', style:'h3' }); contenu.push(tableauPdf(['Pièce','Soumissionnaires concernés'],['*',190],pieces)); }
   contenu.push({ text:'Conditions principales', style:'h3' });
-  contenu.push(tableau(['Condition','Valeur'],['*',170],[
+  contenu.push(tableauPdf(['Condition','Valeur'],['*',170],[
     ['Caution de soumission', c.caution!==''&&c.caution!=null ? c.caution+' % du montant de l’offre' : '—'],
     ['Délai d’exécution maximal', c.delaiMax ? c.delaiMax+' jours' : '—'],
     ['Garantie minimale', c.garantieMin ? c.garantieMin+' mois' : '—'],
@@ -78,17 +78,17 @@ function definitionDossier(){
     contenu.push({ text:'Pièce '+(i+1), style:'surtitre', pageBreak:'before' });
     contenu.push({ text:pi.titre.replace(/^Pièce \d+ — /,''), style:'h1', tocItem:true, tocStyle:{ bold:true }, tocMargin:[0,8,0,0] });
     pi.arts.forEach(function(a){
-      contenu.push({ text:'Article '+a.n+' — '+a.t, style:'h2', tocItem:true, tocStyle:{ fontSize:9.5, color:COUL.gris }, tocMargin:[14,2,0,0] });
+      contenu.push({ text:'Article '+a.n+' — '+a.t, style:'h2', tocItem:true, tocStyle:{ fontSize:9.5, color:COUL_PDF.gris }, tocMargin:[14,2,0,0] });
       a.p.forEach(function(x){
         if(x.indexOf('SPÉCIFICATION MINIMALE')===0) contenu.push({ table:{ widths:['*'], body:[[{ text:x, fontSize:9.5 }]] },
-          layout:{ fillColor:function(){ return COUL.doux; }, hLineWidth:function(){ return 0; }, vLineWidth:function(i){ return i===0?3:0; }, vLineColor:function(){ return COUL.accent; },
+          layout:{ fillColor:function(){ return COUL_PDF.doux; }, hLineWidth:function(){ return 0; }, vLineWidth:function(i){ return i===0?3:0; }, vLineColor:function(){ return COUL_PDF.accent; },
             paddingLeft:function(){ return 10; }, paddingTop:function(){ return 6; }, paddingBottom:function(){ return 6; } }, margin:[0,2,0,8] });
         else contenu.push({ text:x, style:'corps' });
       });
     });
     if(pi.id==='p5'){ // bordereau à remplir par le soumissionnaire
       contenu.push({ text:'Cadre du bordereau des prix (à compléter par le soumissionnaire)', style:'h3' });
-      contenu.push(tableau(['Lot','Désignation','Quantité','Prix unitaire','Montant'],[34,'*',52,72,72],
+      contenu.push(tableauPdf(['Lot','Désignation','Quantité','Prix unitaire','Montant'],[34,'*',52,72,72],
         (c.lots||[]).map(function(l,j){ return [String(j+1),l.nom||'','','','']; }).concat([[{ text:'Total général', colSpan:4, bold:true },'','','','']])));
     }
   });
@@ -97,30 +97,30 @@ function definitionDossier(){
     pageSize:'A4', pageMargins:[50,70,50,60],
     info:{ title:'Dossier d’appel d’offres '+REF(), author:c.autorite||org.nom||'', subject:c.objet||'' },
     header:function(page){ if(page===1) return null; return { margin:[50,26,50,0], stack:[
-      { columns:[{ text:REF()+' — Dossier d’appel d’offres', fontSize:8.5, color:COUL.gris },{ text:c.autorite||org.nom||'', fontSize:8.5, color:COUL.gris, alignment:'right' }] },
-      { canvas:[{ type:'line', x1:0, y1:6, x2:495, y2:6, lineWidth:0.6, lineColor:COUL.trait }] }] }; },
+      { columns:[{ text:REF()+' — Dossier d’appel d’offres', fontSize:8.5, color:COUL_PDF.gris },{ text:c.autorite||org.nom||'', fontSize:8.5, color:COUL_PDF.gris, alignment:'right' }] },
+      { canvas:[{ type:'line', x1:0, y1:6, x2:495, y2:6, lineWidth:0.6, lineColor:COUL_PDF.trait }] }] }; },
     footer:function(page,total){ if(page===1) return null; return { margin:[50,18,50,0], columns:[
-      { text:(c.objet||'').slice(0,90), fontSize:8, color:COUL.gris },{ text:'Page '+page+' sur '+total, fontSize:8.5, color:COUL.gris, alignment:'right', width:90 }] }; },
+      { text:(c.objet||'').slice(0,90), fontSize:8, color:COUL_PDF.gris },{ text:'Page '+page+' sur '+total, fontSize:8.5, color:COUL_PDF.gris, alignment:'right', width:90 }] }; },
     content:contenu,
-    defaultStyle:{ font:'Roboto', fontSize:10, lineHeight:1.25, color:COUL.encre },
+    defaultStyle:{ font:'Roboto', fontSize:10, lineHeight:1.25, color:COUL_PDF.encre },
     styles:{
-      garOrg:{ fontSize:13, bold:true }, garPetit:{ fontSize:9, color:COUL.gris },
+      garOrg:{ fontSize:13, bold:true }, garPetit:{ fontSize:9, color:COUL_PDF.gris },
       garTitre:{ fontSize:24, bold:true, alignment:'center', characterSpacing:2 },
-      garObjet:{ fontSize:13, alignment:'center', color:COUL.gris, margin:[30,10,30,0] },
-      garTheme:{ fontSize:9, alignment:'center', color:COUL.accent, characterSpacing:1 },
-      surtitre:{ fontSize:9, bold:true, color:COUL.accent, characterSpacing:1.5 },
+      garObjet:{ fontSize:13, alignment:'center', color:COUL_PDF.gris, margin:[30,10,30,0] },
+      garTheme:{ fontSize:9, alignment:'center', color:COUL_PDF.accent, characterSpacing:1 },
+      surtitre:{ fontSize:9, bold:true, color:COUL_PDF.accent, characterSpacing:1.5 },
       h1:{ fontSize:18, bold:true, margin:[0,2,0,14] },
       h2:{ fontSize:11.5, bold:true, margin:[0,12,0,5] },
-      h3:{ fontSize:11, bold:true, color:COUL.accent, margin:[0,14,0,6] },
+      h3:{ fontSize:11, bold:true, color:COUL_PDF.accent, margin:[0,14,0,6] },
       corps:{ alignment:'justify', margin:[0,0,0,6] },
-      th:{ bold:true, fontSize:9, color:COUL.gris, fillColor:COUL.fond }
+      th:{ bold:true, fontSize:9, color:COUL_PDF.gris, fillColor:COUL_PDF.fond }
     }
   };
 }
-function cleValeur(lab,val){ return { stack:[{ text:lab.toUpperCase(), fontSize:7.5, bold:true, color:COUL.gris, characterSpacing:0.6 },{ text:String(val==null||val===''?'—':val), fontSize:10.5, margin:[0,2,0,0] }] }; }
-function tableau(entetes, largeurs, lignes){
+function cleValeur(lab,val){ return { stack:[{ text:lab.toUpperCase(), fontSize:7.5, bold:true, color:COUL_PDF.gris, characterSpacing:0.6 },{ text:String(val==null||val===''?'—':val), fontSize:10.5, margin:[0,2,0,0] }] }; }
+function tableauPdf(entetes, largeurs, lignes){
   return { table:{ headerRows:1, widths:largeurs, body:[entetes.map(function(e){ return { text:e, style:'th' }; })].concat(lignes.length?lignes:[[{ text:'—', colSpan:entetes.length }].concat(entetes.slice(1).map(function(){ return ''; }))]) },
-    layout:{ hLineWidth:function(i){ return i===1?0.8:0.4; }, vLineWidth:function(){ return 0; }, hLineColor:function(){ return COUL.trait; },
+    layout:{ hLineWidth:function(i){ return i===1?0.8:0.4; }, vLineWidth:function(){ return 0; }, hLineColor:function(){ return COUL_PDF.trait; },
       paddingTop:function(){ return 5; }, paddingBottom:function(){ return 5; } }, fontSize:9.5, margin:[0,0,0,6] };
 }
 
