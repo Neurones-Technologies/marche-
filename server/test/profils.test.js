@@ -43,7 +43,7 @@ test('marché public : marge de préférence plafonnée, pièces et circuit mini
   refusé(await patch(admin, { cdc: { ...s.cdc, prefActive: true, prefTaux: 20 } }), 422, 'PREFERENCE_OUT_OF_BOUNDS');
   ok(await patch(admin, { cdc: { ...s.cdc, prefActive: true, prefTaux: 15 } }));
   refusé(await patch(admin, { docDefs: s.docDefs.filter((d) => d.id !== 'cnps') }), 409, 'PIECE_IMPOSED');
-  ok(await patch(admin, { docDefs: s.docDefs.filter((d) => d.id !== 'traduction') }));
+  refusé(await patch(admin, { docDefs: s.docDefs.filter((d) => d.id !== 'traduction') }), 409, 'PIECES_LOCKED'); // dossier publié
   refusé(await patch(admin, { approvals: s.approvals.slice(0, 1) }), 422, 'APPROVAL_CIRCUIT_TOO_SHORT');
   const org = clone(s.org); org.reglages = { niveauxApprobationMin: 1 };
   refusé(await patch(admin, { org }), 422, 'SETTING_OUT_OF_BOUNDS');
@@ -59,12 +59,12 @@ test('achats privés : après dépublication, le client choisit ses règles', as
   ok(await patch(admin, { org, cdc: { ...s.cdc, profil: 'prive' } }));
   s = await getState(admin);
   ok(await patch(admin, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } })); // SOTRAP consultée (achats privés)
+  ok(await patch(admin, { docDefs: s.docDefs.filter((d) => d.id !== 'cnps') })); // achats privés : pièce non imposée
   ok(await patch(admin, { cdc: { ...s.cdc, cdcPublie: true } }));
   s = await getState(admin);
   assert.equal(s.cadre.profil, 'prive');
   assert.equal(s.cadre.regles.separationFonctions, false);
   ok(await patch(admin, { approvals: s.approvals.slice(0, 1) }));
-  ok(await patch(admin, { docDefs: s.docDefs.filter((d) => d.id !== 'cnps') }));
   const recours = [{ de: 'Delta Bâtiment SA', statut: 'ouvert', t: 'test', objet: 'Contestation.' }];
   refusé(await patch(admin, { recours }), 409, 'APPEAL_NOT_PROVIDED'); // recours enregistré par les achats
 });

@@ -113,7 +113,7 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const frDate = () => new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abidjan' });
 
 /* Clés propres à une procédure ; toutes les autres appartiennent à l'organisation (une par instance). */
-const PROC_KEYS = ['cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
+const PROC_KEYS = ['docDefs', 'cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
   'qa', 'additifs', 'clarifs', 'coi', 'recours', 'standstill', 'contractSigned', 'infructueux', 'fxFrozen', 'cadre', '_sod', 'rejets', 'consultes'];
 const isProcKey = (k) => PROC_KEYS.includes(k);
 
@@ -242,9 +242,25 @@ function proceduresAll() {
 const procedureGet = (pid) => db.prepare('SELECT * FROM procedures WHERE id=?').get(pid);
 
 /** État initial d'une procédure : le cahier des charges modèle, la grille par défaut, le circuit modèle de l'organisation. */
+/** Pièces d'offre d'une procédure neuve : celles du référencement (demandées aux entreprises non référencées, dont un
+    partenaire référencé est dispensé) et celles qu'impose le profil réglementaire. Les autres, propres à l'appel
+    d'offres, s'ajoutent à la main au cahier des charges. */
+function piecesOffreDefaut(cdc) {
+  const org = (kvGet('org') || { value: {} }).value || {};
+  const modele = (kvGet('docDefs') || { value: seed.DOC_DEFS }).value;
+  const ref = ((kvGet('formulaireReferencement') || { value: { pieces: [] } }).value.pieces) || [];
+  const out = ref.map((p) => ({ id: p.id, label: p.label, scope: p.scope || 'tous' }));
+  const imposees = P.effectif(cdc.profil || org.profilDefaut || P.DEFAUT, org.reglages).piecesImposees || [];
+  for (const id of imposees) {
+    if (out.some((d) => d.id === id)) continue;
+    out.push(clone(modele.find((d) => d.id === id) || seed.DOC_DEFS.find((d) => d.id === id) || { id, label: id, scope: 'tous' }));
+  }
+  return out;
+}
 function procDefaults(cdc) {
   const circuit = (kvGet('circuitModele') || { value: seed.APPROVALS }).value;
   return {
+    docDefs: piecesOffreDefaut(cdc),
     cdc, criteria: clone(seed.CRITERIA), quality: {}, justif: {}, confirmed: {}, excluded: {},
     depClosed: false, evalDone: false, approvals: C.reinitialiser(circuit),
     qa: [], additifs: [], clarifs: [], coi: {}, recours: [], rejets: [], standstill: { days: 15, startedAt: null },
@@ -485,7 +501,7 @@ db.transaction(function migrate() {
     const ph = PROC_KEYS.map(() => '?').join(',');
     db.prepare(`INSERT INTO pkv(procedure_id,key,value,rev,updated_by,updated_at)
       SELECT 'p1',key,value,rev,updated_by,updated_at FROM kv WHERE key IN (${ph})`).run(...PROC_KEYS);
-    db.prepare(`DELETE FROM kv WHERE key IN (${ph})`).run(...PROC_KEYS);
+    db.prepare(`DELETE FROM kv WHERE key IN (${ph}) AND key <> 'docDefs'`).run(...PROC_KEYS); // docDefs : modèle de l'organisation
     ['offers', 'receipts', 'files'].forEach((t) => db.prepare(`UPDATE ${t} SET procedure_id='p1' WHERE procedure_id IS NULL`).run());
     bumpRev();
   }
@@ -509,6 +525,12 @@ db.transaction(function migrate() {
   // 05/10/2026 : formulaire de référencement propre à l'organisation (questions et pièces), distinct des pièces d'une
   // offre ; repris des pièces du référentiel des offres en vigueur.
   if (kvGet('org') && !kvGet('formulaireReferencement')) kvSet('formulaireReferencement', formulaireDefaut((kvGet('docDefs') || { value: seed.DOC_DEFS }).value), 'migration');
+  // 06/10/2026 : les pièces d'une offre deviennent propres à chaque appel d'offres (saisies au cahier des charges) ;
+  // une procédure existante garde la liste de l'organisation qui s'appliquait jusque-là.
+  const modelePieces = (kvGet('docDefs') || { value: seed.DOC_DEFS }).value;
+  for (const p of db.prepare('SELECT id FROM procedures').all()) {
+    if (!db.prepare("SELECT 1 FROM pkv WHERE procedure_id=? AND key='docDefs'").get(p.id)) pkvSet(p.id, 'docDefs', clone(modelePieces), 'migration');
+  }
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.
   if (kvGet('org') && !kvGet('circuitCommande')) kvSet('circuitCommande', clone(CIRCUIT_COMMANDE), 'migration');
   // 02/10/2026 : module 5 (évaluation des partenaires). Réglages par défaut.

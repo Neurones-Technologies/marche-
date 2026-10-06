@@ -58,42 +58,7 @@ function vParams(m){
   champ(f3,'Validité minimale des offres (jours)',sx.validiteMin,function(v){ sx.validiteMin=Number(v)||0; },'number');
   add(add(k3,'div','panel-foot'),'span','muted','Abaisser le seuil de confiance réduit le nombre de vérifications manuelles — et augmente le risque qu\u2019un montant mal extrait fausse le classement. Ce réglage engage l\u2019organisation.');
 
-  var k4=add(m,'div','card'); k4.style.marginTop='18px';
-  add(k4,'div','panel-head','4 · Pièces exigées dans une offre');
-  var b4=add(k4,'div','pad');
-  state.docDefs.forEach(function(d,i){
-    var row=add(b4,'div','docline');
-    var ti=add(row,'input'); ti.type='text'; ti.value=d.label; ti.style.flex='1 1 280px';
-    ti.setAttribute('aria-label','Libellé de la pièce'); fk(ti,'doc-lab-'+d.id);
-    ti.addEventListener('change',function(){ d.label=ti.value; save(); });
-    var se=add(row,'select'); se.setAttribute('aria-label','Profil concerné'); fk(se,'doc-scope-'+d.id);
-    [['tous','Tous les soumissionnaires'],['local','Soumissionnaires locaux'],['etranger','Soumissionnaires hors UEMOA']].forEach(function(x){
-      var op=add(se,'option',null,x[1]); op.value=x[0];
-    });
-    se.value=d.scope;
-    se.addEventListener('change',function(){ d.scope=se.value; logit('Pièce « '+d.label+' » : profil concerné modifié'); save(); render(); });
-    // pièce déjà fournie au référencement : le partenaire référencé n'a pas à la joindre à son offre
-    var pr=(state.formulaireReferencement||{}).pieces||[];
-    var sr=add(row,'select'); sr.setAttribute('aria-label','Pièce du référencement qui la couvre'); fk(sr,'doc-ref-'+d.id);
-    add(sr,'option',null,'À joindre à chaque offre').value='';
-    pr.forEach(function(p){ var op=add(sr,'option',null,'Fournie au référencement : '+p.label); op.value=p.id; });
-    sr.value=R.pieceReferencement(d,pr)||'';
-    sr.addEventListener('change',function(){ d.referencement=sr.value; logit('Pièce « '+d.label+' » : '+(sr.value?'couverte par le référencement':'à joindre à chaque offre')); save(); render(); });
-    var del=add(row,'button','icon-btn','×'); del.setAttribute('aria-label','Supprimer la pièce '+d.label);
-    if(CADRE().piecesImposees.indexOf(d.id)>=0){ del.disabled=true; del.title='Pièce exigée par le profil réglementaire'; }
-    del.addEventListener('click',function(){
-      ask('Cette pièce ne sera plus exigée ni contrôlée sur aucune offre.', function(){
-        state.docDefs.splice(i,1); logit('Pièce retirée du référentiel : '+d.label); save(); render();
-      },'Retirer « '+d.label+' » ?','Retirer');
-    });
-  });
-  var f4b=add(k4,'div','panel-foot');
-  add(f4b,'span','muted','Une pièce « fournie au référencement » n’est pas redemandée au partenaire référencé dont la pièce est validée et en cours de validité ; les autres entreprises la joignent à leur offre. Les pièces du référencement se règlent à la section 10.');
-  add(f4b,'button','btn btn-ghost btn-sm','+ Ajouter une pièce').addEventListener('click',function(){
-    state.docDefs.push({id:'d'+Date.now(), label:'Nouvelle pièce exigée', scope:'tous'});
-    SEED_OFFERS.forEach(function(oo){ oo.docs['d'+0]=true; });
-    logit('Pièce ajoutée au référentiel'); save(); render();
-  });
+  vParamsPiecesReferencement(m); // 4 · pièces d'adhésion des prestataires
 
   var k5=add(m,'div','card'); k5.style.marginTop='18px';
   // sans procédure ouverte (espace neuf) : le circuit par défaut des appels d'offres, que chaque nouvelle procédure reprend
@@ -288,9 +253,9 @@ var SCOPES_PIECE = { tous:'Tous les prestataires', local:'Prestataires locaux', 
 function vParamsFormulaire(m){
   var F=state.formulaireReferencement=state.formulaireReferencement||{champs:[],pieces:[]};
   var k=add(m,'div','card'); k.style.marginTop='18px';
-  add(k,'div','panel-head','10 · Formulaire de référencement des partenaires');
+  add(k,'div','panel-head','10 · Questions du formulaire de référencement');
   var b=add(k,'div','pad');
-  add(b,'p','muted','Ce que le prestataire renseigne et dépose pour demander son référencement, sur le portail des partenaires. Le dossier complet est ensuite instruit selon le parcours de la section 9.');
+  add(b,'p','muted','Les questions posées au prestataire qui demande son référencement sur le portail des partenaires (les documents à fournir se règlent à la section 4). Le dossier complet est ensuite instruit selon le parcours de la section 9.');
 
   add(b,'h3','sous-titre-param','Questions');
   tableau(b,{ cle:'form-questions', lignes:F.champs, vide:'Aucune question : seules les informations de l\u2019entreprise sont demandées.',
@@ -310,25 +275,6 @@ function vParamsFormulaire(m){
     }
   });
 
-  add(b,'h3','sous-titre-param','Documents à fournir');
-  tableau(b,{ cle:'form-pieces', lignes:F.pieces, vide:'Aucun document demandé.',
-    colonnes:[
-      {lab:'Document', val:function(p){ return p.label; }},
-      {lab:'Concerne', val:function(p){ return SCOPES_PIECE[p.scope]||p.scope; }},
-      {lab:'Obligatoire', rendu:function(p,td){ chipCellule(td,p.obligatoire?'Oui':'Non',p.obligatoire?'c-grey':'c-teal'); }},
-      {lab:'Date de validité', val:function(p){ return p.expiration?'Exigée':'—'; }}
-    ],
-    nouveau:{ lab:'Document', action:function(){ fenPiece(null); } },
-    actions:function(p,td){
-      boutonIcone(td,'edit','Modifier « '+p.label+' »',function(){ fenPiece(p); },'fp-mod-'+p.id);
-      boutonIcone(td,'x','Supprimer « '+p.label+' »',function(){
-        ask('Ce document ne sera plus demandé aux prestataires ; les pièces déjà déposées restent archivées.',function(){
-          F.pieces.splice(F.pieces.indexOf(p),1); logit('Formulaire de référencement : document retiré — '+p.label); save(); render();
-        },'Retirer « '+p.label+' » ?','Retirer');
-      },'fp-sup-'+p.id);
-    }
-  });
-  add(add(k,'div','panel-foot'),'span','muted','Une pièce de même nature validée au référencement (même document dans la section 4) tient lieu de pièce d\u2019offre au dépôt.');
 
   function caseACocher(parent, id, lab, val){
     var w=add(parent,'label','case-param'); var c=add(w,'input'); c.type='checkbox'; c.id=id; c.checked=!!val; fk(c,id);
@@ -361,28 +307,61 @@ function vParamsFormulaire(m){
       });
     });
   }
-  function fenPiece(p){
-    ouvrirFenetre(p?'Modifier le document':'Nouveau document',function(corps,pied){
-      var f=add(corps,'div','frm');
-      var w1=add(f,'div'); add(w1,'label',null,'Document demandé').setAttribute('for','fp-lab');
-      var lab=add(w1,'input'); lab.type='text'; lab.id='fp-lab'; lab.maxLength=200; fk(lab,'fp-lab'); lab.value=p?p.label:'';
-      var w2=add(f,'div'); add(w2,'label',null,'Prestataires concernés').setAttribute('for','fp-scope');
-      var sc=add(w2,'select'); sc.id='fp-scope'; fk(sc,'fp-scope');
-      Object.keys(SCOPES_PIECE).forEach(function(s){ add(sc,'option',null,SCOPES_PIECE[s]).value=s; });
-      sc.value=p?p.scope:'tous';
-      var ob=caseACocher(corps,'fp-obl','Document obligatoire pour soumettre le dossier',p?p.obligatoire:true);
-      var ex=caseACocher(corps,'fp-exp','Date de fin de validité exigée (attestation, certificat…)',p?p.expiration:false);
-      var err=add(corps,'div','lg-err'); err.hidden=true;
-      add(pied,'button','btn btn-ghost','Annuler').addEventListener('click',fermerFenetre);
-      add(pied,'button','btn btn-primary',p?'Enregistrer':'Ajouter').addEventListener('click',function(){
-        var v={ id:p?p.id:'d'+Date.now().toString(36), label:lab.value.trim(), scope:sc.value, obligatoire:ob.checked, expiration:ex.checked };
-        if(!v.label){ err.textContent='Saisissez le nom du document.'; err.hidden=false; return; }
-        if(p) F.pieces[F.pieces.indexOf(p)]=v; else F.pieces.push(v);
-        logit('Formulaire de référencement : document '+(p?'modifié':'ajouté')+' — '+v.label);
-        fermerFenetre(); save(); render();
-      });
+}
+
+/* Pièces exigées pour le référencement (adhésion) des prestataires : demandées une fois pour toutes sur le portail des
+   partenaires. Les pièces propres à un appel d'offres se saisissent dans son cahier des charges. */
+function vParamsPiecesReferencement(m){
+  var F=state.formulaireReferencement=state.formulaireReferencement||{champs:[],pieces:[]};
+  var k=add(m,'div','card'); k.style.marginTop='18px';
+  add(k,'div','panel-head','4 · Pièces exigées pour le référencement des prestataires');
+  var b=add(k,'div','pad');
+  tableau(b,{ cle:'form-pieces', lignes:F.pieces, vide:'Aucun document demandé.',
+    colonnes:[
+      {lab:'Document', val:function(p){ return p.label; }},
+      {lab:'Concerne', val:function(p){ return SCOPES_PIECE[p.scope]||p.scope; }},
+      {lab:'Obligatoire', rendu:function(p,td){ chipCellule(td,p.obligatoire?'Oui':'Non',p.obligatoire?'c-grey':'c-teal'); }},
+      {lab:'Date de validité', val:function(p){ return p.expiration?'Exigée':'—'; }}
+    ],
+    nouveau:{ lab:'Document', action:function(){ fenPieceRef(null); } },
+    actions:function(p,td){
+      boutonIcone(td,'edit','Modifier « '+p.label+' »',function(){ fenPieceRef(p); },'fp-mod-'+p.id);
+      boutonIcone(td,'x','Supprimer « '+p.label+' »',function(){
+        ask('Ce document ne sera plus demandé aux prestataires ; les pièces déjà déposées restent archivées.',function(){
+          F.pieces.splice(F.pieces.indexOf(p),1); logit('Formulaire de référencement : document retiré — '+p.label); save(); render();
+        },'Retirer « '+p.label+' » ?','Retirer');
+      },'fp-sup-'+p.id);
+    }
+  });
+  add(add(k,'div','panel-foot'),'span','muted','Demandés une fois pour toutes au prestataire qui demande son adhésion (portail des partenaires, puis sa fiche). Un partenaire référencé dont la pièce est validée et en cours de validité n\u2019a pas à la joindre à ses offres.');
+}
+
+function caseParam(parent, id, lab, val){
+  var w=add(parent,'label','case-param'); var c=add(w,'input'); c.type='checkbox'; c.id=id; c.checked=!!val; fk(c,id);
+  w.appendChild(document.createTextNode(' '+lab)); return c;
+}
+function fenPieceRef(p){
+  var F=state.formulaireReferencement;
+  ouvrirFenetre(p?'Modifier le document':'Nouveau document',function(corps,pied){
+    var f=add(corps,'div','frm');
+    var w1=add(f,'div'); add(w1,'label',null,'Document demandé').setAttribute('for','fp-lab');
+    var lab=add(w1,'input'); lab.type='text'; lab.id='fp-lab'; lab.maxLength=200; fk(lab,'fp-lab'); lab.value=p?p.label:'';
+    var w2=add(f,'div'); add(w2,'label',null,'Prestataires concernés').setAttribute('for','fp-scope');
+    var sc=add(w2,'select'); sc.id='fp-scope'; fk(sc,'fp-scope');
+    Object.keys(SCOPES_PIECE).forEach(function(s){ add(sc,'option',null,SCOPES_PIECE[s]).value=s; });
+    sc.value=p?p.scope:'tous';
+    var ob=caseParam(corps,'fp-obl','Document obligatoire pour soumettre le dossier',p?p.obligatoire:true);
+    var ex=caseParam(corps,'fp-exp','Date de fin de validité exigée (attestation, certificat…)',p?p.expiration:false);
+    var err=add(corps,'div','lg-err'); err.hidden=true;
+    add(pied,'button','btn btn-ghost','Annuler').addEventListener('click',fermerFenetre);
+    add(pied,'button','btn btn-primary',p?'Enregistrer':'Ajouter').addEventListener('click',function(){
+      var v={ id:p?p.id:'d'+Date.now().toString(36), label:lab.value.trim(), scope:sc.value, obligatoire:ob.checked, expiration:ex.checked };
+      if(!v.label){ err.textContent='Saisissez le nom du document.'; err.hidden=false; return; }
+      if(p) F.pieces[F.pieces.indexOf(p)]=v; else F.pieces.push(v);
+      logit('Formulaire de référencement : document '+(p?'modifié':'ajouté')+' — '+v.label);
+      fermerFenetre(); save(); render();
     });
-  }
+  });
 }
 
 /* Inscription en ligne des prestataires : ouverte ou fermée par l'organisation. */

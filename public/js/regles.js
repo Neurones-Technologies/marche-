@@ -152,6 +152,11 @@
     if (!(c.lots || []).some(function (l) { return l && plein(l.nom); })) out.push('au moins un lot');
     if (!(c.specs || []).some(plein)) out.push('au moins une spécification technique');
     if (!(ctx.criteria || []).length || weightTotal(ctx) !== 100) out.push('une grille de critères totalisant 100 %');
+    if (ctx.docDefs) {
+      var ids = ctx.docDefs.map(function (d) { return d.id; });
+      var imp = (cadre(ctx).piecesImposees || []).filter(function (id) { return ids.indexOf(id) < 0; });
+      if (imp.length) out.push('les pièces imposées par le profil réglementaire (' + imp.join(', ') + ')');
+    }
     var co = ctx.consultes || {}, pub = !!P.profil(profilId(ctx)).public;
     if (!(pub && co.mode !== 'restreint') && !(co.partenaires || []).length) out.push('au moins un prestataire consulté');
     return out;

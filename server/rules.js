@@ -21,7 +21,7 @@ const WRITE_PERMS = {
   depClosed: ['depouille.close'],
   evalDone: ['eval.validate', 'recours.handle'],
   approvals: ['decision.approve', 'params.edit', 'recours.handle'],
-  org: ['params.edit'], seuils: ['params.edit'], docDefs: ['params.edit'],
+  org: ['params.edit'], seuils: ['params.edit'], docDefs: ['cdc.edit', 'params.edit'],
   mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'], circuitReferencement: ['params.edit'], formulaireReferencement: ['params.edit'], circuitCommande: ['params.edit'], evaluationPartenaires: ['params.edit'],
   offers: ['params.edit'],
   consultes: ['cdc.edit', 'cdc.publish'],
@@ -424,6 +424,10 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         const lab = (id) => ((cur || []).find((d) => d.id === id) || { label: id }).label;
         return refus(409, 'PIECE_IMPOSED', 'Pièce exigée par le profil réglementaire, elle ne peut pas être retirée : ' + manquantes.map(lab).join(' ; ') + '.');
       }
+      if (value.some((d) => !String(d.label || '').trim() || String(d.label).length > 200 || !['tous', 'local', 'etranger'].includes(d.scope || 'tous')))
+        return 'Chaque pièce a un libellé (200 caractères au plus) et des soumissionnaires concernés.';
+      // pièces d'un dossier publié : figées (les changer modifierait les conditions de participation en cours de route)
+      if ((stored('cdc') || {}).cdcPublie && !same(value, cur)) return refus(409, 'PIECES_LOCKED', 'Le dossier est publié : les pièces exigées ne peuvent plus être modifiées.');
       break;
     }
     default:

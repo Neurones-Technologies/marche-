@@ -10,7 +10,7 @@ function vCDC(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Cahier des charges');
   // « Aperçu » et « Publier » n'apparaissent que lorsque le dossier est prêt (le serveur refuse aussi un dossier incomplet)
-  var manque=R.cdcManquants({ cdc:c, org:state.org, cadre:state.cadre, criteria:state.criteria, consultes:state.consultes });
+  var manque=R.cdcManquants({ cdc:c, org:state.org, cadre:state.cadre, criteria:state.criteria, consultes:state.consultes, docDefs:state.docDefs });
   if(!manque.length){
     var ap=add(h,'button','btn btn-ghost','Aperçu du dossier'); fk(ap,'cdc-apercu');
     ap.addEventListener('click',ouvrirDossier);
@@ -56,7 +56,17 @@ function vCDC(m){
     Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(s,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
     s.value=R.profilId(RCTX());
     s.disabled=!!c.cdcPublie;
-    s.addEventListener('change',function(){ c.profil=s.value; logit('Profil réglementaire de la procédure : '+MPProfils.profil(s.value).lab); save(); render(); });
+    s.addEventListener('change',function(){
+      c.profil=s.value; logit('Profil réglementaire de la procédure : '+MPProfils.profil(s.value).lab);
+      // pièces imposées par le nouveau profil, ajoutées si elles manquent
+      state.docDefs=state.docDefs||[];
+      (CADRE().piecesImposees||[]).forEach(function(id){
+        if(state.docDefs.some(function(d){ return d.id===id; })) return;
+        var mod=DOC_DEFS.filter(function(d){ return d.id===id; })[0] || { id:id, label:id, scope:'tous' };
+        state.docDefs.push({ id:mod.id, label:mod.label, scope:mod.scope||'tous' });
+      });
+      save(); render();
+    });
     if(c.cdcPublie) add(w,'div','muted','Figé à la publication du dossier.');
   })();
   txt(f1,"Langue de soumission",c.langue,function(v){ c.langue=v; });
@@ -163,23 +173,36 @@ function vCDC(m){
     : 'Le profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » n’autorise pas de marge de préférence.').style.marginTop='12px';
   add(b6,'p','muted',"Mécanisme : les offres de soumissionnaires établis hors de l'espace communautaire sont majorées du taux retenu pour les seuls besoins de la comparaison. Le prix contractuel du titulaire reste son prix d'offre.").style.marginTop='12px';
 
-  /* Pièces */
+  /* Pièces propres à l'offre, saisies à la main pour cet appel d'offres. Celles du référencement restent exigées des
+     entreprises non référencées (dossier publié, article 2.4) sans être redemandées à un partenaire référencé. */
   var k7=add(m,'div','card'); k7.style.marginTop='18px';
   add(k7,'div','panel-head','7 · Pièces à joindre à chaque offre');
   var b7=add(k7,'div','pad');
-  var pr7=(state.formulaireReferencement||{}).pieces||[];
-  // seules les pièces propres à l'offre : celles fournies au référencement ne sont pas redemandées ici
-  var aJoindre=DOCS().filter(function(d){ return !R.pieceReferencement(d,pr7); });
-  if(!aJoindre.length) add(b7,'p','muted','Aucune pièce propre à l’offre : toutes sont fournies au référencement.');
+  var pr7=(state.formulaireReferencement||{}).pieces||[], imposees=CADRE().piecesImposees||[];
+  state.docDefs=state.docDefs||[];
+  var aJoindre=state.docDefs.filter(function(d){ return !R.pieceReferencement(d,pr7); });
+  if(!aJoindre.length) add(b7,'p','muted','Aucune pièce propre à l’offre. Ajoutez par exemple la caution de soumission.');
   aJoindre.forEach(function(d){
     var row=add(b7,'div','docline');
-    var lf=add(row,'div');
-    add(lf,'div',null,d.label).style.fontWeight='600';
-    add(lf,'div','muted', d.scope==='tous'?'Exigée de tous les soumissionnaires'
-      : (d.scope==='local'?'Exigée des soumissionnaires établis en Côte d\u2019Ivoire'
-      : 'Exigée des soumissionnaires établis hors zone UEMOA'));
-    add(row,'span','chip '+(d.scope==='tous'?'c-grey':(d.scope==='local'?'c-teal':'c-violet')),
-      d.scope==='tous'?'Tous':(d.scope==='local'?'Local':'Étranger'));
+    var ti=add(row,'input'); ti.type='text'; ti.value=d.label; ti.maxLength=200; ti.style.flex='1 1 280px';
+    ti.setAttribute('aria-label','Pièce à joindre'); fk(ti,'cdc-piece-'+d.id);
+    ti.addEventListener('change',function(){ var v=ti.value.trim(); if(!v){ ti.value=d.label; return; } d.label=v; logit('Pièce à joindre renommée : '+v); save(); });
+    var se=add(row,'select'); se.setAttribute('aria-label','Soumissionnaires concernés'); fk(se,'cdc-piece-scope-'+d.id);
+    [['tous','Tous les soumissionnaires'],['local','Établis en Côte d’Ivoire'],['etranger','Établis hors UEMOA']].forEach(function(x){ add(se,'option',null,x[1]).value=x[0]; });
+    se.value=d.scope||'tous';
+    se.addEventListener('change',function(){ d.scope=se.value; logit('Pièce « '+d.label+' » : soumissionnaires concernés modifiés'); save(); });
+    if(imposees.indexOf(d.id)>=0) add(row,'span','chip c-grey','Imposée par le profil');
+    else boutonIcone(row,'x','Retirer « '+d.label+' »',function(){
+      ask('Cette pièce ne sera plus exigée des soumissionnaires de cet appel d’offres.',function(){
+        state.docDefs.splice(state.docDefs.indexOf(d),1); logit('Pièce retirée de l’appel d’offres : '+d.label); save(); render();
+      },'Retirer « '+d.label+' » ?','Retirer');
+    },'cdc-piece-sup-'+d.id);
+  });
+  var f7=add(k7,'div','panel-foot');
+  var aj7=add(f7,'button','btn btn-ghost btn-sm','+ Ajouter une pièce'); fk(aj7,'cdc-piece-ajout');
+  aj7.addEventListener('click',function(){
+    state.docDefs.push({ id:'d'+Date.now().toString(36), label:'Nouvelle pièce', scope:'tous' });
+    logit('Pièce ajoutée à l’appel d’offres'); save(); render();
   });
 }
 

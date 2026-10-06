@@ -139,6 +139,9 @@ test('consultation : seuls les partenaires référencés et sélectionnés voien
   ok(c, 201);
   pid = c.json.id;
   const s = await getState(achats, pid);
+  // appel d'offres neuf : pièces du référencement seulement ; la caution, propre à l'offre, s'ajoute à la main
+  assert.ok(!s.docDefs.some((d) => d.id === 'caution'));
+  ok(await patch(achats, { docDefs: s.docDefs.concat([{ id: 'caution', label: 'Caution de soumission', scope: 'tous' }]) }, pid));
   // un dossier restreint ne se publie qu'avec au moins un partenaire consulté (ici SOTRAP)
   refusé(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid), 409, 'CDC_INCOMPLETE');
   ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, pid));
