@@ -186,12 +186,18 @@ function cadreProcedureHaut(m){
 /* Pied : étape précédente et suivante. */
 function cadreProcedureBas(m){
   var etape=etapeDe(state.view), pied=add(m,'div','proc-foot');
-  var nav=add(pied,'div'); nav.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+  // navigation entre étapes : des liens, pas des boutons d'action (ceux-ci restent réservés aux actions du processus)
+  function lien(etape, suivante){
+    var bt=add(pied,'button','etape-lien'+(suivante?' suivante':'')); bt.type='button'; fk(bt, suivante?'etape-suiv':'etape-prec');
+    add(bt,'span','etape-lien-lab', suivante?'Étape suivante':'Étape précédente');
+    add(bt,'span','etape-lien-nom', suivante ? etape.lab+' →' : '← '+etape.lab);
+    bt.addEventListener('click',function(){ go(vuesPermises(etape)[0]); });
+  }
   if(etape){
     var i=ETAPES.indexOf(etape);
     var prec=ETAPES[i-1], suiv=ETAPES[i+1];
-    if(prec && vuesPermises(prec).length){ var bp=add(nav,'button','btn btn-ghost btn-sm','← '+prec.lab); fk(bp,'etape-prec'); bp.addEventListener('click',function(){ go(vuesPermises(prec)[0]); }); }
-    if(suiv && vuesPermises(suiv).length){ var bs=add(nav,'button','btn btn-primary btn-sm','Étape suivante : '+suiv.lab+' →'); fk(bs,'etape-suiv'); bs.addEventListener('click',function(){ go(vuesPermises(suiv)[0]); }); }
+    if(prec && vuesPermises(prec).length) lien(prec, false);
+    if(suiv && vuesPermises(suiv).length) lien(suiv, true);
   }
 }
 

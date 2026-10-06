@@ -411,6 +411,13 @@ button.kpi:hover { border-color: var(--color-accent); }
 .proc-etapes .flow-n { background: var(--color-surface); }
 .dt-pied[hidden] { display: none; }
 .proc-foot { display: flex; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-6); padding-top: var(--space-4); border-top: var(--border-w) solid var(--color-border); }
+/* Liens d'étape (précédente / suivante) : de la navigation, sans fond, pour ne pas se confondre avec les boutons d'action */
+.etape-lien { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--space-2) var(--space-1); border: none; background: none; font: inherit; color: var(--color-text); cursor: pointer; text-align: left; border-radius: var(--radius-sm); }
+.etape-lien.suivante { margin-left: auto; align-items: flex-end; text-align: right; }
+.etape-lien-lab { font-size: var(--fs-tiny); letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-2); }
+.etape-lien-nom { font-size: var(--fs-body); font-weight: var(--fw-strong); color: var(--color-accent); }
+.etape-lien:hover .etape-lien-nom { text-decoration: underline; text-underline-offset: 3px; }
+.etape-lien:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 /* Impression : le document affiché (bon de commande, procès-verbal, dossier d'appel d'offres) et lui seul. */
 @media print {
   body:has(.doc-imprimable) * { visibility: hidden; }
