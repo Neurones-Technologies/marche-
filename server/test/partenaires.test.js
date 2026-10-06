@@ -138,6 +138,7 @@ test('consultation : seuls les partenaires référencés et sélectionnés voien
   const c = await call('POST', '/api/procedures', { ref: 'AO-2026-050', objet: 'Mobilier de bureau', profil: 'prive' }, achats);
   ok(c, 201);
   pid = c.json.id;
+  await require('./_client').remplir(achats, pid);
   const s = await getState(achats, pid);
   // appel d'offres neuf : pièces du référencement seulement ; la caution, propre à l'offre, s'ajoute à la main
   assert.ok(!s.docDefs.some((d) => d.id === 'caution'));

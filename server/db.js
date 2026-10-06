@@ -257,11 +257,17 @@ function piecesOffreDefaut(cdc) {
   }
   return out;
 }
-function procDefaults(cdc) {
+/* Cahier des charges d'un appel d'offres neuf : vide (seules la référence, l'objet et l'autorité contractante sont
+   posés) ; « Générer des données fictives » le remplit à la demande. */
+const CDC_VIDE = { procedure: '', langue: '', deviseSoumission: '', ouverture: '', lots: [], specs: [], caution: '', garantieMin: '',
+  delaiMax: '', penalite: '', avance: '', tva: '', retenueNonResident: '', douaneACharge: '', prefActive: false, prefTaux: 0, partTechnique: 75 };
+/* Grille d'un appel d'offres neuf : les deux critères calculés (qu'on ne peut pas ajouter à la main), sans pondération. */
+const criteresVides = () => seed.CRITERIA.filter((c) => c.kind === 'auto').map((c) => ({ ...clone(c), weight: 0 }));
+function procDefaults(cdc, { demo = false } = {}) {
   const circuit = (kvGet('circuitModele') || { value: seed.APPROVALS }).value;
   return {
     docDefs: piecesOffreDefaut(cdc),
-    cdc, criteria: clone(seed.CRITERIA), quality: {}, justif: {}, confirmed: {}, excluded: {},
+    cdc, criteria: demo ? clone(seed.CRITERIA) : criteresVides(), quality: {}, justif: {}, confirmed: {}, excluded: {},
     depClosed: false, evalDone: false, approvals: C.reinitialiser(circuit),
     qa: [], additifs: [], clarifs: [], coi: {}, recours: [], rejets: [], standstill: { days: 15, startedAt: null },
     contractSigned: false, infructueux: null, cadre: null,
@@ -280,7 +286,7 @@ function procedureCreate({ ref, objet, profil, extra }, uid) {
   let pid = 'p' + (ids.length ? Math.max(...ids) + 1 : 1);
   while (procedureGet(pid)) pid = 'p' + (Number(pid.slice(1)) + 1);
   const org = (kvGet('org') || { value: {} }).value;
-  const cdc = { ...clone(seed.CDC), ref, objet, autorite: org.nom || seed.CDC.autorite, cdcPublie: false, profil: profil || org.profilDefaut || P.DEFAUT, ...(extra || {}) };
+  const cdc = { ...clone(CDC_VIDE), ref, objet, autorite: org.nom || '', cdcPublie: false, profil: profil || org.profilDefaut || P.DEFAUT, ...(extra || {}) };
   procedureInsert(pid, procDefaults(cdc), uid);
   return pid;
 }
@@ -440,7 +446,7 @@ function seedAll(withUsers = true, options = null) {
     for (const [k, v] of Object.entries(org)) kvSet(k, v, 'seed');
     if (demo) {
       // procédure de démonstration : AO-2026-014, telle que dans le prototype, avec ses offres
-      const demo = procDefaults(clone(seed.CDC));
+      const demo = procDefaults(clone(seed.CDC), { demo: true });
       seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
       procedureInsert('p1', demo, 'seed');
       seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));

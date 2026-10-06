@@ -32,13 +32,16 @@ test('création : réservée au cahier des charges, référence unique', async (
   assert.equal(s.cdc.ref, 'AO-2026-020');
   assert.equal(s.cdc.profil, 'prive');
   assert.equal(s.cdc.cdcPublie, false);
+  // formulaires vides : aucune donnée d'exemple, grille réduite aux deux critères calculés sans pondération
+  assert.deepEqual([s.cdc.lots, s.cdc.specs, s.cdc.procedure], [[], [], '']);
+  assert.deepEqual(s.criteria.map((x) => [x.id, x.weight]), [['prix', 0], ['delai', 0]]);
   assert.equal(s.offers.length, 0);
   assert.ok(s.approvals.length && s.approvals.every((a) => !a.done));
   assert.ok(s.audit.some((e) => e.a.startsWith('Procédure créée — AO-2026-020')));
 });
 
 test('cloisonnement : écrire dans une procédure ne touche pas l’autre', async () => {
-  const p1 = await getState(achats), p2 = await getState(achats, 'p2');
+  const p1 = await getState(achats), p2 = await require('./_client').remplir(achats, 'p2');
   const crit = clone(p2.criteria); crit[0].weight -= 5; crit[1].weight += 5;
   ok(await patch(achats, { criteria: crit }, 'p2'));
   assert.deepEqual((await getState(achats)).criteria, p1.criteria);
@@ -58,6 +61,7 @@ test('soumissionnaire : il ne voit que les procédures publiées, et dépose dan
   assert.deepEqual((await call('GET', '/api/procedures', null, soum)).json.procedures.map((p) => p.id), ['p1']);
   refusé(await call('GET', '/api/procedures/p2/state', null, soum), 404);
   refusé(await upload('registre', 'rccm.pdf', PDF, soum, 'p2'), 404);
+  await require('./_client').remplir(achats, 'p2');
   const p2 = await getState(achats, 'p2');
   // achats privés : consultation restreinte ; SOTRAP (PRT-0001, référencée) est consultée, puis le dossier publié
   ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, 'p2'));
@@ -107,7 +111,11 @@ test('la chaîne d’audit reste intègre avec des entrées de plusieurs procéd
 test('publication : refusée tant que le dossier n’est pas prêt, avec ce qui manque', async () => {
   const c = await call('POST', '/api/procedures', { ref: 'AO-2026-099', objet: 'Fournitures de bureau' }, achats);
   ok(c, 201);
-  const s = await getState(achats, c.json.id);
+  // un appel d'offres neuf naît vide : publication refusée tant que rien n'est saisi
+  const vide = await patch(achats, { cdc: { ...(await getState(achats, c.json.id)).cdc, cdcPublie: true } }, c.json.id);
+  refusé(vide, 409, 'CDC_INCOMPLETE');
+  assert.match(vide.json.error, /type de procédure.*date limite.*au moins un lot.*grille de critères/);
+  const s = await require('./_client').remplir(achats, c.json.id);
   ok(await patch(achats, { cdc: { ...s.cdc, specs: [] } }, c.json.id));
   const r = await patch(achats, { cdc: { ...s.cdc, specs: [], cdcPublie: true } }, c.json.id);
   refusé(r, 409, 'CDC_INCOMPLETE');

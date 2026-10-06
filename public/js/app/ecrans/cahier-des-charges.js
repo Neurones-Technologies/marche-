@@ -10,6 +10,15 @@ function vCDC(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Cahier des charges');
   // « Aperçu » et « Publier » n'apparaissent que lorsque le dossier est prêt (le serveur refuse aussi un dossier incomplet)
+  // données fictives : uniquement sur demande (un appel d'offres neuf naît vide)
+  if(can('cdc.edit')){
+    var fx=add(h,'button','btn btn-ghost','Générer des données fictives'); fk(fx,'cdc-fictif');
+    fx.addEventListener('click',function(){
+      var plein=(c.lots||[]).length || (c.specs||[]).length || String(c.procedure||'').trim();
+      if(!plein) return genererDonneesFictives();
+      ask('Le cahier des charges et la grille de critères seront remplacés par un exemple.', genererDonneesFictives, 'Générer des données fictives ?', 'Remplacer');
+    });
+  }
   var manque=R.cdcManquants({ cdc:c, org:state.org, cadre:state.cadre, criteria:state.criteria, consultes:state.consultes, docDefs:state.docDefs });
   if(!manque.length){
     var ap=add(h,'button','btn btn-ghost','Aperçu du dossier'); fk(ap,'cdc-apercu');

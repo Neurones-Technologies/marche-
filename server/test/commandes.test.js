@@ -17,6 +17,7 @@ test('préparation : procédure privée attribuée à SOTRAP (partenaire référ
   refusé(await call('POST', '/api/commandes', { procedure: 'p1' }, achats), 409, 'PROCEDURE_NOT_ELIGIBLE');
   const c = await call('POST', '/api/procedures', { ref: 'AO-2026-060', objet: 'Postes de travail', profil: 'prive' }, achats);
   ok(c, 201); pid = c.json.id;
+  await require('./_client').remplir(achats, pid);
   const s0 = await getState(admin, pid);
   ok(await patch(admin, { org: { ...s0.org, reglages: { niveauxApprobationMin: 1 } }, approvals: s0.approvals.slice(0, 1) }, pid));
   ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, pid)); // SOTRAP consultée

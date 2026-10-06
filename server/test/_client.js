@@ -42,3 +42,15 @@ async function inscrire(corps) {
   return call('POST', '/api/inscription', { immatriculation: 'CI-ABJ-2026-B-9', reponses: { activite: 'Fournitures' }, ...corps, brouillon: b });
 }
 module.exports.inscrire = inscrire;
+
+/** Remplit le cahier des charges et la grille d'une procédure neuve, qui naît vide (équivalent du bouton « Générer des
+    données fictives ») ; retourne l'état. */
+async function remplir(cookie, pid) {
+  const seed = require('../seed/seed.json');
+  const s = (await call('GET', `/api/procedures/${pid}/state`, null, cookie)).json.state;
+  const { ref, objet, profil, autorite } = s.cdc;
+  const r = await call('PATCH', `/api/procedures/${pid}/state`, { changes: { cdc: { ...seed.CDC, ref, objet, profil, autorite, cdcPublie: false }, criteria: seed.CRITERIA } }, cookie);
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  return (await call('GET', `/api/procedures/${pid}/state`, null, cookie)).json.state;
+}
+module.exports.remplir = remplir;
