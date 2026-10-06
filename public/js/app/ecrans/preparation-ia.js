@@ -86,7 +86,6 @@ function vCdcModes(m){
       lancerIA('document', MP.upload(MP.url('/ia/document'), fichier));
     });
   }
-  add(z,'p','muted','La proposition s’affiche pour relecture : vous choisissez ce que vous reprenez, puis vous relisez le formulaire. Le texte transmis est traité par le service d’IA d’Anthropic.').style.marginTop='12px';
   if(ia.proposition){
     var rv=add(z,'button','btn btn-ghost btn-sm','Revoir la dernière proposition'); rv.style.marginTop='8px';
     rv.addEventListener('click',ouvrirPropositionIA);

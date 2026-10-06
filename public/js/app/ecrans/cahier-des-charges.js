@@ -204,7 +204,6 @@ function vCDC(m){
 function vPrestataires(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Prestataires consultés');
-  add(l,'p','lede','Choisissez qui peut voir le dossier publié et déposer une offre. Les partenaires sélectionnés sont prévenus dans leur espace dès la publication.');
   vCdcConsultation(m);
 }
 
@@ -230,7 +229,7 @@ function vCdcConsultation(m){
       add(o,'strong',null,x[1]); add(o,'span',null,x[2]);
       o.addEventListener('click',function(){ if(mode!==x[0]) ecrire({ mode:x[0], partenaires:ids }, 'Consultation : '+x[1].toLowerCase()); });
     });
-  } else add(b,'p','muted','Achats privés : seuls les partenaires référencés que vous sélectionnez voient le dossier publié et peuvent déposer une offre. Ils sont prévenus dans leur espace dès la publication.');
+  }
   if(mode==='ouvert') return;
   if(!UI.references){
     add(b,'p','muted','Chargement des partenaires référencés…');
@@ -262,7 +261,6 @@ function vCdcConsultation(m){
       },'consult-ret-'+p.id);
     } : null
   });
-  add(add(k,'div','panel-foot'),'span','muted','Seuls les partenaires référencés peuvent être consultés. '+(state.cdc.cdcPublie?'Un partenaire ajouté maintenant est prévenu aussitôt dans son espace.':'Les partenaires sélectionnés sont prévenus dans leur espace à la publication du dossier.'));
 }
 /* Fenêtre de choix : partenaires référencés pas encore consultés, avec recherche. */
 function choisirPartenaires(deja, valider){
