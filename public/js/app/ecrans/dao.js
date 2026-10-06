@@ -409,9 +409,9 @@ function remplirDossier(pv){
   add(pv,'div','pvd-pied',(c.autorite||org.nom||'')+' — dossier d’appel d’offres '+REF());
 }
 
-/* Aperçu du dossier entier, dans une fenêtre large (avant publication). */
+/* Le dossier entier, dans une fenêtre large : aperçu avant publication, lecture après. */
 function ouvrirDossier(){
-  ouvrirFenetre('Aperçu du dossier — '+REF(), function(corps){
+  ouvrirFenetre((state.cdc.cdcPublie?'Dossier d’appel d’offres — ':'Aperçu du dossier — ')+REF(), function(corps){
     remplirDossier(add(add(corps,'div','doc-scene'),'article','pv-doc'));
   }, { large:true });
 }
@@ -423,5 +423,9 @@ function vDossierPublie(m){
   add(barre,'span','doc-barre-lab','Dossier d’appel d’offres — '+REF());
   chipCellule(barre,'Publié','c-green');
   boutonIcone(barre,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'dossier-imprimer');
-  remplirDossier(add(add(carte,'div','doc-scene'),'article','pv-doc doc-imprimable'));
+  var voir=boutonIcone(barre,'agrandir','Voir le dossier en entier',ouvrirDossier,'dossier-voir'); voir.setAttribute('data-consult','');
+  // aperçu : le haut du document ; le dossier entier s'ouvre en fenêtre (l'impression reste complète)
+  var scene=add(carte,'div','doc-scene doc-apercu');
+  remplirDossier(add(scene,'article','pv-doc doc-imprimable'));
+  add(scene,'div','doc-suite').setAttribute('aria-hidden','true'); // fondu vers le bas
 }
