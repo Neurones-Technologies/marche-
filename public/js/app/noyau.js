@@ -513,8 +513,7 @@ var VIEWS=[
   {id:'partenaires', label:'Partenaires', grp:'Registres', perm:'partenaires.manage'},
   {id:'referencement', label:'Mon référencement', grp:'Registres', role:true, perm:'portail.use'},
   {id:'dashboard',  label:'Vue d’ensemble', grp:'Procédure'},
-  {id:'cdc',        label:'Cahier des charges', grp:'Procédure', perm:'cdc.edit'},
-  {id:'dao',        label:'DAO', grp:'Procédure', perm:'cdc.edit'},
+  {id:'cdc',        label:'Cahier des charges', grp:'Procédure'}, // publié : consultable de tous (soumissionnaires compris)
   {id:'prestataires', label:'Prestataires consultés', grp:'Procédure', perms:['cdc.edit','cdc.publish','partenaires.manage']},
   {id:'criteres',   label:'Grille de critères', grp:'Procédure', perm:'criteres.edit'},
   {id:'qa',         label:'Questions', grp:'Procédure', perm:'offres.read'},

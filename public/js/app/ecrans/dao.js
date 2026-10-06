@@ -1,4 +1,4 @@
-/* Marché+ — Écran DAO et générateur du dossier d’appel d’offres.
+/* Marché+ — Générateur du dossier d’appel d’offres et sa mise en page (affichée par l'écran Cahier des charges).
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
@@ -371,103 +371,54 @@ function buildDAO(){
   return P;
 }
 
-function daoVolume(P){
-  var tech=0, admin=0;
-  P.forEach(function(pi){
+/* ============ Dossier d'appel d'offres mis en page ============
+   Le dossier se présente comme un document (même présentation que le procès-verbal). L'écran « Cahier des charges »
+   l'affiche une fois le dossier publié, en lecture seule pour tous, soumissionnaires compris ; avant publication, il
+   s'ouvre en aperçu dans une fenêtre. */
+function remplirDossier(pv){
+  var c=state.cdc, org=state.org||{}, P=buildDAO();
+  var et=add(pv,'header','pvd-entete');
+  var eg=add(et,'div'); add(eg,'div','pvd-org',c.autorite||org.nom); add(eg,'div',null,[org.ville,org.pays].filter(Boolean).join(' · '));
+  var ed=add(et,'div','pvd-ref'); var r1=add(ed,'div'); r1.appendChild(document.createTextNode('Réf. ')); add(r1,'strong',null,REF());
+  add(ed,'div',null, c.cdcPublie ? 'Dossier publié' : 'Aperçu — non publié');
+
+  var ti=add(pv,'div','pvd-titre');
+  add(ti,'h2',null,'Dossier d’appel d’offres');
+  add(ti,'p',null,c.objet);
+
+  var dl=add(pv,'dl','pvd-meta');
+  [['Autorité contractante',c.autorite],['Procédure',c.procedure],['Date limite de dépôt',c.ouverture],['Langue de soumission',c.langue],
+   ['Devise de soumission',c.deviseSoumission],['Allotissement',(c.lots||[]).length+' lot(s)']].forEach(function(x){
+    var d=add(dl,'div'); add(d,'dt',null,x[0]); add(d,'dd',null,x[1]||'—');
+  });
+
+  var so=add(pv,'section','pvd-sec'); add(so,'h3',null,'Sommaire');
+  var ul=add(so,'ul'); P.forEach(function(pi){ add(ul,'li',null,pi.titre); });
+
+  P.forEach(function(pi,i){
+    var s=add(pv,'section','pvd-sec');
+    var h3=add(s,'h3'); add(h3,'span','pvd-n',String(i+1)); h3.appendChild(document.createTextNode(pi.titre.replace(/^Pièce \d+ — /,'')));
     pi.arts.forEach(function(a){
-      var n=a.t.length; a.p.forEach(function(x){ n+=x.length; });
-      if(a.cat==='tech') tech+=n; else admin+=n;
+      add(s,'h4','pvd-art','Article '+a.n+' — '+a.t);
+      a.p.forEach(function(x){ var p=add(s,'p',null,x); if(x.indexOf('SPÉCIFICATION MINIMALE')===0) p.className='pvd-encadre'; });
     });
   });
-  var total=tech+admin;
-  return { tech:tech, admin:admin, total:total,
-    pages:Math.max(1,Math.round(total/2600)),
-    pctTech: total? Math.round(tech/total*100):0,
-    pctAdmin: total? Math.round(admin/total*100):0 };
+  add(pv,'div','pvd-pied',(c.autorite||org.nom||'')+' — dossier d’appel d’offres '+REF());
 }
 
-function vDAO(m){
-  var c=state.cdc, P=buildDAO(), V=daoVolume(P);
-  var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,"Dossier d'appel d'offres généré");
-  boutonIcone(h,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'dao-imprimer');
+/* Aperçu du dossier entier, dans une fenêtre large (avant publication). */
+function ouvrirDossier(){
+  ouvrirFenetre('Aperçu du dossier — '+REF(), function(corps){
+    remplirDossier(add(add(corps,'div','doc-scene'),'article','pv-doc'));
+  }, { large:true });
+}
 
-  /* Composition */
-  var comp=add(m,'div','card');
-  var cph=add(comp,'div','panel-head');
-  add(cph,'span',null,'Composition du dossier');
-  add(cph,'span','chip '+(V.pages>=20?'c-green':'c-amber'), V.pages+' pages estimées');
-  var cb=add(comp,'div','pad');
-  var cible=Number(c.partTechnique||75);
-  var barw=add(cb,'div'); barw.style.cssText='display:flex;height:26px;border-radius:8px;overflow:hidden;border:1px solid var(--line)';
-  var bt=add(barw,'div',null, 'Technique '+V.pctTech+' %');
-  bt.style.cssText='width:'+V.pctTech+'%;background:var(--teal);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;white-space:nowrap';
-  var ba=add(barw,'div',null,'Administratif et financier '+V.pctAdmin+' %');
-  ba.style.cssText='width:'+V.pctAdmin+'%;background:var(--nav);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;white-space:nowrap';
-  var ecart=V.pctTech-cible;
-  var msg=add(cb,'p',null, 'Cible fixée : '+cible+' % technique / '+(100-cible)+' % administratif et financier. Écart constaté : '+(ecart>=0?'+':'')+ecart+' point(s).');
-  msg.style.cssText='font-size:13px;margin:12px 0 0;color:'+(Math.abs(ecart)<=5?'var(--muted)':'var(--amber)');
-  var ctl=add(cb,'div'); ctl.style.cssText='display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:12px';
-  var wc=add(ctl,'div');
-  var lab=add(wc,'label',null,'Part technique cible (%)'); lab.setAttribute('for','parttech');
-  lab.style.cssText='display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px';
-  var pi=add(wc,'input'); pi.id='parttech'; pi.type='number'; pi.min='50'; pi.max='90'; pi.value=cible; pi.style.width='120px';
-  pi.addEventListener('change',function(){
-    c.partTechnique=Math.max(50,Math.min(90,Number(pi.value)||75));
-    logit('Part technique cible du dossier portée à '+c.partTechnique+' %'); save(); render();
-  });
-  add(ctl,'span','muted','Pour augmenter la part technique, enrichissez les lots et les spécifications du cahier des charges : le CCTP se développe à proportion.');
-
-  /* Sommaire */
-  var som=add(m,'div','card'); som.id='dao-sommaire'; som.style.marginTop='18px';
-  add(som,'div','panel-head','Sommaire');
-  var sb=add(som,'div','pad');
-  P.forEach(function(pi){
-    var v=daoVolume([pi]);
-    var row=add(sb,'div','docline');
-    var go2=add(row,'button','btn btn-ghost btn-sm');
-    go2.style.cssText='text-align:left;justify-content:flex-start;flex:1 1 300px;border:none;background:none;padding:6px 0;min-height:44px';
-    var lf=add(go2,'div');
-    add(lf,'div',null,pi.titre).style.cssText='font-weight:600;color:var(--teal-dark)';
-    add(lf,'div','muted', pi.arts.length+' article(s) · environ '+v.pages+' page(s)');
-    go2.addEventListener('click',function(){
-      var t=document.getElementById('dao-'+pi.id);
-      if(t){ t.scrollIntoView({behavior:'smooth',block:'start'}); t.setAttribute('tabindex','-1'); t.focus({preventScroll:true}); }
-    });
-    add(row,'span','chip '+(pi.cat==='tech'?'c-teal':'c-grey'), pi.cat==='tech'?'Technique':'Administratif / financier');
-  });
-
-  /* Document */
-  var doc=add(m,'div','card'); doc.style.marginTop='18px';
-  add(doc,'div','panel-head','Corps du dossier');
-  var db=add(doc,'div','pad'); var pv=add(db,'div','pv doc-imprimable');
-  add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — '+REF()).style.cssText='font-weight:700;font-size:16px;color:var(--ink)';
-  add(pv,'p',null, c.autorite+' — '+c.procedure);
-  add(pv,'p',null, 'Objet : '+c.objet);
-  add(pv,'p',null, 'Langue : '+c.langue+' · Devise : '+c.deviseSoumission+' · Date limite de dépôt : '+c.ouverture);
-  P.forEach(function(pi){
-    var t=add(pv,'h4',null,pi.titre);
-    t.id='dao-'+pi.id;
-    t.style.cssText='margin:26px 0 10px;font-size:13px;color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:6px;text-transform:none;letter-spacing:0;scroll-margin-top:90px';
-    pi.arts.forEach(function(a){
-      var at=add(pv,'div',null,'Article '+a.n+' — '+a.t);
-      at.style.cssText='font-weight:700;color:var(--ink);margin:14px 0 4px;font-size:13.5px';
-      a.p.forEach(function(x){
-        var p=add(pv,'p',null,x); p.style.margin='0 0 8px';
-        if(x.indexOf('SPÉCIFICATION MINIMALE')===0){
-          p.style.cssText+=';background:var(--amber-bg);border-left:3px solid var(--amber-line);padding:8px 12px';
-        }
-      });
-    });
-    var back=add(pv,'button','btn btn-ghost btn-sm','↑ Retour au sommaire');
-    back.style.marginTop='6px';
-    back.addEventListener('click',function(){
-      var so=document.getElementById('dao-sommaire');
-      if(so) so.scrollIntoView({behavior:'smooth',block:'start'});
-    });
-  });
-
-  var n=add(m,'div','note');
-  add(n,'strong',null,'Ce que ce générateur fait et ne fait pas. ');
-  n.appendChild(document.createTextNode("Il assemble un dossier structuré et cohérent avec vos paramètres, en donnant au volet technique le poids que vous avez fixé. Il ne remplace ni le juriste marchés publics, qui doit viser les clauses au regard du code applicable et des règles du bailleur, ni l'ingénieur métier, qui doit valider que les spécifications correspondent au besoin réel. Un dossier généré et non relu est un risque de recours, pas un gain de temps."));
+/* Dossier publié : le document, en lecture seule, imprimable. */
+function vDossierPublie(m){
+  var carte=add(m,'section','card doc-carte'); carte.setAttribute('aria-label','Dossier d’appel d’offres');
+  var barre=add(carte,'div','doc-barre');
+  add(barre,'span','doc-barre-lab','Dossier d’appel d’offres — '+REF());
+  chipCellule(barre,'Publié','c-green');
+  boutonIcone(barre,'printer','Imprimer ou enregistrer en PDF',function(){ imprimer(); },'dossier-imprimer');
+  remplirDossier(add(add(carte,'div','doc-scene'),'article','pv-doc doc-imprimable'));
 }

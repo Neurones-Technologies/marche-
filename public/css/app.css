@@ -461,6 +461,7 @@ button.kpi:hover { border-color: var(--color-accent); }
 .pvd-sign .muted { font-size: var(--fs-small); }
 .pvd-sign-etat { margin-top: var(--space-2); font-size: var(--fs-small); font-weight: var(--fw-strong); color: var(--color-ok); }
 .pvd-sign-etat.non { color: var(--color-text-2); font-weight: var(--fw-regular); }
+.pvd-art { margin: var(--space-4) 0 var(--space-1); font-size: var(--fs-body); font-weight: var(--fw-strong); color: var(--color-text); break-after: avoid; }
 .pvd-pied { margin-top: var(--space-10); padding-top: var(--space-3); border-top: var(--border-w) solid var(--color-border); text-align: center; font-size: var(--fs-tiny); color: var(--color-text-2); }
 @media (max-width: 720px) { .pv-doc { padding: var(--space-6) var(--space-5); } .doc-scene { padding: var(--space-4) var(--space-2); } .pvd-meta { grid-template-columns: 1fr; } }
 @media print { .doc-scene { padding: 0; background: none; } .pv-doc { padding: 0; } .pvd-sec { break-inside: auto; } }

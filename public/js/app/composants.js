@@ -112,7 +112,7 @@ function initiales(nom){ return String(nom).replace(/[^A-Za-zÀ-ÿ ]/g,' ').spli
 /* Parcours de la procédure, en tête de chaque écran de procédure. */
 /* Le déroulé d'une procédure, en six étapes. Une étape regroupe un ou plusieurs écrans (sous-onglets). */
 var ETAPES = [
-  {id:'prep',    lab:'Préparer',              vues:['cdc','prestataires','dao','criteres']},
+  {id:'prep',    lab:'Préparer',              vues:['cdc','prestataires','criteres']},
   {id:'publi',   lab:'Publication et offres', vues:['qa','reception']},
   {id:'depouil', lab:'Dépouiller',            vues:['depouille','conformite','clarifs']},
   {id:'eval',    lab:'Évaluer',               vues:['evaluation']},

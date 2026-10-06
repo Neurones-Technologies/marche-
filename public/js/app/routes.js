@@ -9,7 +9,7 @@
 var ROUTES_VUES = { accueil:'tableau-de-bord', besoins:'demandes-achat', procedures:'appels-offres', commandes:'execution',
   partenaires:'partenaires', referencement:'mon-referencement', comptes:'utilisateurs', roles:'utilisateurs/roles',
   suppleances:'utilisateurs/suppleances', journal:'audit', params:'parametres', regles:'alertes', envois:'alertes/envois' };
-var ROUTES_PROCEDURE = { dashboard:'vue-ensemble', cdc:'cahier-des-charges', prestataires:'prestataires', dao:'dao', criteres:'criteres', qa:'questions',
+var ROUTES_PROCEDURE = { dashboard:'vue-ensemble', cdc:'cahier-des-charges', prestataires:'prestataires', criteres:'criteres', qa:'questions',
   reception:'reception', depouille:'depouillement', conformite:'conformite', clarifs:'clarifications', evaluation:'evaluation',
   decision:'decision', recours:'cloture', pv:'proces-verbal', audit:'journal', portail:'depot' };
 /* Écrans qui affichent un élément sous leur liste : l'élément entre dans l'adresse. */

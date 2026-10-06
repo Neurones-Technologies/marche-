@@ -4,12 +4,19 @@
 
 function vCDC(m){
   var c=state.cdc;
+  // publié : le dossier mis en page, en lecture seule pour tous
+  if(c.cdcPublie){ vDossierPublie(m); return; }
+  if(!can('cdc.edit') && !can('cdc.publish')) return locked(m,"Le dossier sera consultable ici une fois publié.",'dashboard','Aller à la vue d’ensemble');
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Cahier des charges');
-  // le bouton « Publier » n'apparaît que lorsque le dossier est prêt (le serveur refuse aussi un dossier incomplet)
-  var manque=c.cdcPublie ? [] : R.cdcManquants({ cdc:c, org:state.org, cadre:state.cadre, criteria:state.criteria, consultes:state.consultes });
-  var pb=manque.length ? null : add(h,'button','btn '+(c.cdcPublie?'btn-ghost':'btn-primary'), c.cdcPublie?'Cahier des charges publié ✓':'Publier le cahier des charges');
-  if(pb){ pb.disabled=c.cdcPublie; guard('cdc.publish',pb); }
+  // « Aperçu » et « Publier » n'apparaissent que lorsque le dossier est prêt (le serveur refuse aussi un dossier incomplet)
+  var manque=R.cdcManquants({ cdc:c, org:state.org, cadre:state.cadre, criteria:state.criteria, consultes:state.consultes });
+  if(!manque.length){
+    var ap=add(h,'button','btn btn-ghost','Aperçu du dossier'); fk(ap,'cdc-apercu');
+    ap.addEventListener('click',ouvrirDossier);
+  }
+  var pb=manque.length ? null : add(h,'button','btn btn-primary','Publier le cahier des charges');
+  if(pb) guard('cdc.publish',pb);
   if(pb) pb.addEventListener('click',function(){
     ask('Le dossier devient opposable aux candidats et le portail de dépôt s\u2019ouvre.', function(){
       c.cdcPublie=true; logit('Cahier des charges publié — ouverture aux soumissions');
@@ -171,33 +178,6 @@ function vCDC(m){
       d.scope==='tous'?'Tous':(d.scope==='local'?'Local':'Étranger'));
   });
   add(add(k7,'div','panel-foot'),'span','muted',"Le dossier d'un soumissionnaire étranger n'est pas « allégé » : il est différent. Exiger une attestation CNPS d'une entreprise allemande n'a pas de sens ; exiger une contre-garantie bancaire locale et une traduction certifiée en a un.");
-
-  /* Aperçu DAO */
-  var k8=add(m,'div','card'); k8.style.marginTop='18px';
-  var ph8=add(k8,'div','panel-head'); add(ph8,'span',null,'8 · Génération du dossier d\u2019appel d\u2019offres');
-  var gob=add(ph8,'button','btn btn-primary btn-sm','Générer le dossier complet →');
-  gob.addEventListener('click',function(){ logit('Dossier d\u2019appel d\u2019offres généré'); go('dao'); }); gob.setAttribute('data-consult','');
-  var prb=boutonIcone(ph8,'printer','Imprimer l\u2019extrait',null,'cdc-imprimer');
-  prb.addEventListener('click',function(){ imprimer(); });
-  var b8=add(k8,'div','pad'); var pv=add(b8,'div','pv');
-  add(pv,'div',null,'DOSSIER D\u2019APPEL D\u2019OFFRES — '+REF()).style.cssText='font-weight:700;font-size:15px;color:var(--ink)';
-  add(pv,'p',null, c.autorite+' — '+c.procedure+' — langue : '+c.langue+' — ouverture des plis : '+c.ouverture);
-  add(pv,'h4',null,'Objet'); add(pv,'p',null,c.objet);
-  add(pv,'h4',null,'Allotissement');
-  var u1=add(pv,'ul'); c.lots.forEach(function(x){ add(u1,'li',null, x.nom+' — estimation : '+x.montant); });
-  add(pv,'h4',null,'Spécifications techniques');
-  var u2=add(pv,'ul'); c.specs.forEach(function(x){ add(u2,'li',null,x); });
-  add(pv,'h4',null,'Conditions');
-  add(pv,'p',null,'Caution de soumission : '+c.caution+' % du montant de l\u2019offre · Garantie minimale : '+c.garantieMin+' mois · Délai maximal : '+c.delaiMax+' jours · Pénalité de retard : '+c.penalite+' ‰ par jour · Avance de démarrage : '+c.avance+' %.');
-  add(pv,'h4',null,'Régime fiscal et douanier');
-  add(pv,'p',null,'TVA : '+c.tva+' % · Retenue à la source applicable aux non-résidents : '+c.retenueNonResident+' % · Droits et taxes à l\u2019importation à la charge de : '+c.douaneACharge+'.');
-  add(pv,'h4',null,'Préférence communautaire');
-  add(pv,'p',null, c.prefActive ? 'Une marge de préférence de '+c.prefTaux+' % est appliquée aux fins de comparaison en faveur des soumissionnaires établis dans l\u2019espace UEMOA.' : 'Aucune marge de préférence communautaire n\u2019est appliquée.');
-  add(pv,'h4',null,'Critères d\u2019évaluation');
-  add(pv,'p',null, state.criteria.map(function(x){ return x.label+' ('+x.weight+' %)'; }).join(' · '));
-  add(pv,'h4',null,'Pièces exigées');
-  var u3=add(pv,'ul');
-  DOCS().forEach(function(d){ add(u3,'li',null, d.label+' — '+(d.scope==='tous'?'tous soumissionnaires':(d.scope==='local'?'soumissionnaires locaux':'soumissionnaires hors UEMOA'))); });
 }
 
 /* Écran « Prestataires consultés » (étape Préparer) : qui peut voir le dossier publié et soumissionner. */

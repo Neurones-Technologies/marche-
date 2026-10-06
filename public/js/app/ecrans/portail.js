@@ -40,12 +40,9 @@ function vPortail(m){
   var k0=add(m,'div','card');
   add(k0,'div','panel-head','Dossier d\u2019appel d\u2019offres');
   var b0=add(k0,'div','pad');
-  ['Règlement de consultation','Cahier des clauses techniques particulières','Cadre du bordereau des prix unitaires',
-   "Modèle d'acte d'engagement","Modèle de caution de soumission"].forEach(function(x){
-    var row=add(b0,'div','docline');
-    add(row,'div',null,x).style.fontWeight='600';
-    add(row,'span','chip c-grey','PDF');
-  });
+  add(b0,'p','muted','Avis, règlement de la consultation, clauses administratives et techniques, bordereau des prix et formulaires.');
+  var vd=add(b0,'button','btn btn-primary btn-sm','Consulter le dossier'); vd.style.marginTop='10px'; fk(vd,'portail-dossier');
+  vd.addEventListener('click',function(){ go('cdc'); });
 
   /* Identification */
   var k1=add(m,'div','card'); k1.style.marginTop='18px';
