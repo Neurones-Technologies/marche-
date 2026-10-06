@@ -50,8 +50,8 @@ test('notification : envoyée aux seules adresses réelles des comptes désigné
   const st = await C.getState(achats);
   assert.deepEqual(st.courriels, { mode: 'microsoft365', expediteur: 'marches@example.org' });
   const emails = [
-    { id: 'm-test-1', ev: 'test', ids: ['u2', 'inconnu'], a: ['pirate@ailleurs.example'], objet: 'Dossier publié', corps: 'Bonjour.' },
-    { id: 'm-test-2', ev: 'test', ids: ['u3'], a: [], objet: 'Deuxième message', corps: 'Bonjour.' },
+    { id: 'm-test-1', ev: 'dep.cloture', ids: ['u2', 'inconnu'], a: ['pirate@ailleurs.example'], objet: 'Dossier publié', corps: 'Bonjour.' },
+    { id: 'm-test-2', ev: 'dep.cloture', ids: ['u3'], a: [], objet: 'Deuxième message', corps: 'Bonjour.' },
   ];
   assert.equal((await C.patch(achats, { emails: emails.concat(st.emails) })).status, 200);
   await attendre(300);
@@ -72,7 +72,7 @@ test('un courriel enregistré ne se réécrit pas depuis le navigateur', async (
 
 test('échec de Microsoft 365 : consigné sur le courriel, l’action n’échoue pas', async () => {
   const st = await C.getState(achats);
-  const r = await C.patch(achats, { emails: [{ id: 'm-test-3', ev: 'test', ids: ['u2'], objet: 'ECHEC volontaire', corps: 'x' }].concat(st.emails) });
+  const r = await C.patch(achats, { emails: [{ id: 'm-test-3', ev: 'dep.cloture', ids: ['u2'], objet: 'ECHEC volontaire', corps: 'x' }].concat(st.emails) });
   assert.equal(r.status, 200);
   await attendre(300);
   const m = (await boite(admin)).find((x) => x.id === 'm-test-3');
@@ -87,7 +87,7 @@ test('confidentialité : chacun ne voit que ses courriels et les notifications d
   const vueSoum = (await C.call('GET', '/api/organisation/state', null, soum)).json.state;
   assert.deepEqual(vueSoum.emails, []);
   const st = await C.getState(achats);
-  const notifs = [{ id: 'n-test-1', ev: 'test', lab: 'Test', titre: 'Interne', corps: 'Attribution', t: 'x', roles: ['achats'], lu: [] }];
+  const notifs = [{ id: 'n-test-1', ev: 'depot.recu', lab: 'Test', titre: 'Interne', corps: 'Attribution', t: 'x', roles: ['achats'], lu: [] }];
   assert.equal((await C.patch(achats, { notifs: notifs.concat(st.notifs) })).status, 200);
   assert.ok((await C.getState(achats)).notifs.some((n) => n.id === 'n-test-1'));
   assert.ok(!(await C.call('GET', '/api/organisation/state', null, soum)).json.state.notifs.some((n) => n.id === 'n-test-1'), 'notification interne invisible du soumissionnaire');

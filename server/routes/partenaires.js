@@ -97,8 +97,14 @@ r.put('/:id', (req, res) => {
   res.json({ partenaire: vue(p) });
 });
 
+/* Dépôts de pièces d'une fiche : débit limité par compte, et volume total plafonné (les versions remplacées restent
+   archivées), pour qu'un compte ne puisse pas remplir le disque. */
+const limiteDepots = require('express-rate-limit').rateLimit({ windowMs: 3600000, limit: Number(process.env.PIECES_PAR_HEURE) || 60,
+  keyGenerator: (req) => 'u:' + req.user.id, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Trop de dépôts de pièces : réessayez dans une heure.', code: 'TOO_MANY_UPLOADS' } });
+const PLAFOND_FICHE = (Number(process.env.PARTENAIRE_MAX_MO) || 200) * 1024 * 1024;
 /** Dépôt d'une pièce administrative (fichier brut) ; ?doc= pièce visée, ?expire=AAAA-MM-JJ facultatif. */
-r.post('/:id/fichiers', corpsBrut, (req, res) => {
+r.post('/:id/fichiers', limiteDepots, corpsBrut, (req, res) => {
   const p = req.partenaire;
   if (!req.titulaire) return err(res, 403, 'PARTNER_NOT_OWNER', 'Seul le partenaire dépose ses pièces.');
   if (['verification', 'exclu'].includes(p.statut)) return err(res, 409, 'PARTNER_LOCKED', 'Les pièces ne se modifient pas pendant l’instruction du dossier.');
@@ -110,6 +116,9 @@ r.post('/:id/fichiers', corpsBrut, (req, res) => {
   if (def.expiration && !expire) return err(res, 422, 'PIECE_EXPIRY_REQUIRED', '« ' + def.label + ' » : indiquez sa date de fin de validité.');
   if (expire && !/^\d{4}-\d{2}-\d{2}$/.test(expire)) return err(res, 422, 'FILE_INVALID', 'Date de validité invalide (AAAA-MM-JJ).');
   if (expire && expire < aujourdhui()) return err(res, 422, 'PIECE_EXPIRED', 'Cette pièce est déjà expirée.');
+  const volume = db.prepare('SELECT sum(size) s FROM files WHERE partenaire_id=?').get(p.id).s || 0;
+  if (volume + fx.body.length > PLAFOND_FICHE)
+    return err(res, 413, 'PARTNER_STORAGE_FULL', 'Volume de pièces atteint pour cette fiche : contactez le service des achats.');
   const id = crypto.randomUUID(), ancienne = p.pieces[fx.doc];
   fs.writeFileSync(diskPath(id), fx.body, { mode: 0o600 });
   db.transaction(() => {

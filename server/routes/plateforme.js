@@ -17,6 +17,11 @@ const err = (res, status, code, error) => res.status(status).json({ error, code 
 const limite = rateLimit({ windowMs: 3600000, limit: Number(process.env.PLATEFORME_CREATIONS_PAR_HEURE) || 5, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Trop de demandes depuis cette adresse : réessayez dans une heure.' } });
 
+// ouverture automatique sans courriels réels : le lien de confirmation est rendu à l'écran, n'importe qui ouvre un espace
+if (E.actif() && !E.validationManuelle() && !mail.actif()) {
+  console.warn('ATTENTION : PLATEFORME_VALIDATION=auto sans MAIL_MODE=graph — tout visiteur peut ouvrir un espace sans vérification de son courriel.');
+}
+
 /* Seule l'adresse de la plateforme répond ici. */
 r.use((req, res, next) => (req.plateforme ? next() : err(res, 404, 'NOT_PLATFORM', 'Route inconnue.')));
 

@@ -14,7 +14,7 @@ function parseCookies(h) {
 
 function sign(user) {
   // l'espace de l'entreprise entre dans le jeton : il ne vaut que dans cet espace (plateforme multi-entreprises)
-  return jwt.sign({ sub: user.id, role: user.role, esp: contexte.espace() }, cfg.jwtSecret, { expiresIn: cfg.jwtTtl });
+  return jwt.sign({ sub: user.id, role: user.role, esp: contexte.espace(), v: user.session_v || 0 }, cfg.jwtSecret, { expiresIn: cfg.jwtTtl });
 }
 
 function setCookie(res, token) {
@@ -34,8 +34,10 @@ function requireAuth(req, res, next) {
   try {
     const p = jwt.verify(token, cfg.jwtSecret);
     if ((p.esp || null) !== contexte.espace()) return res.status(401).json({ error: 'Session d’un autre espace : reconnectez-vous.' });
-    const u = db.prepare('SELECT id,nom,email,role,active FROM users WHERE id=?').get(p.sub);
+    const u = db.prepare('SELECT id,nom,email,role,active,session_v FROM users WHERE id=?').get(p.sub);
     if (!u || !u.active) return res.status(401).json({ error: 'Compte introuvable ou désactivé.' });
+    if ((p.v || 0) !== (u.session_v || 0)) return res.status(401).json({ error: 'Mot de passe changé : reconnectez-vous.' });
+    delete u.session_v;
     const rd = roleDef(u.role);
     req.user = { ...u, roleLab: rd.lab, perms: rd.perms || {} };
     req.can = (perm) => !!req.user.perms[perm];

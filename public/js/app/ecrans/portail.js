@@ -192,10 +192,7 @@ function vPortail(m){
       var offer=r.offer, receipt=r.receipt;
       SEED_OFFERS.push(offer); state.quality[offer.id]={metho:offer.aiMetho, refs:offer.aiRefs};
       synced.offers=JSON.stringify(state.offers); synced.quality=JSON.stringify(state.quality);
-      state.receipts.push(receipt);
-      notify('depot.recu','Nouveau dépôt — '+offer.name,
-        "Accusé "+receipt.num+". Soumissionnaire : "+offer.name+" ("+offer.pays+"). Montant : "+sep(offer.montant)+" "+offer.devise+
-        (offer.devise!=='XOF' ? " soit "+xof(montantXOF(offer)) : "")+". Lots : "+d.lots.length+".");
+      state.receipts.push(receipt); // la notification « dépôt reçu » est émise par le serveur
       state.audit.unshift({t:receipt.t, who:me().nom, a:'Dépôt enregistré — '+offer.name+' ('+offer.pays+') — accusé '+receipt.num});
       toast('Offre déposée — accusé '+receipt.num);
       state.draft={ name:'', iso:d.iso, devise:d.devise, montant:'', delai:'', garantie:'', refsCount:'', lots:[], docs:{}, files:{} };

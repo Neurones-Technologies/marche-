@@ -39,6 +39,10 @@ function premierOperateur() {
 }
 r.use((req, res, next) => { premierOperateur(); next(); });
 
+function poserSession(res, o) {
+  res.cookie(COOKIE, jwt.sign({ op: o.id, typ: 'console', v: o.session_v || 0 }, cfg.jwtSecret, { expiresIn: '8h' }),
+    { httpOnly: true, sameSite: 'strict', secure: cfg.prod, maxAge: 8 * 3600 * 1000, path: '/' });
+}
 function lireCookie(req) {
   const m = String(req.headers.cookie || '').match(/(?:^|;\s*)mp_console=([^;]+)/);
   return m ? decodeURIComponent(m[1]) : null;
@@ -48,8 +52,10 @@ function operateur(req, res, next) {
   try {
     const p = jwt.verify(lireCookie(req) || '', cfg.jwtSecret);
     if (p.typ !== 'console') throw new Error('type');
-    const o = reg().prepare('SELECT id,nom,email,actif FROM operateurs WHERE id=?').get(p.op);
+    const o = reg().prepare('SELECT id,nom,email,actif,session_v FROM operateurs WHERE id=?').get(p.op);
     if (!o || !o.actif) return err(res, 401, 'CONSOLE_AUTH', 'Compte désactivé.');
+    if ((p.v || 0) !== (o.session_v || 0)) return err(res, 401, 'CONSOLE_AUTH', 'Mot de passe changé : reconnectez-vous.');
+    delete o.session_v;
     req.op = o;
     next();
   } catch (e) { err(res, 401, 'CONSOLE_AUTH', 'Connexion requise.'); }
@@ -62,11 +68,12 @@ const limiteConnexion = rateLimit({ windowMs: 15 * 60000, limit: Number(process.
 r.post('/connexion', limiteConnexion, (req, res) => {
   const email = String((req.body || {}).email || '').trim().toLowerCase();
   const o = reg().prepare('SELECT * FROM operateurs WHERE lower(email)=?').get(email);
-  if (!o || !o.actif || !bcrypt.compareSync(String((req.body || {}).motDePasse || ''), o.pass_hash)) {
+  // même coût que le compte existe ou non : le temps de réponse ne révèle pas les courriels des opérateurs
+  const bon = bcrypt.compareSync(String((req.body || {}).motDePasse || ''), o ? o.pass_hash : '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvali');
+  if (!o || !o.actif || !bon) {
     return err(res, 401, 'CONSOLE_LOGIN', 'Courriel ou mot de passe incorrect.');
   }
-  res.cookie(COOKIE, jwt.sign({ op: o.id, typ: 'console' }, cfg.jwtSecret, { expiresIn: '8h' }),
-    { httpOnly: true, sameSite: 'strict', secure: cfg.prod, maxAge: 8 * 3600 * 1000, path: '/' });
+  poserSession(res, o);
   reg().prepare("UPDATE operateurs SET derniere_connexion=datetime('now') WHERE id=?").run(o.id);
   E.journaliser(o.nom + ' — console', 'Connexion');
   res.json({ ok: true, operateur: { id: o.id, nom: o.nom, email: o.email } });
@@ -246,7 +253,7 @@ r.patch('/operateurs/:id', (req, res) => {
   if (actif !== !!o.actif) changes.push(actif ? 'réactivé' : 'désactivé');
   if (mdp) changes.push('nouveau mot de passe');
   if (!changes.length) return res.json({ ok: true });
-  reg().prepare('UPDATE operateurs SET nom=?, email=?, actif=?' + (mdp ? ', pass_hash=?' : '') + ' WHERE id=?')
+  reg().prepare('UPDATE operateurs SET nom=?, email=?, actif=?' + (mdp ? ', pass_hash=?, session_v=session_v+1' : '') + ' WHERE id=?')
     .run(...[nom, email, actif ? 1 : 0].concat(mdp ? [bcrypt.hashSync(mdp, 10)] : [], [o.id]));
   E.journaliser(qui(req), `Opérateur ${o.nom} modifié — ${changes.join(' ; ')}`);
   res.json({ ok: true });
@@ -256,7 +263,8 @@ r.post('/mot-de-passe', (req, res) => {
   if (!bcrypt.compareSync(String((req.body || {}).actuel || ''), o.pass_hash)) return err(res, 403, 'OP_PASSWORD_WRONG', 'Mot de passe actuel incorrect.');
   const n = String((req.body || {}).nouveau || '');
   if (!mdpValide(n)) return err(res, 422, 'OP_PASSWORD', MDP_REGLE);
-  reg().prepare('UPDATE operateurs SET pass_hash=? WHERE id=?').run(bcrypt.hashSync(n, 10), req.op.id);
+  reg().prepare('UPDATE operateurs SET pass_hash=?, session_v=session_v+1 WHERE id=?').run(bcrypt.hashSync(n, 10), req.op.id);
+  poserSession(res, reg().prepare('SELECT * FROM operateurs WHERE id=?').get(req.op.id)); // cette session reste ouverte
   E.journaliser(qui(req), 'Mot de passe modifié');
   res.json({ ok: true });
 });

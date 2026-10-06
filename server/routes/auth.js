@@ -57,7 +57,9 @@ r.post('/password', requireAuth, limiter, (req, res) => {
   if (!bcrypt.compareSync(String(current || ''), u.pass_hash)) return res.status(403).json({ error: 'Mot de passe actuel incorrect.' });
   const n = String(next || '');
   if (n.length < 10 || !/[a-z]/.test(n) || !/[A-Z]/.test(n) || !/\d/.test(n)) return res.status(422).json({ error: '10 caractères minimum, avec majuscule, minuscule et chiffre.' });
-  db.prepare('UPDATE users SET pass_hash=? WHERE id=?').run(bcrypt.hashSync(n, 10), req.user.id);
+  // les autres sessions du compte sont fermées ; celle-ci reçoit un jeton à jour
+  db.prepare('UPDATE users SET pass_hash=?, session_v=session_v+1 WHERE id=?').run(bcrypt.hashSync(n, 10), req.user.id);
+  setCookie(res, sign(db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id)));
   auditAppend(req.user.id, whoLabel(req.user), 'Mot de passe modifié');
   res.json({ ok: true });
 });
@@ -97,7 +99,7 @@ r.patch('/users/:id', requireAuth, needPerm('roles.edit'), (req, res) => {
   const nouveauNom = nom !== undefined ? String(nom).trim() : u.nom;
   if (!nouveauNom || nouveauNom.length > 120) return res.status(422).json({ error: 'Nom requis (120 caractères au plus).' });
   const nouveauMail = email !== undefined ? String(email).trim().toLowerCase() : u.email;
-  if (!/^[^@s]+@[^@s]+.[^@s]+$/.test(nouveauMail)) return res.status(422).json({ error: 'Courriel invalide.' });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(nouveauMail)) return res.status(422).json({ error: 'Courriel invalide.' });
   if (nouveauMail !== u.email && db.prepare('SELECT 1 FROM users WHERE email=? AND id<>?').get(nouveauMail, u.id))
     return res.status(409).json({ error: 'Ce courriel est déjà utilisé par un autre compte.' });
   if (password && String(password).length < 10) return res.status(422).json({ error: '10 caractères minimum.' });
@@ -108,7 +110,7 @@ r.patch('/users/:id', requireAuth, needPerm('roles.edit'), (req, res) => {
     if (nouveauMail !== u.email) { db.prepare('UPDATE users SET email=? WHERE id=?').run(nouveauMail, u.id); changes.push(`courriel : ${u.email} → ${nouveauMail}`); }
     if (role !== undefined && role !== u.role) { db.prepare('UPDATE users SET role=? WHERE id=?').run(role, u.id); changes.push(`rôle : ${(roles[u.role] || {}).lab || u.role} → ${roles[role].lab}`); }
     if (typeof active === 'boolean' && (active ? 1 : 0) !== u.active) { db.prepare('UPDATE users SET active=? WHERE id=?').run(active ? 1 : 0, u.id); changes.push(active ? 'activé' : 'désactivé'); }
-    if (password) { db.prepare('UPDATE users SET pass_hash=? WHERE id=?').run(bcrypt.hashSync(String(password), 10), u.id); changes.push('mot de passe réinitialisé'); }
+    if (password) { db.prepare('UPDATE users SET pass_hash=?, session_v=session_v+1 WHERE id=?').run(bcrypt.hashSync(String(password), 10), u.id); changes.push('mot de passe réinitialisé'); }
   })();
   if (changes.length) {
     require('../db').bumpRev();

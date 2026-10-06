@@ -48,6 +48,11 @@ function jeterBrouillon(hash) {
   db.prepare('DELETE FROM brouillons WHERE hash=?').run(hash);
 }
 const purger = () => db.prepare('SELECT hash FROM brouillons WHERE expire<?').all(Date.now()).forEach((b) => jeterBrouillon(b.hash));
+/* Pièces déposées sans compte : plafonnées par brouillon et pour l'ensemble des brouillons de l'espace, pour qu'aucun
+   anonyme ne puisse remplir le disque (partagé avec les autres espaces et les autres applications de la machine). */
+const MO = 1024 * 1024;
+const PLAFOND_BROUILLON = (Number(process.env.BROUILLON_MAX_MO) || 50) * MO;
+const PLAFOND_BROUILLONS = (Number(process.env.BROUILLONS_MAX_MO) || 500) * MO;
 function brouillonDe(req) {
   const hash = empreinte(req.headers['x-brouillon'] || (req.body && req.body.brouillon));
   const b = db.prepare('SELECT * FROM brouillons WHERE hash=? AND expire>?').get(hash, Date.now());
@@ -82,7 +87,13 @@ r.post('/brouillon/pieces', limitePieces, corpsBrut, (req, res) => {
   if (def.expiration && !expire) return err(res, 422, 'PIECE_EXPIRY_REQUIRED', '« ' + def.label + ' » : indiquez sa date de fin de validité.');
   if (expire && expire < aujourdhui()) return err(res, 422, 'PIECE_EXPIRED', 'Ce document est déjà expiré.');
   if (Object.keys(b.pieces).length >= 40 && !b.pieces[fx.doc]) return err(res, 422, 'DRAFT_FULL', 'Trop de documents.');
-  const id = crypto.randomUUID(), ancienne = b.pieces[fx.doc];
+  const ancienne = b.pieces[fx.doc];
+  const taille = Object.values(b.pieces).reduce((t, x) => t + (x === ancienne ? 0 : x.taille || 0), 0);
+  if (taille + fx.body.length > PLAFOND_BROUILLON) return err(res, 413, 'DRAFT_TOO_LARGE', `Le dossier dépasse ${PLAFOND_BROUILLON / MO} Mo : allégez vos documents.`);
+  purger();
+  if ((db.prepare("SELECT sum(size) s FROM files WHERE owner='inscription'").get().s || 0) + fx.body.length > PLAFOND_BROUILLONS)
+    return err(res, 503, 'DRAFTS_FULL', 'Le dépôt de documents est momentanément saturé : réessayez dans quelques heures.');
+  const id = crypto.randomUUID();
   fs.writeFileSync(diskPath(id), fx.body, { mode: 0o600 });
   db.transaction(() => {
     db.prepare("INSERT INTO files(id,owner,doc_id,name,mime,size,sha256) VALUES(?,'inscription',?,?,?,?,?)").run(id, fx.doc, fx.name, fx.mime, fx.body.length, fx.sha);

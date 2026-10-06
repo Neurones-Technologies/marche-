@@ -96,10 +96,16 @@ function addColumn(table, col, def) {
 ['offers', 'receipts', 'files', 'audit'].forEach((t) => addColumn(t, 'procedure_id', 'TEXT'));
 // 05/10/2026 : l'adresse IP de l'auteur est consignée avec chaque entrée du journal.
 addColumn('audit', 'ip', 'TEXT');
+// 06/10/2026 : l'accusé de dépôt porte son déposant ; un soumissionnaire ne reçoit que les siens (jamais ceux des
+// concurrents : raison sociale et montant). Un accusé antérieur, sans déposant, ne va plus qu'aux lecteurs des offres.
+addColumn('receipts', 'owner', 'TEXT');
 // 02/10/2026 : module 1. Un compte de soumissionnaire est rattaché à sa fiche partenaire ; une pièce de référencement
 // appartient à la fiche ; un compte créé par inscription publique reste inactif tant que son courriel n'est pas vérifié.
 addColumn('users', 'partenaire_id', 'TEXT');
 addColumn('users', 'a_verifier', 'INTEGER NOT NULL DEFAULT 0');
+// 06/10/2026 : version des sessions d'un compte, portée par le jeton ; un nouveau mot de passe l'incrémente et ferme
+// ainsi les sessions ouvertes ailleurs.
+addColumn('users', 'session_v', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('files', 'partenaire_id', 'TEXT');
 }
 

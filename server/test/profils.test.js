@@ -66,7 +66,7 @@ test('achats privés : après dépublication, le client choisit ses règles', as
   ok(await patch(admin, { approvals: s.approvals.slice(0, 1) }));
   ok(await patch(admin, { docDefs: s.docDefs.filter((d) => d.id !== 'cnps') }));
   const recours = [{ de: 'Delta Bâtiment SA', statut: 'ouvert', t: 'test', objet: 'Contestation.' }];
-  refusé(await patch(soum, { recours }), 409, 'APPEAL_NOT_PROVIDED');
+  refusé(await patch(admin, { recours }), 409, 'APPEAL_NOT_PROVIDED'); // recours enregistré par les achats
 });
 
 test('achats privés : le cadre figé ne bouge plus si le client change ses réglages', async () => {

@@ -17,11 +17,14 @@ function buildState(req) {
   const values = { ...org.values, ...proc.values }, revs = { ...org.revs, ...proc.revs };
   const users = db.prepare('SELECT id,nom,role FROM users WHERE active=1 ORDER BY rowid').all();
   const canSeeOffers = req.can('offres.read');
-  const receipts = db.prepare('SELECT data FROM receipts WHERE procedure_id=? ORDER BY created_at, num').all(req.pid).map((x) => JSON.parse(x.data));
+  // accusés de dépôt : tous pour les lecteurs des offres, ses seuls dépôts pour un soumissionnaire
+  const receipts = canSeeOffers
+    ? db.prepare('SELECT data FROM receipts WHERE procedure_id=? ORDER BY created_at, num').all(req.pid)
+    : req.can('portail.use') ? db.prepare('SELECT data FROM receipts WHERE procedure_id=? AND owner=? ORDER BY created_at, num').all(req.pid, req.user.id) : [];
   const st = {
     ...values, users, me: req.user.id, procedure: req.pid,
     offers: canSeeOffers ? req.store.offers() : [],
-    receipts: req.can('portail.use') || canSeeOffers ? receipts : [],
+    receipts: receipts.map((x) => JSON.parse(x.data)),
     audit: req.pid && (req.can('audit.read') || req.can('pv.read')) ? auditList(200, req.pid) : [],
   };
   delete st._sod; // historique de séparation des fonctions : interne au serveur
@@ -54,6 +57,19 @@ function buildState(req) {
   }
   // Un soumissionnaire ne doit voir ni les notes, ni les décisions internes.
   if (!canSeeOffers) { st.quality = {}; st.justif = {}; st.confirmed = {}; st.excluded = {}; }
+  // … ni le personnel (qui évalue, qui approuve), ni les délibérations, ni ce qui concerne ses concurrents (qui est
+  // consulté, leurs clarifications et leurs recours) : son portail n'en a pas besoin
+  if (!canSeeOffers && req.can('portail.use')) {
+    const moi = partenaireDe(req.user.id), nom = (s) => String(s || '').trim().toLowerCase();
+    const mesOffres = new Set(req.pid ? req.store.offers().filter((o) => o.depotPar === req.user.id).map((o) => o.id) : []);
+    st.users = users.filter((u) => u.id === req.user.id);
+    st.approvals = (st.approvals || []).map((a) => ({ role: a.role, roleId: a.roleId, seuil: a.seuil, requis: a.requis, done: a.done, at: a.at }));
+    st.rejets = []; st.coi = {}; st.notifRules = {};
+    st.circuitModele = []; st.circuitBesoin = []; st.circuitReferencement = []; st.circuitCommande = [];
+    if (st.consultes) st.consultes = { mode: st.consultes.mode, partenaires: moi && (st.consultes.partenaires || []).includes(moi.id) ? [moi.id] : [] };
+    st.clarifs = (st.clarifs || []).filter((c) => mesOffres.has(c.offerId));
+    st.recours = (st.recours || []).filter((x) => moi && nom(x.de) === nom(moi.raisonSociale));
+  }
   return { state: st, revs, rev: getRev() };
 }
 
@@ -108,17 +124,25 @@ function ecrire(req, changes) {
         // fusion par identifiant : jamais de notification perdue, « lu » cumulé entre utilisateurs
         const cur = (kvGet(k) || { value: [] }).value;
         const byId = new Map(cur.map((x) => [x.id, x]));
+        const regle = (x) => ((kvGet('notifRules') || { value: {} }).value || {})[x.ev] || { roles: [] };
         const out = [];
         for (const x of changes[k]) {
           if (!x || !x.id) continue;
           const old = byId.get(x.id); byId.delete(x.id);
-          if (old && Array.isArray(x.lu)) x.lu = [...new Set([...(old.lu || []), ...x.lu])];
+          if (k === 'notifs') {
+            // notification enregistrée : seule la lecture change, et chacun ne marque lu que pour lui-même
+            if (old) { out.push({ ...old, lu: [...new Set([...(old.lu || []), ...(Array.isArray(x.lu) && x.lu.includes(uid) ? [uid] : [])])] }); continue; }
+            out.push({ id: String(x.id).slice(0, 40), ev: String(x.ev), lab: String(x.lab || '').slice(0, 120), titre: String(x.titre || '').slice(0, 250),
+              corps: String(x.corps || '').slice(0, 5000), t: frDate(), roles: regle(x).roles.slice(), lu: [] });
+            continue;
+          }
           if (k === 'emails') {
             if (old) { out.push(old); continue; } // un courriel enregistré ne se réécrit pas depuis le navigateur
-            // nouveau courriel : destinataires = comptes actifs désignés par identifiant, avec leur adresse réelle
-            // (jamais une adresse fournie par le navigateur : la plateforme ne sert pas à écrire à n'importe qui)
-            const ids = [...new Set((Array.isArray(x.ids) ? x.ids : []).map(String))].slice(0, 50);
-            const comptes = ids.length ? db.prepare(`SELECT id, nom, email FROM users WHERE active=1 AND id IN (${ids.map(() => '?').join(',')})`).all(...ids) : [];
+            // nouveau courriel : destinataires = comptes actifs désignés par identifiant et visés par la règle de
+            // l'événement, avec leur adresse réelle (jamais une adresse fournie par le navigateur)
+            const ids = [...new Set((Array.isArray(x.ids) ? x.ids : []).map(String))].slice(0, 50), roles = regle(x).roles;
+            const comptes = ids.length ? db.prepare(`SELECT id, nom, email, role FROM users WHERE active=1 AND id IN (${ids.map(() => '?').join(',')})`).all(...ids)
+              .filter((u) => roles.includes(u.role)) : [];
             const e = { id: String(x.id).slice(0, 40), ev: String(x.ev || '').slice(0, 40), de: mail.actif() ? mail.expediteur() : String(x.de || '').slice(0, 120),
               ids: comptes.map((u) => u.id), a: comptes.map((u) => u.email), noms: comptes.map((u) => u.nom),
               objet: String(x.objet || '').slice(0, 250), corps: String(x.corps || '').slice(0, 20000), t: frDate(),
@@ -149,6 +173,30 @@ function expedier(e) {
     x.statut = r.statut; if (r.erreur) x.erreur = r.erreur; x.expedie = frDate();
     require('../db').kvSet('emails', cur, 'courriel');
   }).catch((err) => console.error('Courriel', e.id, err));
+}
+
+/** Annonce d'un événement par le serveur, selon sa règle (notifRules) : notification, et courriel aux comptes actifs des
+    rôles visés. Pour les actions d'un prestataire, qui n'émet lui-même ni notification ni courriel. */
+function annoncer(ev, lab, titre, corps, ref) {
+  const r = ((kvGet('notifRules') || { value: {} }).value || {})[ev];
+  if (!r) return;
+  const id = Date.now() + Math.random().toString(36).slice(2, 6), kvSet = require('../db').kvSet;
+  if (r.inapp) {
+    const cur = (kvGet('notifs') || { value: [] }).value;
+    cur.unshift({ id: 'n' + id, ev, lab, titre, corps, t: frDate(), roles: r.roles.slice(), lu: [] });
+    kvSet('notifs', cur.slice(0, 120), 'serveur');
+  }
+  if (r.email) {
+    const comptes = db.prepare('SELECT id, nom, email, role FROM users WHERE active=1').all().filter((u) => r.roles.includes(u.role)).slice(0, 50);
+    const org = (kvGet('org') || { value: {} }).value || {};
+    const e = { id: 'm' + id, ev, de: mail.actif() ? mail.expediteur() : ((kvGet('mailFrom') || {}).value || ''), ids: comptes.map((u) => u.id), a: comptes.map((u) => u.email),
+      noms: comptes.map((u) => u.nom), objet: '[' + ref + '] ' + titre, corps: corps + '\n\n—\n' + (org.nom || '') + ' — plateforme Marché+\nCe message est généré automatiquement ; ne pas y répondre.',
+      t: frDate(), statut: !comptes.length ? 'sans destinataire' : (mail.actif() ? 'en cours' : 'simulé') };
+    const cur = (kvGet('emails') || { value: [] }).value;
+    cur.unshift(e);
+    kvSet('emails', cur.slice(0, 80), 'serveur');
+    if (comptes.length && mail.actif()) expedier(e);
+  }
 }
 
 /** Modification d'une ou plusieurs clés entières, avec détection de conflit sur les révisions envoyées. */
@@ -324,8 +372,10 @@ r.post('/offers', (req, res) => {
     // numérotation des accusés continue sur toute l'instance : un numéro ne désigne qu'un seul dépôt
     const n = db.prepare('SELECT COUNT(*) c FROM receipts').get().c + 1;
     receipt = { num: 'DEP-' + String(n).padStart(4, '0'), ref: cdc.ref, name, pays: offer.pays, t: frDate(), montant: sep(montant) + ' ' + d.devise, lots: lots.length };
-    db.prepare('INSERT INTO receipts(num,data,procedure_id) VALUES(?,?,?)').run(receipt.num, JSON.stringify(receipt), req.pid);
+    db.prepare('INSERT INTO receipts(num,data,procedure_id,owner) VALUES(?,?,?,?)').run(receipt.num, JSON.stringify(receipt), req.pid, req.user.id);
     auditAppend(req.user.id, whoLabel(req.user), `Dépôt enregistré — ${name} (${offer.pays}) — accusé ${receipt.num}`, req.pid);
+    annoncer('depot.recu', 'Nouveau dépôt reçu', 'Nouveau dépôt — ' + name,
+      `Accusé ${receipt.num}. Soumissionnaire : ${name} (${offer.pays}). Montant : ${receipt.montant}. Lots : ${lots.length}.`, cdc.ref);
   })();
   res.status(201).json({ offer, receipt, rev: getRev() });
 });

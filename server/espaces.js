@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS journal (
   if (!cols.includes('suspendu_le')) REG.exec('ALTER TABLE espaces ADD COLUMN suspendu_le TEXT');
   if (!cols.includes('motif')) REG.exec('ALTER TABLE espaces ADD COLUMN motif TEXT');
   if (!cols.includes('origine')) REG.exec("ALTER TABLE espaces ADD COLUMN origine TEXT");
+  // version des sessions d'un opérateur : un nouveau mot de passe ferme ses sessions ouvertes ailleurs
+  if (!REG.prepare('PRAGMA table_info(operateurs)').all().some((c) => c.name === 'session_v')) REG.exec('ALTER TABLE operateurs ADD COLUMN session_v INTEGER NOT NULL DEFAULT 0');
   // l'installation existante (base principale) devient le premier espace
   const initial = INITIAL();
   if (initial && !REG.prepare('SELECT 1 FROM espaces WHERE slug=?').get(initial)) {

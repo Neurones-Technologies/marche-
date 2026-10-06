@@ -120,7 +120,11 @@ test('opérateurs : ajout, désactivation, mot de passe ; tout entre au journal'
   assert.equal((await req(PLAT, 'GET', '/api/console/tableau', null, marie)).status, 401, 'session coupée');
   assert.equal((await req(PLAT, 'POST', '/api/console/connexion', { email: n.email, motDePasse: n.motDePasse })).status, 401);
   assert.equal((await req(PLAT, 'POST', '/api/console/mot-de-passe', { actuel: 'faux', nouveau: 'Nouveau+2026x' }, op)).status, 403);
-  assert.equal((await req(PLAT, 'POST', '/api/console/mot-de-passe', { actuel: PW, nouveau: 'Nouveau+2026x' }, op)).status, 200);
+  const mdp = await req(PLAT, 'POST', '/api/console/mot-de-passe', { actuel: PW, nouveau: 'Nouveau+2026x' }, op);
+  assert.equal(mdp.status, 200);
+  // les sessions ouvertes avec l'ancien mot de passe sont fermées ; celle-ci reçoit un nouveau jeton
+  assert.equal((await req(PLAT, 'GET', '/api/console/moi', null, op)).status, 401, 'ancien jeton refusé');
+  op = mdp.cookie;
   const j = (await req(PLAT, 'GET', '/api/console/journal', null, op)).json.journal.map((l) => l.action);
   // modification : nom, courriel, nouveau mot de passe d'un autre opérateur (réactivé)
   assert.equal((await req(PLAT, 'PATCH', '/api/console/operateurs/' + a.json.id, { email: OP.email }, op)).status, 409, 'courriel déjà pris');

@@ -27,10 +27,12 @@ const WRITE_PERMS = {
   consultes: ['cdc.edit', 'cdc.publish'],
   roles: ['roles.edit'], users: ['roles.edit'], // délégations et affectations : routes /api/suppleances uniquement
   notifRules: ['notif.manage'],
-  qa: ['qa.answer', 'portail.use'],
+  // questions, clarifications et recours : enregistrés par les achats, jamais réécrits par un prestataire (la clé entière
+  // lui permettrait de modifier les réponses officielles ou d'écrire au nom d'un concurrent)
+  qa: ['qa.answer'],
   additifs: ['qa.answer'],
-  clarifs: ['clarif.send', 'portail.use'],
-  recours: ['recours.handle', 'portail.use'],
+  clarifs: ['clarif.send'],
+  recours: ['recours.handle'],
   standstill: ['decision.approve', 'contract.sign', 'recours.handle'],
   contractSigned: ['contract.sign'],
   infructueux: ['decision.approve'],
@@ -274,6 +276,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       for (let i = 0; i < before.length; i++) {
         const a = value[i], b = before[i];
         if (a.de !== b.de || a.objet !== b.objet || a.t !== b.t) return refus(409, 'APPEAL_LOCKED', 'Un recours enregistré ne peut pas être modifié.');
+        if (b.par) { a.par = b.par; a.enregistre = b.enregistre; } // posés par le serveur à l'enregistrement
         if (a.statut === b.statut && a.decision === b.decision) continue;
         if (!req.can('recours.handle')) return 'Instruire un recours exige l’habilitation « Instruire un recours ».';
         if (b.statut !== 'ouvert') return refus(409, 'APPEAL_LOCKED', 'Ce recours a déjà été tranché.');
@@ -282,6 +285,8 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (value.slice(before.length).some((r) => r.statut !== 'ouvert')) return 'Un nouveau recours est enregistré « ouvert ».';
       if (value.length > before.length && !cadreOf(next).recoursActif)
         return refus(409, 'APPEAL_NOT_PROVIDED', 'Le profil réglementaire de la procédure ne prévoit pas de recours.');
+      // un nouveau recours : qui l'enregistre et quand, posés par le serveur (t reste la date de réception déclarée)
+      value.slice(before.length).forEach((r) => { r.par = uid; r.enregistre = frDate(); });
       break;
     }
     case 'contractSigned': {
@@ -384,6 +389,20 @@ function validateChange(key, value, req, changes = { [key]: value }) {
     case 'consultes': {
       const e = require('./consultation').verifier(value, cur, next, (id) => ST.offers().some((o) => o.partenaire === id));
       if (e) return refus(422, 'CONSULTATION_INVALID', e);
+      break;
+    }
+    case 'notifs':
+    case 'emails': {
+      // le navigateur ne fait qu'annoncer un événement configuré (notifRules) ; les destinataires sont ceux de la règle.
+      // Un prestataire n'en émet aucun : le serveur annonce son dépôt (sinon il écrirait au personnel depuis la boîte
+      // officielle de l'organisation, avec un contenu libre)
+      if (!Array.isArray(value)) return 'Liste invalide.';
+      const connus = new Set((cur || []).map((x) => x && x.id));
+      const nouveaux = value.filter((x) => x && x.id && !connus.has(x.id));
+      if (!nouveaux.length) break;
+      if (req.can('portail.use') && !req.can('offres.read')) return 'Un prestataire n’émet ni notification ni courriel.';
+      const regles = stored('notifRules') || {}, canal = key === 'notifs' ? 'inapp' : 'email';
+      if (nouveaux.some((x) => !regles[x.ev] || !regles[x.ev][canal])) return refus(422, 'EVENT_UNKNOWN', 'Événement de notification inconnu ou désactivé.');
       break;
     }
     case 'formulaireReferencement': {
