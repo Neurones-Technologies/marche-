@@ -165,15 +165,13 @@ function vCDC(m){
 
   /* Pièces */
   var k7=add(m,'div','card'); k7.style.marginTop='18px';
-  add(k7,'div','panel-head','7 · Pièces exigées du dossier de candidature');
+  add(k7,'div','panel-head','7 · Pièces à joindre à chaque offre');
   var b7=add(k7,'div','pad');
   var pr7=(state.formulaireReferencement||{}).pieces||[];
-  var groupes7=[['À joindre à chaque offre', DOCS().filter(function(d){ return !R.pieceReferencement(d,pr7); })],
-    ['Déjà fournies au référencement — un partenaire référencé n’a pas à les joindre', DOCS().filter(function(d){ return !!R.pieceReferencement(d,pr7); })]];
-  groupes7.forEach(function(g){
-  if(!g[1].length) return;
-  add(b7,'div','crit-groupe-titre',g[0]).style.marginTop='10px';
-  g[1].forEach(function(d){
+  // seules les pièces propres à l'offre : celles fournies au référencement ne sont pas redemandées ici
+  var aJoindre=DOCS().filter(function(d){ return !R.pieceReferencement(d,pr7); });
+  if(!aJoindre.length) add(b7,'p','muted','Aucune pièce propre à l’offre : toutes sont fournies au référencement.');
+  aJoindre.forEach(function(d){
     var row=add(b7,'div','docline');
     var lf=add(row,'div');
     add(lf,'div',null,d.label).style.fontWeight='600';
@@ -183,8 +181,6 @@ function vCDC(m){
     add(row,'span','chip '+(d.scope==='tous'?'c-grey':(d.scope==='local'?'c-teal':'c-violet')),
       d.scope==='tous'?'Tous':(d.scope==='local'?'Local':'Étranger'));
   });
-  });
-  add(add(k7,'div','panel-foot'),'span','muted',"Le dossier d'un soumissionnaire étranger n'est pas « allégé » : il est différent. Exiger une attestation CNPS d'une entreprise allemande n'a pas de sens ; exiger une contre-garantie bancaire locale et une traduction certifiée en a un.");
 }
 
 /* Écran « Prestataires consultés » (étape Préparer) : qui peut voir le dossier publié et soumissionner. */
