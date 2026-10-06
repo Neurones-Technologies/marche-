@@ -162,6 +162,22 @@ function vCDC(m){
     ? 'Profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » : taux de '+K.preferenceTauxMax+' % au plus.'
     : 'Le profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » n’autorise pas de marge de préférence.').style.marginTop='12px';
   add(b6,'p','muted',"Mécanisme : les offres de soumissionnaires établis hors de l'espace communautaire sont majorées du taux retenu pour les seuls besoins de la comparaison. Le prix contractuel du titulaire reste son prix d'offre.").style.marginTop='12px';
+
+  /* Pièces */
+  var k7=add(m,'div','card'); k7.style.marginTop='18px';
+  add(k7,'div','panel-head','7 · Pièces exigées du dossier de candidature');
+  var b7=add(k7,'div','pad');
+  DOCS().forEach(function(d){
+    var row=add(b7,'div','docline');
+    var lf=add(row,'div');
+    add(lf,'div',null,d.label).style.fontWeight='600';
+    add(lf,'div','muted', d.scope==='tous'?'Exigée de tous les soumissionnaires'
+      : (d.scope==='local'?'Exigée des soumissionnaires établis en Côte d\u2019Ivoire'
+      : 'Exigée des soumissionnaires établis hors zone UEMOA'));
+    add(row,'span','chip '+(d.scope==='tous'?'c-grey':(d.scope==='local'?'c-teal':'c-violet')),
+      d.scope==='tous'?'Tous':(d.scope==='local'?'Local':'Étranger'));
+  });
+  add(add(k7,'div','panel-foot'),'span','muted',"Le dossier d'un soumissionnaire étranger n'est pas « allégé » : il est différent. Exiger une attestation CNPS d'une entreprise allemande n'a pas de sens ; exiger une contre-garantie bancaire locale et une traduction certifiée en a un.");
 }
 
 /* Écran « Prestataires consultés » (étape Préparer) : qui peut voir le dossier publié et soumissionner. */
