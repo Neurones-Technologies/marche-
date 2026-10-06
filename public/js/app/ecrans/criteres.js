@@ -1,8 +1,7 @@
 /* Marché+ — Écran Grille de critères.
-   Une barre de répartition montre d'un coup d'œil le poids de chaque critère (et la part non attribuée) ; dessous,
-   une ligne compacte par critère, regroupée par type, avec un curseur pour la pondération.
-   Couleurs : palette catégorielle validée (8 teintes, ordre fixe, jamais recyclé) ; au-delà, gris et regroupement
-   « Autres » dans la barre. Le nom et le pourcentage sont toujours écrits : la couleur ne porte jamais seule l'identité.
+   Une ligne compacte par critère, regroupée par type (la part de chaque type devant son titre), avec un curseur pour
+   la pondération ; le total figure en tête. Couleurs : palette catégorielle validée (8 teintes, ordre fixe, jamais
+   recyclé), au-delà du gris ; le nom et la valeur sont toujours écrits à côté.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
@@ -14,36 +13,16 @@ function vCriteres(m){
   add(l,'h1',null,'Grille de critères');
   var fige=!!state.depClosed, crit=state.criteria, wt=weightTotal();
 
-  /* Répartition */
-  var k1=add(m,'div','card');
-  var ph=add(k1,'div','panel-head'); add(ph,'span',null,'Répartition des pondérations');
-  add(ph,'span','chip '+(wt===100?'c-green':'c-red'), wt===100 ? 'Total : 100 % ✓' : 'Total : '+wt+' %');
-  var b1=add(k1,'div','pad');
-  var barre=add(b1,'div','crit-barre'); barre.setAttribute('role','img');
-  barre.setAttribute('aria-label','Répartition : '+crit.map(function(c){ return c.label+' '+c.weight+' %'; }).join(', ')+(wt<100?', non attribué '+(100-wt)+' %':''));
-  var echelle=Math.max(100,wt), autres=0, nAutres=0;
-  crit.forEach(function(c,i){
-    if(i>=CRIT_TEINTES){ autres+=Number(c.weight)||0; nAutres++; return; }
-    segment(barre, c.label, Number(c.weight)||0, echelle, teinteCritere(i));
-  });
-  if(nAutres) segment(barre, 'Autres ('+nAutres+')', autres, echelle, 'var(--crit-autre)');
-  if(wt<100) segment(barre, 'Non attribué', 100-wt, echelle, null);
-  var auto=0, qual=0; crit.forEach(function(c){ if(c.kind==='auto') auto+=Number(c.weight)||0; else qual+=Number(c.weight)||0; });
-  var res=add(b1,'div','crit-resume');
-  add(res,'span',null,'Calculés automatiquement : '+auto+' %');
-  add(res,'span',null,'Notés par l’évaluateur : '+qual+' %');
-  if(wt>100) add(res,'span','crit-alerte','Dépassement : +'+(wt-100)+' %');
-  else if(wt<100) add(res,'span','crit-alerte','Reste à répartir : '+(100-wt)+' %');
-
   /* Critères, regroupés par type */
-  var k2=add(m,'div','card'); k2.style.marginTop='18px';
+  var k2=add(m,'div','card');
   var ph2=add(k2,'div','panel-head'); add(ph2,'span',null,'Critères');
-  add(ph2,'span','chip c-grey',crit.length+' critère'+(crit.length>1?'s':''));
+  add(ph2,'span','chip '+(wt===100?'c-green':'c-red'), wt===100 ? 'Total : 100 % ✓' : (wt<100 ? 'Total : '+wt+' % · reste '+(100-wt)+' %' : 'Total : '+wt+' % · dépassement de '+(wt-100)+' %'));
   var b2=add(k2,'div','pad');
   [['auto','Calculés automatiquement'],['qual','Notés par l’évaluateur · note proposée par l’IA']].forEach(function(g){
     var lignes=crit.map(function(c,i){ return {c:c,i:i}; }).filter(function(x){ return (x.c.kind==='auto')===(g[0]==='auto'); });
+    var part=lignes.reduce(function(t,x){ return t+(Number(x.c.weight)||0); },0);
     var grp=add(b2,'div','crit-groupe');
-    add(grp,'div','crit-groupe-titre',g[1]);
+    var gt=add(grp,'div','crit-groupe-titre'); add(gt,'span','crit-groupe-pct',part+' %'); gt.appendChild(document.createTextNode(g[1]));
     lignes.forEach(function(x){ ligneCritere(grp, x.c, x.i, fige); });
     if(g[0]==='qual' && !fige){
       var aj=add(grp,'button','btn btn-ghost btn-sm crit-ajout','+ Ajouter un critère'); fk(aj,'crit-ajouter');
@@ -60,17 +39,6 @@ function vCriteres(m){
     add(lk,'strong',null,'Grille figée. ');
     lk.appendChild(document.createTextNode("Le dépouillement est clôturé : la grille publiée au dossier ne peut plus être modifiée. La changer après l'ouverture des plis serait un motif d'annulation."));
   }
-}
-
-/* Un segment de la barre ; teinte null : la part non attribuée (hachurée). Libellé écrit dès que la place le permet. */
-function segment(barre, lab, poids, echelle, teinte){
-  if(poids<=0) return;
-  var s=add(barre,'div','crit-seg'+(teinte?'':' vide'));
-  s.style.flexGrow=String(poids); s.style.flexBasis='0';
-  if(teinte) s.style.background=teinte;
-  s.title=lab+' — '+poids+' %';
-  if(poids/echelle>=0.12){ add(s,'span','crit-seg-lab',lab); add(s,'span','crit-seg-val',poids+' %'); }
-  else if(poids/echelle>=0.05) add(s,'span','crit-seg-val',poids+' %');
 }
 
 /* Ligne d'un critère : pastille, nom modifiable, curseur, valeur, suppression. */

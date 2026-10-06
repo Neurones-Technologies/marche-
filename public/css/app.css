@@ -902,21 +902,15 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .cdc-mode-actions { margin-top: 12px; }
 @media (max-width: 900px) { .consult-modes.cdc-modes { grid-template-columns: 1fr; } }
 
-/* Grille de critères : barre de répartition et lignes compactes.
+/* Grille de critères : lignes compactes regroupées par type.
    Palette catégorielle validée (validate_palette.js, fond clair : séparation daltonisme ΔE ≥ 9, vision normale ≥ 19,6) ;
    trois teintes sous 3:1 sur le fond : nom et pourcentage toujours écrits à côté. */
 :root {
   --crit-1: #2a78d6; --crit-2: #eb6834; --crit-3: #1baf7a; --crit-4: #eda100;
   --crit-5: #e87ba4; --crit-6: #008300; --crit-7: #4a3aa7; --crit-8: #e34948; --crit-autre: #9b958d;
 }
-.crit-barre { display: flex; gap: 2px; height: 44px; border-radius: var(--radius-sm); overflow: hidden; background: var(--color-surface); }
-.crit-seg { min-width: 4px; display: flex; flex-direction: column; justify-content: center; padding: 0 10px; overflow: hidden; color: #fff; line-height: 1.15; }
-.crit-seg.vide { background: repeating-linear-gradient(135deg, var(--color-surface-2) 0 6px, var(--color-border-strong) 6px 8px); color: var(--color-text-2); }
-.crit-seg-lab { font-size: var(--fs-tiny); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .95; }
-.crit-seg-val { font-size: var(--fs-small); font-weight: var(--fw-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.crit-resume { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin-top: var(--space-3); font-size: var(--fs-small); color: var(--color-text-2); }
-.crit-alerte { color: var(--color-blocked); font-weight: var(--fw-strong); }
 .crit-groupe + .crit-groupe { margin-top: var(--space-5); }
+.crit-groupe-pct { display: inline-block; min-width: 46px; margin-right: var(--space-2); padding: 1px 8px; border-radius: var(--radius-pill); background: var(--color-accent-soft); color: var(--color-accent); font-variant-numeric: tabular-nums; text-align: center; letter-spacing: 0; }
 .crit-groupe-titre { font-size: var(--fs-tiny); font-weight: var(--fw-strong); letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-2); margin-bottom: var(--space-1); }
 .crit-ligne { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(220px, 1fr) 32px; gap: var(--space-4); align-items: center; padding: 6px 0; border-bottom: var(--border-w) solid var(--color-border); }
 .crit-id { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
