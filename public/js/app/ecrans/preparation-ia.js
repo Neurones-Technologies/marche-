@@ -8,14 +8,20 @@
 UI.ia = null;
 function etatIA(){
   var pid=state.procedure;
-  if(!UI.ia || UI.ia.pid!==pid) UI.ia={ pid:pid, actif:null, mode:lireModeCdc(pid), tache:null, depuis:0, erreur:null, proposition:null, source:'', choix:{} };
+  if(!UI.ia || UI.ia.pid!==pid) UI.ia={ pid:pid, actif:null, tache:null, depuis:0, erreur:null, proposition:null, source:'', choix:{} };
   return UI.ia;
 }
-/* Le mode choisi est mémorisé par procédure dans ce navigateur. */
-function lireModeCdc(pid){ try{ return localStorage.getItem('marcheplus.cdcmode.'+pid) || null; }catch(e){ return null; } }
+/* Mode de saisie du cahier des charges : enregistré avec lui (modeSaisie), donc retrouvé par tous et partout. Un
+   cahier des charges déjà commencé, sans mode enregistré (antérieur), s'ouvre sur le formulaire ; un neuf (référence,
+   objet et autorité seulement) laisse le choix. */
+function cdcEntame(c){
+  var plein=function(x){ return String(x==null?'':x).trim()!==''; };
+  return (c.lots||[]).length>0 || (c.specs||[]).length>0 || ['procedure','langue','deviseSoumission','ouverture','caution','garantieMin','delaiMax','penalite','avance','tva','retenueNonResident','douaneACharge'].some(function(k){ return plein(c[k]); });
+}
+function modeCdc(){ var c=state.cdc||{}; return c.modeSaisie || (cdcEntame(c) ? 'formulaire' : null); }
 function choisirModeCdc(mode){
-  var ia=etatIA(); ia.mode=mode; ia.erreur=null;
-  try{ localStorage.setItem('marcheplus.cdcmode.'+ia.pid, mode); }catch(e){}
+  etatIA().erreur=null;
+  if(state.cdc.modeSaisie!==mode){ state.cdc.modeSaisie=mode; save(); }
   render();
 }
 
@@ -33,7 +39,7 @@ function vCdcModes(m){
     ia.actif=false;
     MP.api('GET',MP.url('/ia')).then(function(r){ ia.actif=!!r.actif; render(); }).catch(function(){});
   }
-  var mode=ia.mode;
+  var mode=modeCdc();
   if(!ia.actif && mode && mode!=='formulaire') mode=null; // IA indisponible : seul le formulaire reste possible
   // carte enveloppée : elle reste hors du sommaire et de la numérotation des sections du cahier des charges
   var k=add(add(m,'div'),'div','card'); k.style.marginBottom='18px';
