@@ -258,8 +258,10 @@ function procedureInsert(pid, values, uid) {
 }
 /** Nouvelle procédure (non publiée) : identifiant attribué par le serveur. */
 function procedureCreate({ ref, objet, profil, extra }, uid) {
-  const n = db.prepare('SELECT COUNT(*) c FROM procedures').get().c + 1;
-  let pid = 'p' + n;
+  // jamais un identifiant déjà porté, même par une procédure supprimée dont le journal d'audit garde la trace
+  const ids = db.prepare("SELECT id FROM procedures UNION SELECT DISTINCT procedure_id FROM audit WHERE procedure_id IS NOT NULL").all()
+    .map((x) => Number(String(x.id).replace(/^p/, ''))).filter((x) => Number.isInteger(x));
+  let pid = 'p' + (ids.length ? Math.max(...ids) + 1 : 1);
   while (procedureGet(pid)) pid = 'p' + (Number(pid.slice(1)) + 1);
   const org = (kvGet('org') || { value: {} }).value;
   const cdc = { ...clone(seed.CDC), ref, objet, autorite: org.nom || seed.CDC.autorite, cdcPublie: false, profil: profil || org.profilDefaut || P.DEFAUT, ...(extra || {}) };
