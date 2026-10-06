@@ -130,6 +130,11 @@ dans le volume.
 main `APP_URL`, `MAIL_MODE=graph` et les variables `M365_*` (procédure dans le README, « Courriels »), puis relancer
 le script. Garder `chmod 600` sur le `.env` : il contient alors le secret de l'application Entra ID.
 
+**IA de préparation (Claude, Anthropic)** : ajouter `ANTHROPIC_API_KEY=<clé>` au `.env` (clé créée sur platform.claude.com),
+puis relancer le script. Les documents chargés et les idées saisies sont envoyés à l'API d'Anthropic pour rédiger la
+proposition. Une demande coûte de l'ordre de 0,05 à 0,30 $ ; `IA_PAR_HEURE` (30 par défaut) limite les demandes par compte.
+La proposition est rendue en tâche de fond (le navigateur interroge son état) : aucun réglage du délai de nginx n'est requis.
+
 **Mise à jour de la version d'avant les procédures multiples** : les migrations reprennent les données au démarrage
 (procédure p1, rôles et habilitations, fiches partenaires). Sauvegarder d'abord le volume (voir « Exploitation »).
 

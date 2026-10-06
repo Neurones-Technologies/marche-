@@ -16,6 +16,7 @@ function vCDC(m){
       save(); render();
     }, 'Publier le cahier des charges ?', 'Publier');
   });
+  if(can('cdc.edit') && !c.cdcPublie) vCdcIA(m); // proposition par l'IA, à partir d'un document ou d'une idée
 
   /* Identification */
   var k1=add(m,'div','card'); add(k1,'div','panel-head','1 · Identification de la procédure');
@@ -163,11 +164,9 @@ function vCDC(m){
   });
   add(add(k7,'div','panel-foot'),'span','muted',"Le dossier d'un soumissionnaire étranger n'est pas « allégé » : il est différent. Exiger une attestation CNPS d'une entreprise allemande n'a pas de sens ; exiger une contre-garantie bancaire locale et une traduction certifiée en a un.");
 
-  vCdcConsultation(m);
-
   /* Aperçu DAO */
   var k8=add(m,'div','card'); k8.style.marginTop='18px';
-  var ph8=add(k8,'div','panel-head'); add(ph8,'span',null,'9 · Génération du dossier d\u2019appel d\u2019offres');
+  var ph8=add(k8,'div','panel-head'); add(ph8,'span',null,'8 · Génération du dossier d\u2019appel d\u2019offres');
   var gob=add(ph8,'button','btn btn-primary btn-sm','Générer le dossier complet →');
   gob.addEventListener('click',function(){ logit('Dossier d\u2019appel d\u2019offres généré'); go('dao'); }); gob.setAttribute('data-consult','');
   var prb=boutonIcone(ph8,'printer','Imprimer l\u2019extrait',null,'cdc-imprimer');
@@ -193,7 +192,15 @@ function vCDC(m){
   DOCS().forEach(function(d){ add(u3,'li',null, d.label+' — '+(d.scope==='tous'?'tous soumissionnaires':(d.scope==='local'?'soumissionnaires locaux':'soumissionnaires hors UEMOA'))); });
 }
 
-/* 8 · Partenaires consultés. Achats privés : seuls les partenaires référencés sélectionnés voient le dossier publié et
+/* Écran « Prestataires consultés » (étape Préparer) : qui peut voir le dossier publié et soumissionner. */
+function vPrestataires(m){
+  var h=add(m,'div','head'); var l=add(h,'div');
+  add(l,'h1',null,'Prestataires consultés');
+  add(l,'p','lede','Choisissez qui peut voir le dossier publié et déposer une offre. Les partenaires sélectionnés sont prévenus dans leur espace dès la publication.');
+  vCdcConsultation(m);
+}
+
+/* Partenaires consultés. Achats privés : seuls les partenaires référencés sélectionnés voient le dossier publié et
    déposent une offre. Acheteur public : appel d'offres ouvert à toute entreprise (obligation légale), ou consultation
    restreinte aux partenaires sélectionnés. La sélection se fait parmi les seuls partenaires référencés. */
 UI.references = null;
@@ -202,8 +209,8 @@ function vCdcConsultation(m){
   var mode = pub && co.mode!=='restreint' ? 'ouvert' : 'restreint', ids=co.partenaires||[];
   var peut=can('cdc.edit')||can('cdc.publish');
   var ecrire=function(v, message){ state.consultes=v; logit(message); save(); render(); };
-  var k=add(m,'div','card'); k.style.marginTop='18px';
-  var ph=add(k,'div','panel-head'); add(ph,'span',null,'8 · Partenaires consultés');
+  var k=add(m,'div','card');
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,'Mode de consultation');
   add(ph,'span','chip '+(mode==='ouvert'?'c-violet':'c-teal'), mode==='ouvert' ? 'Ouvert à toute entreprise' : ids.length+' partenaire'+(ids.length>1?'s':'')+' consulté'+(ids.length>1?'s':''));
   var b=add(k,'div','pad');
   if(pub){

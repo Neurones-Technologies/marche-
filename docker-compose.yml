@@ -31,6 +31,10 @@ services:
       CONSOLE_EMAIL: ${CONSOLE_EMAIL:-}
       CONSOLE_NOM: ${CONSOLE_NOM:-}
       CONSOLE_MOT_DE_PASSE: ${CONSOLE_MOT_DE_PASSE:-}
+      # IA de préparation du cahier des charges (Claude, Anthropic) : sans clé, la fonction est indisponible
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      IA_MODELE: ${IA_MODELE:-}
+      IA_PAR_HEURE: ${IA_PAR_HEURE:-}
       MAIL_MODE: ${MAIL_MODE:-simule}
       M365_TENANT_ID: ${M365_TENANT_ID:-}
       M365_CLIENT_ID: ${M365_CLIENT_ID:-}

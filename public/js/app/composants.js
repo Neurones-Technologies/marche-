@@ -60,7 +60,7 @@ function icon(parent, name){
   return s;
 }
 /* Icône de chaque écran du menu. */
-var NAV_ICONS = { accueil:'home', dashboard:'info', envois:'chat', procedures:'folder', besoins:'demande', referencement:'badge', partenaires:'users', commandes:'camion', cdc:'file', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
+var NAV_ICONS = { accueil:'home', dashboard:'info', envois:'chat', procedures:'folder', besoins:'demande', referencement:'badge', partenaires:'users', commandes:'camion', cdc:'file', prestataires:'users', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
   reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
   recours:'scale', pv:'stamp', audit:'list', journal:'list', roles:'key', comptes:'users', suppleances:'clock', params:'cog', regles:'ring' };
 
@@ -112,7 +112,7 @@ function initiales(nom){ return String(nom).replace(/[^A-Za-zÀ-ÿ ]/g,' ').spli
 /* Parcours de la procédure, en tête de chaque écran de procédure. */
 /* Le déroulé d'une procédure, en six étapes. Une étape regroupe un ou plusieurs écrans (sous-onglets). */
 var ETAPES = [
-  {id:'prep',    lab:'Préparer',              vues:['cdc','dao','criteres']},
+  {id:'prep',    lab:'Préparer',              vues:['cdc','prestataires','dao','criteres']},
   {id:'publi',   lab:'Publication et offres', vues:['qa','reception']},
   {id:'depouil', lab:'Dépouiller',            vues:['depouille','conformite','clarifs']},
   {id:'eval',    lab:'Évaluer',               vues:['evaluation']},

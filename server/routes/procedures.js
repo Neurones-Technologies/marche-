@@ -68,6 +68,7 @@ r.use('/:pid', (req, res, next) => {
   next();
 });
 r.use('/:pid/files', require('./files').proc);
+r.use('/:pid/ia', require('./ia')); // proposition de cahier des charges par l'IA (document ou idée)
 r.use('/:pid', require('./state'));
 
 module.exports = r;

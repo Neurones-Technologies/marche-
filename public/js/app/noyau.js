@@ -515,6 +515,7 @@ var VIEWS=[
   {id:'dashboard',  label:'Vue d’ensemble', grp:'Procédure'},
   {id:'cdc',        label:'Cahier des charges', grp:'Procédure', perm:'cdc.edit'},
   {id:'dao',        label:'DAO', grp:'Procédure', perm:'cdc.edit'},
+  {id:'prestataires', label:'Prestataires consultés', grp:'Procédure', perms:['cdc.edit','cdc.publish','partenaires.manage']},
   {id:'criteres',   label:'Grille de critères', grp:'Procédure', perm:'criteres.edit'},
   {id:'qa',         label:'Questions', grp:'Procédure', perm:'offres.read'},
   {id:'portail',    label:'Déposer une offre', grp:'Procédure', role:true, perm:'portail.use'},
