@@ -58,11 +58,11 @@ test('achats privés : après dépublication, le client choisit ses règles', as
   org.reglages = { recoursActif: false, delaiRecoursJours: 0, separationFonctions: false, niveauxApprobationMin: 1 };
   ok(await patch(admin, { org, cdc: { ...s.cdc, profil: 'prive' } }));
   s = await getState(admin);
+  ok(await patch(admin, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } })); // SOTRAP consultée (achats privés)
   ok(await patch(admin, { cdc: { ...s.cdc, cdcPublie: true } }));
   s = await getState(admin);
   assert.equal(s.cadre.profil, 'prive');
   assert.equal(s.cadre.regles.separationFonctions, false);
-  ok(await patch(admin, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } })); // SOTRAP consultée (achats privés)
   ok(await patch(admin, { approvals: s.approvals.slice(0, 1) }));
   ok(await patch(admin, { docDefs: s.docDefs.filter((d) => d.id !== 'cnps') }));
   const recours = [{ de: 'Delta Bâtiment SA', statut: 'ouvert', t: 'test', objet: 'Contestation.' }];

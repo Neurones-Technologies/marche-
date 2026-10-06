@@ -132,7 +132,24 @@
     return Math.max(0, Math.ceil(s.days - ecoule));
   }
 
+  /* Ce qui manque au dossier pour être publié : liste de libellés, vide quand il est prêt. Le contexte porte aussi
+     consultes (partenaires consultés). */
+  function cdcManquants(ctx) {
+    var c = ctx.cdc || {}, out = [], plein = function (x) { return String(x == null ? '' : x).trim() !== ''; };
+    if (!plein(c.objet)) out.push('l’objet du marché');
+    if (!plein(c.autorite)) out.push('l’autorité contractante');
+    if (!plein(c.procedure)) out.push('le type de procédure');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(c.ouverture || ''))) out.push('la date limite de dépôt des offres (AAAA-MM-JJ)');
+    if (!(c.lots || []).some(function (l) { return l && plein(l.nom); })) out.push('au moins un lot');
+    if (!(c.specs || []).some(plein)) out.push('au moins une spécification technique');
+    if (!(ctx.criteria || []).length || weightTotal(ctx) !== 100) out.push('une grille de critères totalisant 100 %');
+    var co = ctx.consultes || {}, pub = !!P.profil(profilId(ctx)).public;
+    if (!(pub && co.mode !== 'restreint') && !(co.partenaires || []).length) out.push('au moins un prestataire consulté');
+    return out;
+  }
+
   return {
+    cdcManquants: cdcManquants,
     profilId: profilId, cadre: cadre, prefTaux: prefTaux,
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,

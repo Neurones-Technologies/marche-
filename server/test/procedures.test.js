@@ -59,10 +59,10 @@ test('soumissionnaire : il ne voit que les procédures publiées, et dépose dan
   refusé(await call('GET', '/api/procedures/p2/state', null, soum), 404);
   refusé(await upload('registre', 'rccm.pdf', PDF, soum, 'p2'), 404);
   const p2 = await getState(achats, 'p2');
-  ok(await patch(achats, { cdc: { ...p2.cdc, cdcPublie: true } }, 'p2'));
-  // achats privés : consultation restreinte ; SOTRAP (PRT-0001, référencée) est consultée
-  assert.deepEqual((await call('GET', '/api/procedures', null, soum)).json.procedures.map((p) => p.id), ['p1']);
+  // achats privés : consultation restreinte ; SOTRAP (PRT-0001, référencée) est consultée, puis le dossier publié
   ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, 'p2'));
+  assert.deepEqual((await call('GET', '/api/procedures', null, soum)).json.procedures.map((p) => p.id), ['p1']);
+  ok(await patch(achats, { cdc: { ...p2.cdc, cdcPublie: true } }, 'p2'));
   assert.deepEqual((await call('GET', '/api/procedures', null, soum)).json.procedures.map((p) => p.id), ['p1', 'p2']);
   for (const doc of ['registre', 'fiscal', 'caution']) ok(await upload(doc, doc + '.pdf', PDF, soum, 'p2'), 201);
   // le brouillon de pièces est propre à la procédure
@@ -102,4 +102,18 @@ test('la chaîne d’audit reste intègre avec des entrées de plusieurs procéd
   const v = await call('GET', '/api/audit/verify', null, admin);
   ok(v);
   assert.equal(v.json.ok, true);
+});
+
+test('publication : refusée tant que le dossier n’est pas prêt, avec ce qui manque', async () => {
+  const c = await call('POST', '/api/procedures', { ref: 'AO-2026-099', objet: 'Fournitures de bureau' }, achats);
+  ok(c, 201);
+  const s = await getState(achats, c.json.id);
+  ok(await patch(achats, { cdc: { ...s.cdc, specs: [] } }, c.json.id));
+  const r = await patch(achats, { cdc: { ...s.cdc, specs: [], cdcPublie: true } }, c.json.id);
+  refusé(r, 409, 'CDC_INCOMPLETE');
+  assert.match(r.json.error, /au moins une spécification technique/);
+  ok(await patch(achats, { criteria: s.criteria.map((x, i) => (i ? x : { ...x, weight: x.weight - 10 })) }, c.json.id));
+  assert.match((await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, c.json.id)).json.error, /grille de critères totalisant 100 %/);
+  ok(await patch(achats, { criteria: s.criteria }, c.json.id));
+  ok(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, c.json.id)); // complet : publié
 });

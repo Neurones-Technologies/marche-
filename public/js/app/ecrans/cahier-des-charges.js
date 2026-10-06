@@ -6,9 +6,11 @@ function vCDC(m){
   var c=state.cdc;
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Cahier des charges');
-  var pb=add(h,'button','btn '+(c.cdcPublie?'btn-ghost':'btn-primary'), c.cdcPublie?'Cahier des charges publié ✓':'Publier le cahier des charges');
-  pb.disabled=c.cdcPublie; guard('cdc.publish',pb);
-  pb.addEventListener('click',function(){
+  // le bouton « Publier » n'apparaît que lorsque le dossier est prêt (le serveur refuse aussi un dossier incomplet)
+  var manque=c.cdcPublie ? [] : R.cdcManquants({ cdc:c, org:state.org, cadre:state.cadre, criteria:state.criteria, consultes:state.consultes });
+  var pb=manque.length ? null : add(h,'button','btn '+(c.cdcPublie?'btn-ghost':'btn-primary'), c.cdcPublie?'Cahier des charges publié ✓':'Publier le cahier des charges');
+  if(pb){ pb.disabled=c.cdcPublie; guard('cdc.publish',pb); }
+  if(pb) pb.addEventListener('click',function(){
     ask('Le dossier devient opposable aux candidats et le portail de dépôt s\u2019ouvre.', function(){
       c.cdcPublie=true; logit('Cahier des charges publié — ouverture aux soumissions');
       notify('cdc.publie', 'Cahier des charges publié',
@@ -18,6 +20,11 @@ function vCDC(m){
   });
   // mode de saisie (formulaire, document, idée) : seul ce qu'exige le mode choisi s'affiche
   if(can('cdc.edit') && !c.cdcPublie && !vCdcModes(m)) return;
+  if(manque.length){
+    var av=add(add(m,'div'),'div','note'); av.style.marginBottom='18px';
+    add(av,'strong',null,'Avant de publier, complétez : ');
+    av.appendChild(document.createTextNode(manque.join(' ; ')+'.'));
+  }
 
   /* Identification */
   var k1=add(m,'div','card'); add(k1,'div','panel-head','1 · Identification de la procédure');

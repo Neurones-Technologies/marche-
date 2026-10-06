@@ -139,6 +139,9 @@ test('consultation : seuls les partenaires référencés et sélectionnés voien
   ok(c, 201);
   pid = c.json.id;
   const s = await getState(achats, pid);
+  // un dossier restreint ne se publie qu'avec au moins un partenaire consulté (ici SOTRAP)
+  refusé(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid), 409, 'CDC_INCOMPLETE');
+  ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, pid));
   ok(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid));
   const lot = s.cdc.lots[0].id;
   // un second prestataire, inscrit et vérifié, mais pas référencé

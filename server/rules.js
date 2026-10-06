@@ -97,6 +97,10 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (cur && cur.cdcPublie && value.ref !== cur.ref)
         return refus(409, 'REFERENCE_LOCKED', 'Le dossier est publié : sa référence ne peut plus être modifiée.');
       if (!!value.cdcPublie !== !!(cur && cur.cdcPublie) && !req.can('cdc.publish')) return 'Publier le cahier des charges exige l’habilitation « Publier ».';
+      if (value.cdcPublie && !(cur && cur.cdcPublie)) {
+        const manque = R.cdcManquants({ ...ctxOf(next), cdc: value, consultes: next('consultes') });
+        if (manque.length) return refus(409, 'CDC_INCOMPLETE', 'Le dossier n’est pas prêt à être publié. À compléter : ' + manque.join(' ; ') + '.');
+      }
       if (cur && cur.cdcPublie && value.cdcPublie) {
         const a = JSON.stringify({ ...cur, cdcPublie: 0 }), b = JSON.stringify({ ...value, cdcPublie: 0 });
         if (a !== b && !req.can('cdc.edit')) return 'Cahier des charges publié : modification réservée.';
