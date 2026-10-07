@@ -92,7 +92,7 @@ Durées indicatives. Le marché public reste hors du plan.
 | 3 — L'offre du fournisseur | 8 | Prix par lot | S15 | Fait |
 | | 9 | Mémoire technique et bordereau chiffré joints à l'offre | S16 | Fait |
 | | 10 | Modification ou retrait de l'offre avant la date limite | S19 | Fait |
-| | 11 | Plusieurs collaborateurs par entreprise | S7 | À faire |
+| | 11 | Plusieurs collaborateurs par entreprise | S7 | Fait |
 | 4 — Qualité du travail de l'acheteur | 12 | Clauses techniques propres à chaque achat (rédigées par l'IA) | A4 | À faire |
 | | 13 | Notes d'évaluation proposées par l'IA à partir du mémoire technique, ou mention « simulé » | A14 | À faire |
 | | 14 | Extraction réelle des offres reçues hors plateforme | A11 | À faire |

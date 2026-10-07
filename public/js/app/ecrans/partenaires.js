@@ -81,6 +81,64 @@ function evaluationsPartenaire(parent, p){
   add(add(k,'div','panel-foot'),'span','muted','Une note sous le seuil lève une alerte ; elle n\u2019entraîne jamais de suspension automatique. Les évaluateurs des offres la voient, sans effet sur le classement.');
 }
 
+/* Collaborateurs de l'entreprise : chacun a son propre compte et voit la même offre en cours, les mêmes fichiers et
+   accusés. Un collaborateur invite un collègue (lien pour choisir son mot de passe) ou retire un accès. */
+var INVITATION_DEMO = null; // dernier lien d'invitation, quand aucun courriel n'est envoyé (démonstration) : survit au rendu
+function collaborateursPartenaire(zone, p){
+  var k=add(zone,'div','card'); k.style.marginTop='18px';
+  add(k,'div','panel-head','Collaborateurs');
+  var b=add(k,'div','pad'); add(b,'p','muted','Chargement…');
+  function dessiner(comptes){
+    b.textContent='';
+    add(b,'p','muted','Chaque collaborateur se connecte avec son propre compte. Tous voient et préparent la même offre de l’entreprise, sur chaque consultation.');
+    comptes.filter(function(c){ return c.actif; }).forEach(function(c){
+      var row=add(b,'div','docline');
+      var lf=add(row,'div'); var t=add(lf,'div'); t.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+      add(t,'strong',null,c.nom);
+      if(c.moi) add(t,'span','chip c-violet','Vous');
+      else if(!c.derniereConnexion) add(t,'span','chip c-amber','Invitation envoyée');
+      add(lf,'div','muted',c.email+(c.derniereConnexion?' · dernière connexion le '+String(c.derniereConnexion).slice(0,10).split('-').reverse().join('/'):''));
+      if(c.moi) return;
+      var rm=add(row,'button','btn btn-ghost btn-sm','Retirer l’accès'); fk(rm,'collab-retirer-'+c.id);
+      rm.addEventListener('click',function(){
+        ask(c.nom+' ne pourra plus se connecter. Les offres déjà déposées restent celles de l’entreprise.',function(){
+          MP.api('DELETE','/api/partenaires/'+enc(p.id)+'/comptes/'+enc(c.id),{}).then(function(){ toast('Accès retiré à '+c.nom+'.'); charger(); })
+            .catch(function(e){ toast(e.message||'Retrait impossible.'); });
+        },'Retirer l’accès de '+c.nom+' ?','Retirer l’accès');
+      });
+    });
+    if(p.statut==='exclu') return;
+    var f=add(b,'div','frm'); f.style.marginTop='14px';
+    var wn=add(f,'div'); add(wn,'label',null,'Nom du collègue').setAttribute('for','collab-nom');
+    var nom=add(wn,'input'); nom.type='text'; nom.id='collab-nom'; nom.maxLength=120; fk(nom,'collab-nom');
+    var we=add(f,'div'); add(we,'label',null,'Son courriel professionnel').setAttribute('for','collab-email');
+    var em=add(we,'input'); em.type='email'; em.id='collab-email'; em.maxLength=200; fk(em,'collab-email');
+    var go=add(add(b,'div','echange-actions'),'button','btn btn-ghost','Inviter ce collègue'); fk(go,'collab-inviter');
+    add(go.parentNode,'span','muted','Il reçoit un lien, valable 72 heures, pour choisir son mot de passe.');
+    go.addEventListener('click',function(){
+      if(nom.value.trim().length<2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em.value.trim())){ toast('Indiquez le nom et le courriel du collègue.'); return; }
+      go.disabled=true;
+      MP.api('POST','/api/partenaires/'+enc(p.id)+'/comptes',{ nom:nom.value.trim(), email:em.value.trim() }).then(function(r){
+        toast('Invitation envoyée à '+r.compte.email+'.');
+        INVITATION_DEMO = r.lien ? { email:r.compte.email, lien:r.lien } : null;
+        charger();
+      }).catch(function(e){ go.disabled=false; toast(e.message||'Invitation impossible.'); });
+    });
+  }
+  function charger(){
+    MP.api('GET','/api/partenaires/'+enc(p.id)+'/comptes').then(function(r){
+      dessiner(r.comptes);
+      // démonstration sans envoi de courriel : le lien d'invitation est affiché pour pouvoir avancer
+      var inv=INVITATION_DEMO;
+      if(inv && r.comptes.some(function(c){ return c.email===inv.email && c.actif && !c.derniereConnexion; })){
+        var n=add(b,'div','note'); n.style.marginTop='12px'; add(n,'strong',null,'Aucun courriel envoyé (démonstration). ');
+        n.appendChild(document.createTextNode('Lien à transmettre à '+inv.email+' : '+inv.lien));
+      }
+    }).catch(function(e){ b.textContent=''; add(b,'p','muted',e.message); });
+  }
+  charger();
+}
+
 /* ============ Mon référencement (prestataire) ============ */
 function vReferencement(m){
   var h=add(m,'div','head'); var l=add(h,'div');
@@ -202,6 +260,7 @@ function vReferencement(m){
         },'Soumettre le dossier de référencement ?','Soumettre');
       });
     }
+    collaborateursPartenaire(zone,p);
     evaluationsPartenaire(zone,p);
     circuitPartenaire(zone,p,null);
     historiquePartenaire(zone,p);

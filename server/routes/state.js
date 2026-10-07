@@ -1,7 +1,7 @@
 /* Routes d'une procédure, montées sous /api/procedures/:pid (voir routes/procedures.js, qui pose req.pid et
    req.store). L'état renvoyé réunit les clés de l'organisation et celles de la procédure. */
 const express = require('express');
-const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, offerDelete, offersReplace, frDate, isProcKey, partenaireDe, partenairesAll } = require('../db');
+const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, offerDelete, offersReplace, frDate, isProcKey, partenaireDe, partenairesAll, equipeDe, marques } = require('../db');
 const { whoLabel } = require('../auth');
 const { validateChange, effectsOf } = require('../rules');
 const R = require('../../public/js/regles.js');
@@ -17,10 +17,11 @@ function buildState(req) {
   const values = { ...org.values, ...proc.values }, revs = { ...org.revs, ...proc.revs };
   const users = db.prepare('SELECT id,nom,role FROM users WHERE active=1 ORDER BY rowid').all();
   const canSeeOffers = req.can('offres.read');
-  // accusés de dépôt : tous pour les lecteurs des offres, ses seuls dépôts pour un soumissionnaire
+  // accusés de dépôt : tous pour les lecteurs des offres, ceux de son entreprise pour un soumissionnaire
+  const equipe = equipeDe(req.user.id);
   const receipts = canSeeOffers
     ? db.prepare('SELECT data FROM receipts WHERE procedure_id=? ORDER BY created_at, num').all(req.pid)
-    : req.can('portail.use') ? db.prepare('SELECT data FROM receipts WHERE procedure_id=? AND owner=? ORDER BY created_at, num').all(req.pid, req.user.id) : [];
+    : req.can('portail.use') ? db.prepare(`SELECT data FROM receipts WHERE procedure_id=? AND owner IN (${marques(equipe)}) ORDER BY created_at, num`).all(req.pid, ...equipe) : [];
   const st = {
     ...values, users, me: req.user.id, procedure: req.pid,
     offers: canSeeOffers ? req.store.offers() : [],
@@ -61,7 +62,7 @@ function buildState(req) {
   // consulté, leurs clarifications et leurs recours) : son portail n'en a pas besoin
   if (!canSeeOffers && req.can('portail.use')) {
     const moi = partenaireDe(req.user.id), nom = (s) => String(s || '').trim().toLowerCase();
-    const mesOffres = new Set(req.pid ? req.store.offers().filter((o) => o.depotPar === req.user.id).map((o) => o.id) : []);
+    const mesOffres = new Set(req.pid ? req.store.offers().filter((o) => equipe.includes(o.depotPar)).map((o) => o.id) : []);
     st.users = users.filter((u) => u.id === req.user.id);
     st.approvals = (st.approvals || []).map((a) => ({ role: a.role, roleId: a.roleId, seuil: a.seuil, requis: a.requis, done: a.done, at: a.at }));
     st.rejets = []; st.coi = {}; st.notifRules = {};
@@ -70,9 +71,9 @@ function buildState(req) {
     st.clarifs = (st.clarifs || []).map((c, i) => ({ ...c, i })).filter((c) => mesOffres.has(c.offerId)); // i : rang, pour répondre
     // questions : publiées sans leur auteur ; réclamations : les siennes seulement
     st.qa = (st.qa || []).map((q) => ({ id: q.id, question: q.question, t: q.t, reponse: q.reponse, tRep: q.tRep, mienne: q.par === req.user.id }));
-    st.reclamations = (st.reclamations || []).filter((x) => x.par === req.user.id);
+    st.reclamations = (st.reclamations || []).filter((x) => equipe.includes(x.par));
     // son offre en cours : ce qu'il a déposé, pour la relire, la modifier ou la retirer avant l'échéance
-    const o = req.pid ? req.store.offers().find((x) => x.depotPar === req.user.id) : null;
+    const o = req.pid ? req.store.offers().find((x) => equipe.includes(x.depotPar)) : null;
     st.monOffre = o ? { id: o.id, name: o.name, iso: o.iso, devise: o.devise, montant: o.montant, prixLots: o.prixLots, lots: o.lots || [],
       delai: o.delai, garantie: o.garantie, refsCount: o.refsCount, depot: o.depot,
       pieces: (o.pieces || []).map((p) => ({ doc: p.doc, name: p.name, size: p.size, offre: !!p.offre, referencement: !!p.referencement })) } : null;
@@ -148,7 +149,7 @@ function ecrire(req, changes) {
             const { partenaireGet } = require('../db');
             require('../consultation').consultation((kk) => req.store.get(kk)).partenaires
               .forEach((pid) => ((partenaireGet(pid) || {}).comptes || []).forEach((u) => concernes.add(u)));
-            req.store.offers().forEach((o) => { if (o.depotPar) concernes.add(o.depotPar); });
+            req.store.offers().forEach((o) => { if (o.depotPar) equipeDe(o.depotPar).forEach((u) => concernes.add(u)); });
           }
           return concernes;
         };
@@ -269,7 +270,7 @@ r.put('/clarifications/:i/reponse', (req, res) => {
   if (!estFournisseur(req)) return res.status(403).json({ error: 'Réservé aux fournisseurs.', code: 'FORBIDDEN' });
   const clarifs = req.store.get('clarifs') || [], i = Number(req.params.i), cl = clarifs[i];
   const o = cl && req.store.offers().find((x) => x.id === cl.offerId);
-  if (!cl || !o || o.depotPar !== req.user.id) return res.status(404).json({ error: 'Demande introuvable.', code: 'CLARIF_UNKNOWN' });
+  if (!cl || !o || !equipeDe(req.user.id).includes(o.depotPar)) return res.status(404).json({ error: 'Demande introuvable.', code: 'CLARIF_UNKNOWN' });
   if (cl.statut !== 'envoyee') return res.status(409).json({ error: 'Vous avez déjà répondu à cette demande.', code: 'CLARIF_ANSWERED' });
   const reponse = texte((req.body || {}).reponse, 5000);
   if (reponse.length < 2) return res.status(422).json({ error: 'La réponse est vide.', code: 'ANSWER_EMPTY' });
@@ -283,7 +284,7 @@ r.put('/clarifications/:i/reponse', (req, res) => {
 /** Réclamation d'un fournisseur qui a déposé une offre ; traitée et répondue par l'acheteur. */
 r.post('/reclamations', (req, res) => {
   if (!estFournisseur(req)) return res.status(403).json({ error: 'Réservé aux fournisseurs.', code: 'FORBIDDEN' });
-  const offre = req.store.offers().find((x) => x.depotPar === req.user.id);
+  const offre = req.store.offers().find((x) => equipeDe(req.user.id).includes(x.depotPar));
   if (!offre) return res.status(403).json({ error: 'Seul un fournisseur ayant déposé une offre peut adresser une réclamation.', code: 'NO_OFFER' });
   const objet = texte((req.body || {}).objet, 200), detail = texte((req.body || {}).texte, 3000);
   if (objet.length < 3 || detail.length < 10) return res.status(422).json({ error: 'Indiquez l’objet et le détail de votre réclamation.', code: 'CLAIM_INCOMPLETE' });
@@ -456,11 +457,13 @@ r.post('/offers', (req, res) => {
   const refus = require('../consultation').refusDepot(require('../consultation').consultation((k) => req.store.get(k)), partenaire);
   if (refus) return res.status(403).json(refus);
   // une seule offre en cours par entreprise : pour la changer, il la retire d'abord (ses fichiers lui sont rendus)
-  if (req.store.offers().some((o) => o.depotPar === req.user.id))
+  const equipe = equipeDe(req.user.id);
+  if (req.store.offers().some((o) => equipe.includes(o.depotPar)))
     return res.status(409).json({ error: 'Vous avez déjà une offre en cours sur cette consultation : retirez-la pour en déposer une nouvelle.', code: 'OFFER_EXISTS' });
 
   const docDefs = req.store.get('docDefs');
-  const pending = db.prepare('SELECT * FROM files WHERE owner=? AND procedure_id=? AND offer_id IS NULL').all(req.user.id, req.pid);
+  // fichiers préparés par l'entreprise : tout collaborateur joint des pièces au même dépôt
+  const pending = db.prepare(`SELECT * FROM files WHERE owner IN (${marques(equipe)}) AND procedure_id=? AND offer_id IS NULL`).all(...equipe, req.pid);
   const byDoc = new Map(pending.map((f) => [f.doc_id, f]));
   // pièces exigées selon le pays du soumissionnaire et le profil réglementaire (zone de préférence, pays local)
   const exigees = new Set(R.requiredDocs({ org, cdc, cadre: req.store.get('cadre'), docDefs }, { iso: d.iso }).map((x) => x.id));
@@ -501,7 +504,7 @@ r.post('/offers', (req, res) => {
       }));
     if (partenaire) offer.partenaire = partenaire.id;
     offerInsert(offer, true, req.pid);
-    db.prepare('UPDATE files SET offer_id=? WHERE owner=? AND procedure_id=? AND offer_id IS NULL').run(id, req.user.id, req.pid);
+    db.prepare(`UPDATE files SET offer_id=? WHERE owner IN (${marques(equipe)}) AND procedure_id=? AND offer_id IS NULL`).run(id, ...equipe, req.pid);
     const q = req.store.get('quality'); q[id] = { metho: offer.aiMetho, refs: offer.aiRefs }; req.store.set('quality', q, req.user.id);
     // numérotation des accusés continue sur toute l'instance : un numéro ne désigne qu'un seul dépôt
     const n = db.prepare('SELECT COUNT(*) c FROM receipts').get().c + 1;
@@ -518,7 +521,8 @@ r.post('/offers', (req, res) => {
    est marqué retiré, et ses fichiers lui sont rendus : il peut déposer une offre modifiée sans tout rejoindre. */
 r.delete('/offers/mienne', (req, res) => {
   if (!req.can('portail.use')) return res.status(403).json({ error: 'Habilitation insuffisante.', needs: ['portail.use'] });
-  const o = req.store.offers().find((x) => x.depotPar === req.user.id);
+  const equipe = equipeDe(req.user.id);
+  const o = req.store.offers().find((x) => equipe.includes(x.depotPar));
   if (!o) return res.status(404).json({ error: 'Aucune offre en cours à retirer.', code: 'OFFER_UNKNOWN' });
   const echeance = R.echeanceDepot(req.store.get('cdc'));
   if ((echeance && Date.now() > echeance) || req.store.get('depClosed'))
@@ -526,9 +530,9 @@ r.delete('/offers/mienne', (req, res) => {
   const t = frDate();
   db.transaction(() => {
     offerDelete(o.id);
-    db.prepare('UPDATE files SET offer_id=NULL WHERE offer_id=? AND owner=?').run(o.id, req.user.id);
+    db.prepare('UPDATE files SET offer_id=NULL WHERE offer_id=?').run(o.id);
     const q = req.store.get('quality'); delete q[o.id]; req.store.set('quality', q, req.user.id);
-    for (const x of db.prepare('SELECT num,data FROM receipts WHERE procedure_id=? AND owner=?').all(req.pid, req.user.id)) {
+    for (const x of db.prepare(`SELECT num,data FROM receipts WHERE procedure_id=? AND owner IN (${marques(equipe)})`).all(req.pid, ...equipe)) {
       const rc = JSON.parse(x.data);
       if (rc.retire || (rc.offre && rc.offre !== o.id)) continue;
       db.prepare('UPDATE receipts SET data=? WHERE num=?').run(JSON.stringify({ ...rc, retire: t }), x.num);

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
-const { db, auditAppend, bumpRev } = require('../db');
+const { db, auditAppend, bumpRev, equipeDe, marques } = require('../db');
 const { requireAuth, needPerm, whoLabel } = require('../auth');
 const cfg = require('../config');
 
@@ -53,8 +53,10 @@ r.post('/', needPerm('portail.use'), corpsBrut, (req, res) => {
   const fx = lireFichier(req);
   if (fx.erreur) return res.status(fx.status).json({ error: fx.erreur });
   const { doc, name, body, sha } = fx, t = { mime: fx.mime };
-  const pendingCount = db.prepare('SELECT COUNT(*) c FROM files WHERE owner=? AND offer_id IS NULL').get(req.user.id).c;
-  const old = db.prepare('SELECT id FROM files WHERE owner=? AND procedure_id=? AND doc_id=? AND offer_id IS NULL').all(req.user.id, req.pid, doc);
+  // le brouillon de dépôt est celui de l'entreprise : un nouveau fichier remplace celui d'un collègue pour la même pièce
+  const eq = equipeDe(req.user.id);
+  const pendingCount = db.prepare(`SELECT COUNT(*) c FROM files WHERE owner IN (${marques(eq)}) AND offer_id IS NULL`).get(...eq).c;
+  const old = db.prepare(`SELECT id FROM files WHERE owner IN (${marques(eq)}) AND procedure_id=? AND doc_id=? AND offer_id IS NULL`).all(...eq, req.pid, doc);
   if (!old.length && pendingCount >= 40) return res.status(422).json({ error: 'Trop de pièces en attente.' });
   const id = crypto.randomUUID();
   fs.writeFileSync(diskPath(id), body, { mode: 0o600 });
@@ -66,11 +68,14 @@ r.post('/', needPerm('portail.use'), corpsBrut, (req, res) => {
 });
 
 /** Mes pièces en attente (brouillon de dépôt) */
-r.get('/mine', needPerm('portail.use'), (req, res) =>
-  res.json(db.prepare('SELECT * FROM files WHERE owner=? AND procedure_id=? AND offer_id IS NULL ORDER BY created_at').all(req.user.id, req.pid).map(pub)));
+r.get('/mine', needPerm('portail.use'), (req, res) => {
+  const eq = equipeDe(req.user.id);
+  res.json(db.prepare(`SELECT * FROM files WHERE owner IN (${marques(eq)}) AND procedure_id=? AND offer_id IS NULL ORDER BY created_at`).all(...eq, req.pid).map(pub));
+});
 
 r.delete('/:id', needPerm('portail.use'), (req, res) => {
-  const f = db.prepare('SELECT * FROM files WHERE id=? AND owner=? AND procedure_id=? AND offer_id IS NULL').get(req.params.id, req.user.id, req.pid);
+  const eq = equipeDe(req.user.id);
+  const f = db.prepare(`SELECT * FROM files WHERE id=? AND owner IN (${marques(eq)}) AND procedure_id=? AND offer_id IS NULL`).get(req.params.id, ...eq, req.pid);
   if (!f) return res.status(404).json({ error: 'Pièce introuvable ou déjà déposée.' });
   try { fs.unlinkSync(diskPath(f.id)); } catch (e) { /* déjà absent */ }
   db.prepare('DELETE FROM files WHERE id=?').run(f.id);
@@ -80,13 +85,14 @@ r.delete('/:id', needPerm('portail.use'), (req, res) => {
 /** Téléchargement : propriétaire (brouillon) ou lecteur des offres (pièces déposées) */
 g.get('/:id', (req, res) => {
   const f = db.prepare('SELECT * FROM files WHERE id=?').get(req.params.id);
+  const eq = equipeDe(req.user.id), lui = f && eq.includes(f.owner); // un fichier de son entreprise
   // pièce de référencement : son déposant, les acheteurs qui référencent, et les lecteurs des offres (elle tient lieu
   // de pièce du dossier de candidature lors d'un dépôt)
   const ok = f && (f.partenaire_id != null
-    ? (f.owner === req.user.id || req.can('partenaires.manage') || req.can('offres.read'))
-    : ((f.offer_id == null && f.owner === req.user.id) || (f.offer_id != null && (req.can('offres.read') || f.owner === req.user.id))));
+    ? (lui || req.can('partenaires.manage') || req.can('offres.read'))
+    : (lui || (f.offer_id != null && req.can('offres.read'))));
   if (!ok) return res.status(404).json({ error: 'Pièce introuvable.' });
-  if (f.partenaire_id != null && f.owner !== req.user.id) auditAppend(req.user.id, whoLabel(req.user), `Pièce de référencement consultée — ${f.name} (partenaire ${f.partenaire_id})`);
+  if (f.partenaire_id != null && !lui) auditAppend(req.user.id, whoLabel(req.user), `Pièce de référencement consultée — ${f.name} (partenaire ${f.partenaire_id})`);
   else if (f.offer_id != null) auditAppend(req.user.id, whoLabel(req.user), `Pièce consultée — ${f.name} (offre ${f.offer_id})`, f.procedure_id);
   res.set({ 'Content-Type': f.mime, 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'Cache-Control': 'private, no-store' });
   res.sendFile(path.resolve(diskPath(f.id)));

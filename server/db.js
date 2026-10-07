@@ -350,6 +350,14 @@ function partenaireDe(uid) {
   const u = db.prepare('SELECT partenaire_id FROM users WHERE id=?').get(uid);
   return u && u.partenaire_id ? partenaireGet(u.partenaire_id) : null;
 }
+/** Comptes d'une même entreprise (même fiche partenaire), désactivés compris : ils partagent l'offre en cours, les
+    fichiers en préparation et les accusés. Un compte sans fiche est seul dans son équipe. */
+function equipeDe(uid) {
+  const u = db.prepare('SELECT partenaire_id FROM users WHERE id=?').get(uid);
+  return u && u.partenaire_id ? db.prepare('SELECT id FROM users WHERE partenaire_id=?').all(u.partenaire_id).map((x) => x.id) : [uid];
+}
+/** Marques SQL d'une liste : « ?,?,? ». */
+const marques = (liste) => liste.map(() => '?').join(',');
 /** Nouvelle fiche, rattachée au compte uid ; statut « candidat » tant qu'elle n'est pas soumise. */
 function partenaireCreer(champs, uid, statut) {
   const p = { id: partenaireNumero(), ...champs, statut: statut || 'candidat', comptes: uid ? [uid] : [], pieces: {}, circuit: [], historique: [], cree: frDate() };
@@ -572,7 +580,7 @@ module.exports = {
   ouvrirBase, fermerBase, db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
   auditAppend, auditList, auditJournal, auditVerify, offersAll, offerInsert, offerDelete, offersReplace,
   commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero,
-  partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, jetonCreer, jetonUtiliser,
+  partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, equipeDe, marques, jetonCreer, jetonUtiliser,
   proceduresAll, procedureGet, procedureCreate, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero,
   resetDemo, slug, frDate, seed,
 };

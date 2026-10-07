@@ -8,8 +8,8 @@
 const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
-const { db, kvGet, partenairesAll, partenaireGet, partenaireSave, partenaireDe, commandesAll, auditAppend, frDate } = require('../db');
-const { requireAuth, whoLabel } = require('../auth');
+const { db, kvGet, partenairesAll, partenaireGet, partenaireSave, partenaireDe, commandesAll, auditAppend, frDate, jetonCreer } = require('../db');
+const { requireAuth, whoLabel, bcrypt } = require('../auth');
 const { lireFichier, corpsBrut, diskPath } = require('./files');
 const SU = require('../suppleance');
 const C = require('../../public/js/circuits.js');
@@ -104,6 +104,57 @@ const limiteDepots = require('express-rate-limit').rateLimit({ windowMs: 3600000
   message: { error: 'Trop de dépôts de pièces : réessayez dans une heure.', code: 'TOO_MANY_UPLOADS' } });
 const PLAFOND_FICHE = (Number(process.env.PARTENAIRE_MAX_MO) || 200) * 1024 * 1024;
 /** Dépôt d'une pièce administrative (fichier brut) ; ?doc= pièce visée, ?expire=AAAA-MM-JJ facultatif. */
+/* Collaborateurs : les comptes rattachés à la fiche. Un collaborateur invite un collègue (lien à usage unique, valable
+   72 heures, pour choisir son mot de passe) ou retire un accès ; tous partagent l'offre en cours et ses fichiers. */
+const MAX_COLLABORATEURS = 10;
+const comptesDe = (p) => db.prepare('SELECT id, nom, email, active, last_login FROM users WHERE partenaire_id=? ORDER BY created_at').all(p.id);
+r.get('/:id/comptes', (req, res) => {
+  res.json({ comptes: comptesDe(req.partenaire).map((u) => ({ id: u.id, nom: u.nom, email: u.email, actif: !!u.active, derniereConnexion: u.last_login, moi: u.id === req.user.id })) });
+});
+r.post('/:id/comptes', (req, res) => {
+  const p = req.partenaire, d = req.body || {};
+  if (!req.titulaire) return err(res, 403, 'FORBIDDEN', 'Seuls les collaborateurs de l’entreprise invitent un collègue.');
+  if (p.statut === 'exclu') return err(res, 409, 'PARTNER_EXCLUDED', 'Entreprise exclue : aucun accès ne peut être ouvert.');
+  const nom = String(d.nom || '').trim(), email = String(d.email || '').trim().toLowerCase();
+  if (nom.length < 2 || nom.length > 120) return err(res, 422, 'NAME_INVALID', 'Indiquez le nom du collaborateur.');
+  if (!require('../mail').adresseValide(email)) return err(res, 422, 'EMAIL_INVALID', 'Adresse de courriel invalide.');
+  if (comptesDe(p).filter((u) => u.active).length >= MAX_COLLABORATEURS) return err(res, 422, 'TOO_MANY', MAX_COLLABORATEURS + ' collaborateurs actifs au plus.');
+  if (db.prepare('SELECT 1 FROM users WHERE lower(email)=?').get(email)) return err(res, 409, 'EMAIL_TAKEN', 'Cette adresse a déjà un compte sur la plateforme.');
+  const uid = 'u' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex');
+  let lien;
+  db.transaction(() => {
+    // mot de passe aléatoire jamais communiqué : le collègue choisit le sien par le lien reçu
+    db.prepare('INSERT INTO users(id,nom,email,role,pass_hash,partenaire_id) VALUES(?,?,?,?,?,?)')
+      .run(uid, nom, email, 'soum', bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10), p.id);
+    p.comptes = (p.comptes || []).concat(uid);
+    journal(req, p, `accès ouvert à ${nom} (${email})`);
+    partenaireSave(p);
+    lien = require('../espaces').adresseCourante() + '/?reinit=' + jetonCreer(uid, 'reinit', 72);
+  })();
+  const org = (kvGet('org') || { value: {} }).value;
+  require('../mail').envoyer({ a: [email], objet: 'Invitation à rejoindre l’espace de ' + p.raisonSociale + ' sur Marché+',
+    corps: `Bonjour ${nom},\n\n${req.user.nom} vous ouvre un accès à l’espace fournisseur de ${p.raisonSociale} auprès de ${org.nom || 'l’organisation'}.\n` +
+      `Pour choisir votre mot de passe, ouvrez ce lien dans les 72 heures :\n${lien}\n\nVotre identifiant est cette adresse de courriel.` })
+    .catch((e) => console.error('Courriel d’invitation', e));
+  res.status(201).json({ compte: { id: uid, nom, email, actif: true, moi: false },
+    ...(!require('../config').prod && !require('../mail').actif() ? { lien } : {}) });
+});
+r.delete('/:id/comptes/:uid', (req, res) => {
+  const p = req.partenaire;
+  if (!req.titulaire) return err(res, 403, 'FORBIDDEN', 'Seuls les collaborateurs de l’entreprise gèrent ses accès.');
+  if (req.params.uid === req.user.id) return err(res, 422, 'SELF', 'Vous ne pouvez pas retirer votre propre accès.');
+  const u = comptesDe(p).find((x) => x.id === req.params.uid && x.active);
+  if (!u) return err(res, 404, 'ACCOUNT_UNKNOWN', 'Collaborateur introuvable.');
+  db.transaction(() => {
+    // le compte reste rattaché à l'entreprise (ses dépôts restent les siens) mais ne se connecte plus
+    db.prepare('UPDATE users SET active=0, session_v=session_v+1 WHERE id=?').run(u.id);
+    p.comptes = (p.comptes || []).filter((x) => x !== u.id);
+    journal(req, p, `accès retiré à ${u.nom} (${u.email})`);
+    partenaireSave(p);
+  })();
+  res.json({ ok: true });
+});
+
 r.post('/:id/fichiers', limiteDepots, corpsBrut, (req, res) => {
   const p = req.partenaire;
   if (!req.titulaire) return err(res, 403, 'PARTNER_NOT_OWNER', 'Seul le partenaire dépose ses pièces.');
