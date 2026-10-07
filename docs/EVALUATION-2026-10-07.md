@@ -83,7 +83,7 @@ Durées indicatives. Le marché public reste hors du plan.
 | Lot | # | Travail | Axes couverts | Statut |
 |---|---|---|---|---|
 | 1 — Corrections rapides | 1 | Notifications : attribution et publication aux seuls fournisseurs concernés | S25 | Fait |
-| | 2 | Mot de passe oublié | S6 | À faire |
+| | 2 | Mot de passe oublié | S6 | Fait |
 | | 3 | Date limite de dépôt appliquée | A10, S13 | À faire |
 | 2 — Dialogue avec le fournisseur | 4 | Questions posées par le fournisseur ; réponses et additifs publiés par l'acheteur | S11, S12, A9 | À faire |
 | | 5 | Réponse du fournisseur aux demandes de clarification | S21, A13 | À faire |

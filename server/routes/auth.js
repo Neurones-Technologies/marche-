@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { db, auditAppend, jetonUtiliser } = require('../db');
+const { db, auditAppend, jetonUtiliser, jetonCreer } = require('../db');
 const { sign, setCookie, clearCookie, requireAuth, bcrypt, whoLabel, needPerm, roleDef } = require('../auth');
 const { slug } = require('../db');
 const cfg = require('../config');
@@ -47,6 +47,41 @@ r.get('/jeton', (req, res) => {
   db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
   auditAppend(u.id, whoLabel({ ...u, roleLab: roleDef(u.role).lab }), 'Connexion');
   res.redirect('/tableau-de-bord?bienvenue=1');
+});
+
+/* Mot de passe oublié : un lien à usage unique, valable une heure, est envoyé au courriel du compte. La réponse est la
+   même que le compte existe ou non (pas d'énumération des comptes) ; demandes limitées par adresse IP. Sans envoi réel
+   des courriels, hors production, le lien est rendu dans la réponse pour pouvoir avancer (démonstration). */
+const limiteOubli = rateLimit({ windowMs: 3600000, limit: Number(process.env.OUBLI_PAR_HEURE) || 5, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Trop de demandes : réessayez dans une heure.' } });
+const REPONSE_OUBLI = 'Si un compte actif correspond à cette adresse, un courriel vient de lui être envoyé avec un lien valable une heure.';
+const mdpValide = (n) => n.length >= 10 && n.length <= 200 && /[a-z]/.test(n) && /[A-Z]/.test(n) && /\d/.test(n);
+r.post('/oubli', limiteOubli, (req, res) => {
+  const mail = require('../mail');
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  const u = email ? db.prepare('SELECT id, nom, email FROM users WHERE lower(email)=? AND active=1').get(email) : null;
+  let lien = null;
+  if (u) {
+    // une nouvelle demande annule les liens précédents encore valables
+    db.prepare("UPDATE jetons SET used=1 WHERE user_id=? AND type='reinit' AND used=0").run(u.id);
+    lien = require('../espaces').adresseCourante() + '/?reinit=' + jetonCreer(u.id, 'reinit', 1);
+    mail.envoyer({ a: [u.email], objet: 'Réinitialisation de votre mot de passe Marché+',
+      corps: `Bonjour ${u.nom},\n\nPour choisir un nouveau mot de passe, ouvrez ce lien dans l’heure :\n${lien}\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.` })
+      .catch((e) => console.error('Courriel de réinitialisation', e));
+    auditAppend(u.id, u.nom + ' — mot de passe oublié', 'Lien de réinitialisation du mot de passe demandé');
+  }
+  res.json({ message: REPONSE_OUBLI, ...(lien && !cfg.prod && !require('../mail').actif() ? { lien } : {}) });
+});
+/** Nouveau mot de passe par le lien reçu : ferme aussi les sessions ouvertes du compte. */
+r.post('/reinit', limiter, (req, res) => {
+  const n = String((req.body || {}).motDePasse || '');
+  if (!mdpValide(n)) return res.status(422).json({ error: '10 caractères minimum, avec majuscule, minuscule et chiffre.', code: 'PASSWORD_WEAK' });
+  const uid = jetonUtiliser((req.body || {}).jeton, 'reinit');
+  const u = uid && db.prepare('SELECT id, nom, role FROM users WHERE id=? AND active=1').get(uid);
+  if (!u) return res.status(410).json({ error: 'Lien invalide, déjà utilisé ou expiré : refaites une demande.', code: 'TOKEN_INVALID' });
+  db.prepare('UPDATE users SET pass_hash=?, session_v=session_v+1 WHERE id=?').run(bcrypt.hashSync(n, 10), u.id);
+  auditAppend(u.id, whoLabel({ ...u, roleLab: roleDef(u.role).lab }), 'Mot de passe réinitialisé par le lien reçu par courriel');
+  res.json({ ok: true, message: 'Mot de passe modifié : connectez-vous avec le nouveau.' });
 });
 
 r.get('/me', requireAuth, (req, res) => res.json({ user: pub(req.user), perms: req.user.perms }));

@@ -64,11 +64,32 @@
     <input id="lg-pw" type="password" autocomplete="current-password" required>
     <div id="lg-err" class="lg-err" role="alert" hidden></div>
     <button class="btn btn-primary" type="submit" id="lg-go">Connecter</button>
+    <button type="button" class="lg-lien" id="lg-oubli">Mot de passe oublié ?</button>
     <div id="lg-ok" class="lg-ok" role="status" hidden></div>
     <details class="lg-demo" id="lg-demo" hidden>
       <summary>Comptes de démo</summary>
       <div id="lg-demo-list"></div>
     </details>
+  </form>
+  <form id="oubli-form" class="login-card" novalidate hidden>
+    <h1>Mot de passe oublié</h1>
+    <p class="muted">Indiquez le courriel de votre compte : vous recevrez un lien pour choisir un nouveau mot de passe.</p>
+    <label for="ob-email">Courriel</label>
+    <input id="ob-email" type="email" autocomplete="username" required>
+    <div id="ob-err" class="lg-err" role="alert" hidden></div>
+    <div id="ob-ok" class="lg-ok" role="status" hidden></div>
+    <button class="btn btn-primary" type="submit" id="ob-go">Envoyer le lien</button>
+    <button type="button" class="lg-lien" id="ob-retour">Retour à la connexion</button>
+  </form>
+  <form id="reinit-form" class="login-card" novalidate hidden>
+    <h1>Nouveau mot de passe</h1>
+    <label for="ri-pw1">Nouveau mot de passe</label>
+    <input id="ri-pw1" type="password" autocomplete="new-password" required>
+    <label for="ri-pw2">Confirmation</label>
+    <input id="ri-pw2" type="password" autocomplete="new-password" required>
+    <small class="muted">10 caractères minimum, avec majuscule, minuscule et chiffre.</small>
+    <div id="ri-err" class="lg-err" role="alert" hidden></div>
+    <button class="btn btn-primary" type="submit" id="ri-go">Enregistrer</button>
   </form>
 </div>
 <div id="dlg" class="dlg" hidden></div>

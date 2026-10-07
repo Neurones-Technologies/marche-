@@ -90,6 +90,7 @@
     $('login').hidden = false;
     // l'espace de l'entreprise : son nom au-dessus du formulaire
     api('GET', '/api/espace').then(function (e) { var x = $('lg-espace'); x.hidden = !e.nom; x.textContent = e.nom ? 'Espace de ' + e.nom : ''; }).catch(function () {});
+    vueConnexion('login-form');
     var er = $('lg-err');
     er.hidden = !msg; er.textContent = msg || '';
     $('lg-pw').value = '';
@@ -158,8 +159,42 @@
       .catch(function (err) { var er = $('lg-err'); er.hidden = false; er.textContent = err.message; });
   }
 
-  // Démarrage : session existante ? sinon écran de connexion.
-  api('GET', '/api/auth/me').then(function () { return enter(false); }).catch(function () { showLogin(); });
+  /* Mot de passe oublié : demande du lien, puis nouveau mot de passe par le lien reçu (/?reinit=…). */
+  function vueConnexion(id) { ['login-form', 'oubli-form', 'reinit-form'].forEach(function (x) { $(x).hidden = x !== id; }); }
+  $('lg-oubli').addEventListener('click', function () {
+    vueConnexion('oubli-form'); $('ob-email').value = $('lg-email').value; $('ob-err').hidden = true; $('ob-ok').hidden = true; $('ob-email').focus();
+  });
+  $('ob-retour').addEventListener('click', function () { vueConnexion('login-form'); $('lg-email').focus(); });
+  $('oubli-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var b = $('ob-go'); b.disabled = true; $('ob-err').hidden = true;
+    api('POST', '/api/auth/oubli', { email: $('ob-email').value })
+      .then(function (r) {
+        var o = $('ob-ok'); o.hidden = false; o.textContent = r.message;
+        if (r.lien) { // démonstration : courriels non configurés
+          o.appendChild(document.createElement('br'));
+          var a = document.createElement('a'); a.href = r.lien; a.textContent = 'Ouvrir le lien (démonstration : courriels non configurés)'; o.appendChild(a);
+        }
+      })
+      .catch(function (err) { var er = $('ob-err'); er.hidden = false; er.textContent = err.message; })
+      .then(function () { b.disabled = false; });
+  });
+  var jetonReinit = (location.search.match(/[?&]reinit=([0-9a-f]{64})/) || [])[1];
+  if (jetonReinit) history.replaceState(null, '', location.pathname); // le jeton ne reste ni dans la barre d'adresse ni dans l'historique
+  $('reinit-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var er = $('ri-err'); er.hidden = true;
+    if ($('ri-pw1').value !== $('ri-pw2').value) { er.hidden = false; er.textContent = 'Les deux saisies ne correspondent pas.'; return; }
+    var b = $('ri-go'); b.disabled = true;
+    api('POST', '/api/auth/reinit', { jeton: jetonReinit, motDePasse: $('ri-pw1').value })
+      .then(function (r) { jetonReinit = null; vueConnexion('login-form'); var o = $('lg-ok'); o.hidden = false; o.textContent = r.message; $('lg-email').focus(); })
+      .catch(function (err) { er.hidden = false; er.textContent = err.message; })
+      .then(function () { b.disabled = false; });
+  });
+
+  // Démarrage : lien de réinitialisation ? sinon session existante, ou écran de connexion.
+  if (jetonReinit) { showLogin(); vueConnexion('reinit-form'); setTimeout(function () { $('ri-pw1').focus(); }, 0); }
+  else api('GET', '/api/auth/me').then(function () { return enter(false); }).catch(function () { showLogin(); });
 
   // Comptes de démonstration (affichés seulement si l'instance les expose)
   api('GET', '/api/auth/demo').then(function (r) {
