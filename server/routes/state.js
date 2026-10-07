@@ -505,10 +505,13 @@ r.post('/offers', (req, res) => {
   // fichiers préparés par l'entreprise : tout collaborateur joint des pièces au même dépôt
   const pending = db.prepare(`SELECT * FROM files WHERE owner IN (${marques(equipe)}) AND procedure_id=? AND offer_id IS NULL`).all(...equipe, req.pid);
   const byDoc = new Map(pending.map((f) => [f.doc_id, f]));
-  // pièces exigées selon le pays du soumissionnaire et le profil réglementaire (zone de préférence, pays local)
-  const exigees = new Set(R.requiredDocs({ org, cdc, cadre: req.store.get('cadre'), docDefs }, { iso: d.iso }).map((x) => x.id));
-  // une pièce validée au référencement (et non expirée) tient lieu de pièce du dossier, sauf si une autre est jointe
+  // pièces exigées selon le pays du soumissionnaire et le profil réglementaire (zone de préférence, pays local) : celles
+  // de l'appel d'offres, pas celles du référencement (sauf imposées par le profil)
   const piecesRef = require('../formulaire').formulaire().pieces, refDe = (x) => R.pieceReferencement(x, piecesRef);
+  const ctxR = { org, cdc, cadre: req.store.get('cadre'), docDefs };
+  const propres = new Set(R.piecesOffre(docDefs, piecesRef, R.cadre(ctxR).piecesImposees).map((x) => x.id));
+  const exigees = new Set(R.requiredDocs(ctxR, { iso: d.iso }).map((x) => x.id).filter((id) => propres.has(id)));
+  // une pièce imposée validée au référencement (et non expirée) tient lieu de pièce du dossier, sauf si une autre est jointe
   const parRef = (x) => !byDoc.has(x.id) && partenaire && partenaire.statut === 'reference' && !!refDe(x) && pieceValable(partenaire.pieces[refDe(x)]);
   const docs = {}, missing = [];
   docDefs.forEach((x) => {
@@ -538,7 +541,8 @@ r.post('/offers', (req, res) => {
     // pièces administratives exigées, puis documents de l'offre (mémoire technique, bordereau des prix)
     offer.pieces = pending.filter((f) => docs[f.doc_id] === true || DOCS_OFFRE[f.doc_id])
       .map((f) => ({ id: f.id, doc: f.doc_id, name: f.name, size: f.size, sha256: f.sha256, ...(DOCS_OFFRE[f.doc_id] ? { offre: true } : {}) }))
-      .concat(docDefs.filter((x) => exigees.has(x.id) && parRef(x)).map((x) => {
+      // pièces du référencement valables : jointes à l'offre pour l'acheteur, sans être exigées du soumissionnaire
+      .concat(docDefs.filter((x) => (exigees.has(x.id) || !propres.has(x.id)) && parRef(x)).map((x) => {
         const pc = partenaire.pieces[refDe(x)];
         return { id: pc.fichier, doc: x.id, name: pc.nom, size: pc.taille, sha256: pc.sha256, referencement: partenaire.id, expire: pc.expire };
       }));

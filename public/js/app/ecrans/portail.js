@@ -192,14 +192,17 @@ function vPortail(m, etape){
   /* Pièces */
   var k3=add(zPrep,'div','card'); k3.style.marginTop='18px';
   var ph3=add(k3,'div','panel-head');
-  add(ph3,'span',null,'3 · Pièces du dossier de candidature');
+  add(ph3,'span',null,'3 · Pièces demandées par l’appel d’offres');
   add(ph3,'span','chip '+(uem?'c-teal':'c-violet'), uem?'Liste applicable aux soumissionnaires UEMOA':'Liste applicable aux soumissionnaires hors zone');
   var b3=add(k3,'div','pad');
-  var req = DOCS().filter(function(x){
+  // pièces propres à l'appel d'offres (cahier des charges) ; celles du référencement ne sont pas redemandées
+  var piecesRef=(state.formulaireReferencement||{}).pieces;
+  var req = R.piecesOffre(DOCS(), piecesRef, CADRE().piecesImposees).filter(function(x){
     if(x.scope==='tous') return true;
     if(x.scope==='local') return loc;
     return !uem;
   });
+  if(!req.length) add(b3,'p','muted','Aucune pièce demandée par cet appel d’offres.');
   // pièces validées au référencement : elles tiennent lieu de pièce du dossier (le serveur les reprend au dépôt)
   var mp=state.monPartenaire, couvertes=(mp && mp.statut==='reference' && mp.piecesValables) || {};
   req.forEach(function(doc){

@@ -270,10 +270,16 @@ const CDC_VIDE = { procedure: '', langue: '', deviseSoumission: '', ouverture: '
   delaiMax: '', penalite: '', avance: '', tva: '', retenueNonResident: '', douaneACharge: '', prefActive: false, prefTaux: 0, partTechnique: 75 };
 /* Grille d'un appel d'offres neuf : les deux critères calculés (qu'on ne peut pas ajouter à la main), sans pondération. */
 const criteresVides = () => seed.CRITERIA.filter((c) => c.kind === 'auto').map((c) => ({ ...clone(c), weight: 0 }));
+/** Pièces de l'appel d'offres de démonstration : celles par défaut, plus la caution de soumission (propre à l'offre). */
+function piecesOffreDemo(cdc) {
+  const d = piecesOffreDefaut(cdc);
+  if (!d.some((x) => x.id === 'caution')) d.push(clone(seed.DOC_DEFS.find((x) => x.id === 'caution')));
+  return d;
+}
 function procDefaults(cdc, { demo = false } = {}) {
   const circuit = (kvGet('circuitModele') || { value: seed.APPROVALS }).value;
   return {
-    docDefs: piecesOffreDefaut(cdc),
+    docDefs: demo ? piecesOffreDemo(cdc) : piecesOffreDefaut(cdc),
     cdc, criteria: demo ? clone(seed.CRITERIA) : criteresVides(), quality: {}, justif: {}, confirmed: {}, excluded: {},
     depClosed: false, evalDone: false, approvals: C.reinitialiser(circuit),
     qa: [], additifs: [], clarifs: [], coi: {}, recours: [], rejets: [], reclamations: [], standstill: { days: 15, startedAt: null },

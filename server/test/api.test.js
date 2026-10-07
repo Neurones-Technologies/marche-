@@ -36,7 +36,9 @@ test('le soumissionnaire ne voit pas une procédure non publiée', async () => {
 test('publication du CDC puis dépôt d’offre avec accusé et audit', async () => {
   const achats = await login('y.koffi@bal.ci');
   const st = (await call('GET', '/api/procedures/p1/state', null, achats)).json;
-  const pub = await call('PATCH', '/api/procedures/p1/state', { changes: { cdc: { ...st.state.cdc, cdcPublie: true } }, base: { cdc: st.revs.cdc } }, achats);
+  // pièce propre à l'appel d'offres (les pièces du référencement ne sont pas redemandées dans l'offre)
+  const dd = st.state.docDefs.some((x) => x.id === 'caution') ? st.state.docDefs : st.state.docDefs.concat([{ id: 'caution', label: 'Caution de soumission', scope: 'tous' }]);
+  const pub = await call('PATCH', '/api/procedures/p1/state', { changes: { docDefs: dd, cdc: { ...st.state.cdc, cdcPublie: true } }, base: { cdc: st.revs.cdc, docDefs: st.revs.docDefs } }, achats);
   assert.equal(pub.status, 200);
   const soum = await login('contact.sotrap@bal.ci');
   // publiée, la procédure est visible du soumissionnaire, mais ni les offres ni les notes
@@ -49,6 +51,7 @@ test('publication du CDC puis dépôt d’offre avec accusé et audit', async ()
   const noFiles = await call('POST', '/api/procedures/p1/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', montant: 91000000, delai: 90, garantie: 24, refsCount: 4, lots: ['l1', 'l2'] }, soum);
   assert.equal(noFiles.status, 422);
   assert.match(noFiles.json.error, /Pièces manquantes/);
+  assert.doesNotMatch(noFiles.json.error, /Registre|fiscale/); // pièces du référencement : pas redemandées
   assert.equal((await upload('registre', 'virus.exe', Buffer.from('MZ....'), soum)).status, 415);
   assert.equal((await upload('registre', 'faux.pdf', Buffer.from('pas un pdf'), soum)).status, 415);
   const evalCookie = await login('f.assamoi@bal.ci');

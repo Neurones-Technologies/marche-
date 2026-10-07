@@ -144,6 +144,13 @@
     return ids.indexOf(docDef.id) >= 0 ? docDef.id : null;
   }
 
+  /* Pièces que l'offre doit joindre : celles propres à l'appel d'offres (cahier des charges, « Pièces à joindre à chaque
+     offre »). Les pièces du référencement n'y sont pas redemandées (elles relèvent du dossier du partenaire), sauf
+     celles que le profil réglementaire impose à chaque offre. */
+  function piecesOffre(docDefs, piecesRef, imposees) {
+    return (docDefs || []).filter(function (d) { return !pieceReferencement(d, piecesRef) || (imposees || []).indexOf(d.id) >= 0; });
+  }
+
   /* Échéance de dépôt des offres : la date limite du cahier des charges à 10 h 00, heure d'Abidjan (UTC, sans heure
      d'été), comme l'annonce le dossier. Retourne un instant (ms) ou null si la date n'est pas renseignée. */
   var HEURE_LIMITE = '10:00';
@@ -194,7 +201,7 @@
   }
 
   return {
-    cdcManquants: cdcManquants, resultatOffre: resultatOffre, pieceReferencement: pieceReferencement, echeanceDepot: echeanceDepot,
+    cdcManquants: cdcManquants, resultatOffre: resultatOffre, pieceReferencement: pieceReferencement, piecesOffre: piecesOffre, echeanceDepot: echeanceDepot,
     profilId: profilId, cadre: cadre, prefTaux: prefTaux,
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,
