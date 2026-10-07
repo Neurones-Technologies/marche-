@@ -148,9 +148,11 @@ var ZONES_VIDER=[
   ['budget','Budget','Lignes budgétaires.'],
   ['notifications','Notifications et courriels','Notifications et boîte d’envoi.'],
   ['suppleances','Suppléances','Délégations et affectations des valideurs.'],
+  ['comptes','Comptes utilisateurs','Tous les comptes, sauf le vôtre. Les suppléances partent avec eux.'],
   ['journal','Piste d’audit','Le journal repart d’une chaîne neuve.']
 ];
 var ZONES_FICTIVES=[
+  ['comptes','Comptes utilisateurs','Un compte par rôle (achats, évaluateurs, approbateur, auditeur, demandeur, fournisseur), mot de passe de démonstration.'],
   ['budget','Budget','Trois lignes budgétaires (informatique, maintenance, agences).'],
   ['partenaires','Partenaires','Quatre entreprises, dont deux référencées (SOTRAP, Delta Bâtiment).'],
   ['appels','Appel d’offres','Un appel d’offres réseau et télécoms avec huit offres reçues.'],
@@ -212,6 +214,7 @@ resetBtn.addEventListener('click',function(){
         if(a.partenaires!=null) m.push(a.partenaires+' partenaire'+(a.partenaires>1?'s':''));
         if(a.besoins!=null) m.push(a.besoins+' demande'+(a.besoins>1?'s':'')+' d’achat');
         if(a.budget!=null) m.push(a.budget+' ligne'+(a.budget>1?'s':'')+' budgétaire'+(a.budget>1?'s':''));
+        if(a.comptes!=null) m.push(a.comptes+' compte'+(a.comptes>1?'s':'')+(a.motDePasse?' (mot de passe : '+a.motDePasse+')':''));
         rechargerApres('Ajouté : '+m.join(', ')+'.');
       }).catch(function(e){ rendre(); toast(e.message||'Ajout impossible.'); });
     } });
@@ -221,7 +224,11 @@ var viderBtn=document.getElementById('btn-vider');
 viderBtn.addEventListener('click',function(){
   fenetreZones({ cle:'vider', titre:'Vider des données', bouton:'Vider', danger:true, confirmation:true, zones:ZONES_VIDER,
     intro:'Choisissez les zones à effacer. Les paramètres de l’organisation et les comptes sont toujours conservés.',
-    force:function(coche, k){ return k==='commandes' && coche.appels ? 'Effacées avec les appels d’offres, auxquels elles sont rattachées.' : ''; },
+    force:function(coche, k){
+      if(k==='commandes' && coche.appels) return 'Effacées avec les appels d’offres, auxquels elles sont rattachées.';
+      if(k==='suppleances' && coche.comptes) return 'Effacées avec les comptes, qu’elles désignent.';
+      return '';
+    },
     lancer:function(zones, rendre){
       MP.api('POST','/api/admin/vider',{ confirmation:'VIDER', zones:zones }).then(function(){ rechargerApres('Données effacées.'); })
         .catch(function(e){ rendre(); toast(e.message||'Effacement impossible.'); });

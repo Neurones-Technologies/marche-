@@ -56,3 +56,17 @@ test('données fictives par zones : ajoutées sans rien effacer, références et
   assert.deepEqual(procs.map((p) => p.ref).sort(), ['AO-2026-014', 'AO-2026-015']);
   assert.equal((await call('GET', '/api/audit', null, admin)).json.verification.ok, true);
 });
+
+test('comptes : vidés sauf celui de l’auteur, puis recréés en données fictives', async () => {
+  const admin = await login('administrateur@bal.ci');
+  ok(await call('POST', '/api/admin/vider', { confirmation: 'VIDER', zones: ['comptes'] }, admin));
+  const restants = (await call('GET', '/api/auth/users', null, admin)).json;
+  assert.deepEqual(restants.map((u) => u.email), ['administrateur@bal.ci']);
+  const r = await call('POST', '/api/admin/fictives', { zones: ['comptes'] }, admin);
+  ok(r, 201);
+  assert.equal(r.json.ajout.comptes, 7);
+  const sotrap = await login('contact.sotrap@bal.ci'); // le compte fournisseur retrouve sa fiche partenaire
+  const moi = (await call('GET', '/api/partenaires/moi', null, sotrap));
+  assert.equal(moi.status, 200, JSON.stringify(moi.json));
+  assert.equal((await call('POST', '/api/admin/fictives', { zones: ['comptes'] }, admin)).json.ajout.comptes, 0);
+});

@@ -24,7 +24,7 @@ r.post('/admin/reset', needPerm('params.edit', 'roles.edit'), (req, res) => {
 
 /** Zones choisies : absentes, toutes (vidage) ; sinon une liste non vide de zones connues. */
 const zonesDe = (d, connues, toutesParDefaut) => {
-  if (d.zones == null) return toutesParDefaut ? Object.keys(connues) : null;
+  if (d.zones == null) return toutesParDefaut ? [] : null; // vidage sans choix : la valeur par défaut de viderDonnees
   if (!Array.isArray(d.zones) || !d.zones.length || d.zones.some((z) => !Object.prototype.hasOwnProperty.call(connues, z))) return null;
   return [...new Set(d.zones)];
 };

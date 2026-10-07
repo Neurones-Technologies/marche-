@@ -621,14 +621,17 @@ db.transaction(function migrate() {
 }
 
 /** Zones de données que l'on peut vider, avec leur libellé (journal d'audit). Les paramètres de l'organisation (profil,
-    rôles, circuits, formulaires, seuils, règles de notification) et les comptes ne sont jamais touchés. */
+    rôles, circuits, formulaires, seuils, règles de notification) ne sont jamais touchés ; le compte de celui qui vide
+    est toujours gardé. */
 const ZONES_VIDER = { appels: 'appels d’offres et offres', commandes: 'commandes', besoins: 'demandes d’achat', partenaires: 'partenaires',
-  budget: 'budget', notifications: 'notifications et courriels', suppleances: 'suppléances', journal: 'piste d’audit' };
+  budget: 'budget', notifications: 'notifications et courriels', suppleances: 'suppléances', comptes: 'comptes (sauf celui de l’auteur)', journal: 'piste d’audit' };
 /** Vide les zones choisies (toutes par défaut). Les commandes, rattachées à un appel d'offres, partent avec les appels
     d'offres. Retourne les identifiants des fichiers à effacer du disque. */
 function viderDonnees(uid, who, zones) {
-  const z = new Set(zones && zones.length ? zones : Object.keys(ZONES_VIDER));
+  // sans choix : tout, sauf les comptes (à cocher explicitement)
+  const z = new Set(zones && zones.length ? zones : Object.keys(ZONES_VIDER).filter((k) => k !== 'comptes'));
   if (z.has('appels')) z.add('commandes');
+  if (z.has('comptes')) z.add('suppleances'); // les délégations citent des comptes
   const fichiers = [];
   const del = (where) => {
     fichiers.push(...db.prepare('SELECT id FROM files WHERE ' + where).all().map((f) => f.id));
@@ -653,16 +656,21 @@ function viderDonnees(uid, who, zones) {
     }
     const vides = { budget: { budget: { lignes: [] } }, notifications: { notifs: [], emails: [] }, suppleances: { delegations: [], affectations: [] } };
     for (const [zone, cles] of Object.entries(vides)) if (z.has(zone)) for (const [k, v] of Object.entries(cles)) if (kvGet(k)) kvSet(k, v, 'vidage');
+    if (z.has('comptes')) {
+      db.prepare('DELETE FROM users WHERE id<>?').run(uid);
+      db.prepare('DELETE FROM jetons WHERE user_id<>?').run(uid);
+      for (const p of partenairesAll()) if ((p.comptes || []).some((c) => c !== uid)) { p.comptes = p.comptes.filter((c) => c === uid); partenaireSave(p); }
+    }
     if (z.has('journal')) db.exec('DELETE FROM audit;');
     bumpRev();
-    auditAppend(uid, who, 'Données effacées : ' + Object.keys(ZONES_VIDER).filter((k) => z.has(k)).map((k) => ZONES_VIDER[k]).join(', ') + ' ; paramètres et comptes conservés');
+    auditAppend(uid, who, 'Données effacées : ' + Object.keys(ZONES_VIDER).filter((k) => z.has(k)).map((k) => ZONES_VIDER[k]).join(', ') + ' ; paramètres conservés');
   });
   tx();
   return fichiers;
 }
 
 /* ---- données fictives, ajoutées à la demande, par zone, sans rien effacer ---- */
-const ZONES_FICTIVES = { budget: 'lignes budgétaires', partenaires: 'partenaires', appels: 'appel d’offres avec ses offres', besoins: 'demandes d’achat' };
+const ZONES_FICTIVES = { comptes: 'comptes', budget: 'lignes budgétaires', partenaires: 'partenaires', appels: 'appel d’offres avec ses offres', besoins: 'demandes d’achat' };
 const PARTENAIRES_FICTIFS = [
   { raisonSociale: 'SOTRAP Ingénierie SA', pays: 'CI', immatriculation: 'CI-ABJ-2009-B-14522', adresse: 'Abidjan, Plateau',
     contact: { nom: 'K. Amani', email: 'contact.sotrap@bal.ci', tel: '' }, domaines: ['Réseaux et télécoms'], statut: 'reference', compte: 'contact.sotrap@bal.ci' },
@@ -691,6 +699,22 @@ function nouveauPid() {
 function ajouterFictives(uid, who, zones) {
   const z = new Set(zones || []), ajout = {};
   const tx = db.transaction(() => {
+    if (z.has('comptes')) {
+      // les comptes de la démonstration (un par rôle), au mot de passe de démonstration ; jamais un courriel en double
+      const roles = (kvGet('roles') || { value: {} }).value, h = bcrypt.hashSync(cfg.seedPassword, 10);
+      ajout.comptes = 0;
+      seed.USERS.forEach((u, i) => {
+        const email = slug(u.nom) + '@bal.ci';
+        if (!roles[u.role] || db.prepare('SELECT 1 FROM users WHERE lower(email)=?').get(email)) return;
+        const id = db.prepare('SELECT 1 FROM users WHERE id=?').get(u.id) ? 'u' + Date.now().toString(36) + i : u.id;
+        db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)').run(id, u.nom, email, u.role, h);
+        // compte fournisseur : rattaché à la fiche dont il est le contact, si elle n'a pas encore de compte
+        const p = u.role === 'soum' && partenairesAll().find((x) => String((x.contact || {}).email).toLowerCase() === email && !(x.comptes || []).length);
+        if (p) { p.comptes = [id]; partenaireSave(p); db.prepare('UPDATE users SET partenaire_id=? WHERE id=?').run(p.id, id); }
+        ajout.comptes++;
+      });
+      ajout.motDePasse = ajout.comptes ? cfg.seedPassword : null;
+    }
     if (z.has('budget')) {
       const b = (kvGet('budget') || { value: { lignes: [] } }).value, lignes = b.lignes || [];
       const neuves = budgetDemo().filter((l) => !lignes.some((x) => x.id === l.id || x.code === l.code));
