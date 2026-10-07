@@ -159,7 +159,7 @@ function vPortail(m, etape){
 
   /* Offre */
   var k2=add(zPrep,'div','card'); k2.style.marginTop='18px';
-  add(k2,'div','panel-head','2 · Contenu de l\u2019offre');
+  add(k2,'div','panel-head','2 · Contenu');
   var p2=add(k2,'div','pad');
   add(p2,'div','stat-k','Lots soumissionnés').style.marginBottom='8px';
   var lb=add(p2,'div'); lb.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px';
@@ -181,14 +181,14 @@ function vPortail(m, etape){
     });
   }
   d.montant=d.lots.reduce(function(t,id){ return t+(Number(d.prixLots[id])||0); },0) || '';
-  var tot=add(p2,'div','prix-total'); add(tot,'span',null,'Montant total HT de l’offre');
+  var tot=add(p2,'div','prix-total'); add(tot,'span',null,'Montant total HT');
   add(tot,'strong',null, d.montant ? sep(d.montant)+' '+d.devise : '—');
   var f2=add(p2,'div','frm');
   fld(f2,"Délai d'exécution (jours)",'input',d.delai,function(v){ d.delai=v; },'number');
   fld(f2,'Garantie proposée (mois)','input',d.garantie,function(v){ d.garantie=v; },'number');
   fld(f2,'Nombre de références similaires','input',d.refsCount,function(v){ d.refsCount=v; },'number');
   // documents de l'offre : ils accompagnent les montants et sont transmis à l'acheteur avec le pli
-  add(p2,'div','stat-k','Documents de l’offre').style.margin='18px 0 4px';
+  add(p2,'div','stat-k','Documents').style.margin='18px 0 4px';
   DOCS_OFFRE.forEach(function(x){ ligneFichier(p2, x, x.aide, ''); });
 
   /* Pièces */
