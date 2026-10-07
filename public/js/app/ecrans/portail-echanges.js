@@ -95,7 +95,6 @@ function vEchanges(m){
 
   var k=add(cote,'section','card chat'); k.setAttribute('aria-label','Conversation avec l’acheteur');
   var ph=add(k,'div','panel-head'); add(ph,'span',null,'Conversation');
-  add(ph,'span','muted chat-aide','Vos questions et leurs réponses sont partagées avec les autres entreprises, sans votre nom. Vos réclamations et vos réponses aux clarifications ne sont lues que par l’acheteur.');
   var fil=add(k,'div','chat-fil'); fil.setAttribute('role','log'); fil.setAttribute('aria-live','polite');
   var msgs=filEchanges();
   if(!msgs.length) add(fil,'p','muted chat-vide','Aucun échange pour l’instant. Posez une question sur le dossier ci-dessous : la réponse de l’acheteur apparaîtra ici.');
@@ -147,9 +146,7 @@ function saisieEchange(sa, limite, questionOuverte, reclamation){
   tx.placeholder = rec ? 'Exposez votre réclamation : ce que vous contestez et pourquoi.' : 'Votre question sur le dossier (publiée sans votre nom, avec la réponse).';
   tx.setAttribute('aria-label', rec ? 'Exposé de la réclamation' : 'Votre question');
   var env=add(ligne,'button','btn btn-primary','Envoyer'); fk(env, rec?'pt-rec-go':'pt-question-go');
-  add(sa,'div','muted chat-aide', rec ? 'La réclamation et la réponse de l’acheteur restent entre lui et votre entreprise.'
-    : (limite ? 'Vous pouvez poser vos questions jusqu’au '+new Date(limite).toLocaleDateString('fr-FR',{ day:'numeric', month:'long' })+' (3 jours avant la date limite). ' : '')
-      +'Pour l’équité entre les candidats, l’acheteur répond à toutes les entreprises consultées, sans dire qui a posé la question.');
+  if(rec) add(sa,'div','muted chat-aide','La réclamation et la réponse de l’acheteur restent entre lui et votre entreprise.');
   env.addEventListener('click',function(){
     var v=tx.value.trim();
     if(rec){
