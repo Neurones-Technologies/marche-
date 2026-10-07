@@ -32,6 +32,11 @@ function vPortailResultat(m){
   add(b,'p',null,r.motif);
   if(r.statut==='retenue') add(b,'p','muted','L’acheteur vous contactera pour la suite : mise au point et bon de commande.');
   else if(r.statut!=='infructueux') add(b,'p','muted','Vous pouvez adresser une réclamation motivée ci-dessous si vous contestez cette décision.');
+  var o=state.monOffre||{}, mp=state.monPartenaire||{};
+  var bl=add(b,'button','btn btn-ghost btn-sm','Télécharger la lettre (PDF)'); fk(bl,'ma-lettre');
+  bl.addEventListener('click',function(){
+    telechargerLettres([{ nom:o.name||mp.raisonSociale||'', pays:o.iso?paysLettre(o.iso):'', montant:o.montant, devise:o.devise, resultat:r }],'Résultat '+REF()+'.pdf');
+  });
 }
 
 /* Additifs au dossier : ce qui modifie ou précise le dossier depuis sa publication (repris aussi dans le PDF). */
@@ -47,6 +52,8 @@ function vPortailAdditifs(m){
     String(a.texte||'').split(/\n\s*\n/).forEach(function(x){ if(x.trim()) add(e,'p',null,x.trim()); });
   });
 }
+
+function paysLettre(iso){ return ({ CI:'Côte d’Ivoire', BF:'Burkina Faso', SN:'Sénégal', ML:'Mali', NE:'Niger', TG:'Togo', BJ:'Bénin', GW:'Guinée-Bissau' })[iso] || iso; }
 
 /* Questions et réponses : publiées sans leur auteur ; on pose la sienne jusqu'à 3 jours avant l'échéance. */
 function vPortailQuestions(m){

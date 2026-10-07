@@ -14,6 +14,9 @@ function vRecours(m){
   var K=CADRE(), J=delaiJours();
 
   if(!allApproved()) return locked(m,"Cette étape s'ouvre une fois l'attribution prononcée.",'decision',"Aller au circuit d'approbation");
+  // une lettre par soumissionnaire (retenu, non retenu, écarté), en un seul PDF
+  var bl=add(h,'button','btn btn-ghost','Lettres de résultat (PDF)'); fk(bl,'lettres-resultat');
+  bl.addEventListener('click',function(){ telechargerLettres(lettresSoumissionnaires(),'Lettres de résultat '+REF()+'.pdf'); logit('Lettres de résultat générées'); });
 
   var rows=ranking(), win=rows[0];
   var notifie=!!state.standstill.startedAt, reste=standstillReste(), ro=recoursOuverts().length;
