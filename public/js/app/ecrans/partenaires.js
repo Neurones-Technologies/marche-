@@ -275,8 +275,9 @@ function vPartenaires(m){
   add(l,'h1',null,'Partenaires');
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
 
+  var liste=[];
   function charger(){
-    MP.api('GET','/api/partenaires').then(function(r){ zone.textContent=''; dessiner(r.partenaires); })
+    MP.api('GET','/api/partenaires').then(function(r){ liste=r.partenaires; zone.textContent=''; dessiner(r.partenaires); if(UI.fenetre) dessinerFenetre(); })
       .catch(function(e){ zone.textContent=''; add(zone,'p','muted',e.message); });
   }
   function agir(method, path, body, message){
@@ -296,73 +297,100 @@ function vPartenaires(m){
       ],
       recherche:function(p){ return [p.id, p.raisonSociale, p.pays, p.immatriculation, (p.domaines||[]).join(' ')].join(' '); },
       filtres:[{ lab:'Statut', options:Object.keys(STATUTS_PARTENAIRE).map(function(k){ return [k, STATUTS_PARTENAIRE[k][0]]; }), test:function(p,v){ return p.statut===v; } }],
-      actions:function(p,td){ boutonCellule(td, UI.partenaire===p.id?'Affiché':'Ouvrir', function(){ UI.partenaire=p.id; majUrl(); zone.textContent=''; dessiner(list); }, 'prt-open-'+p.id).disabled=UI.partenaire===p.id; }
+      actions:function(p,td){ boutonCellule(td,'Ouvrir',function(){ ouvrirPartenaire(p.id); },'prt-open-'+p.id); }
     });
-    var cur=list.filter(function(p){ return p.id===UI.partenaire; })[0];
-    if(cur) fiche(cur);
+    // adresse d'un partenaire (/partenaires/PRT-0001) : sa fenêtre s'ouvre
+    if(UI.partenaire && !UI.fenetre && list.some(function(p){ return p.id===UI.partenaire; })) ouvrirPartenaire(UI.partenaire);
   }
-  function fiche(p){
-    var rt=retourListe(zone,'Tous les partenaires',function(){ UI.partenaire=null; majUrl(); charger(); },'prt-retour'); rt.style.marginTop='18px';
-    var k=add(zone,'div','card');
-    var ph=add(k,'div','panel-head'); add(ph,'span',null,p.id+' — '+p.raisonSociale); chipStatutPartenaire(ph,p.statut);
-    var b=add(k,'div','pad');
-    [['Pays',p.pays],['Immatriculation',p.immatriculation],['Adresse',p.adresse],['Contact',[(p.contact||{}).nom,(p.contact||{}).email,(p.contact||{}).tel].filter(Boolean).join(' · ')],
-     ['Domaines',(p.domaines||[]).join(', ')],['Fiche créée le',p.cree],['Référencé le',p.referenceLe]].forEach(function(x){
-      if(!x[1]) return; var row=add(b,'div','docline'); add(row,'div','muted',x[0]); add(row,'div',null,x[1]);
-    });
-    if(p.rejet && p.statut==='rejete'){ var w=add(b,'div','warn'); add(w,'strong',null,'Rejeté ('+p.rejet.role+') : '); w.appendChild(document.createTextNode(p.rejet.motif)); }
-    if(p.decision){ var w2=add(b,'div','note'); add(w2,'strong',null,'Dernière décision ('+p.decision.at+') : '); w2.appendChild(document.createTextNode(p.decision.vers+' — '+p.decision.motif)); }
-    if((p.questions||[]).length){
-      var kq=add(zone,'div','card'); kq.style.marginTop='18px';
-      add(kq,'div','panel-head','Réponses au questionnaire');
-      var bq=add(kq,'div','pad');
-      p.questions.forEach(function(q){ var row=add(bq,'div','docline'); add(row,'div','muted',q.label); add(row,'div',null,valeurReponse(q,(p.reponses||{})[q.id])); });
-    }
-    var foot=add(k,'div','panel-foot');
-    function bouton(lab, statut, msg, titre){
-      var bt=add(foot,'button','btn btn-ghost btn-sm',lab); fk(bt,'prt-'+statut);
-      bt.addEventListener('click',function(){
-        demander(msg,function(motif){ agir('POST',enc(p.id)+'/statut',{statut:statut, motif:motif},'Partenaire '+p.id+' : '+lab.toLowerCase()+'.'); },titre,lab,'Motif');
-      });
-    }
-    if(p.statut==='reference') bouton('Suspendre','suspendu','Le partenaire ne pourra plus déposer d’offre là où le référencement est exigé, jusqu’à sa réactivation.','Suspendre '+p.raisonSociale+' ?');
-    if(p.statut==='suspendu') bouton('Réactiver','reference','Les pièces exigées doivent être validées et en cours de validité.','Réactiver '+p.raisonSociale+' ?');
-    if(['reference','suspendu','candidat','rejete'].indexOf(p.statut)>=0) bouton('Exclure','exclu','L’exclusion est définitive.','Exclure '+p.raisonSociale+' ?');
+  /* Fenêtre d'un partenaire : actions (suspendre, réactiver, exclure), fiche modifiable, pièces, parcours, historique. */
+  function ouvrirPartenaire(id){
+    UI.partenaire=id; majUrl();
+    ouvrirFenetre(function(){ var p=liste.filter(function(x){ return x.id===id; })[0]; return p ? p.id+' — '+p.raisonSociale : 'Partenaire'; }, function(c,pied){
+      var p=liste.filter(function(x){ return x.id===id; })[0]; if(!p) return false;
+      var ch=add(c,'div','fen-chips'); chipStatutPartenaire(ch,p.statut);
+      if(p.evaluation && p.evaluation.nb) chipCellule(ch,'Note '+p.evaluation.moyenne+'/100', p.evaluation.alerte?'c-red':'c-grey');
+      if(p.referenceLe) chipCellule(ch,'Référencé le '+p.referenceLe,'c-grey');
 
-    var kp=add(zone,'div','card'); kp.style.marginTop='18px';
-    add(kp,'div','panel-head','Pièces administratives');
-    var bp=add(kp,'div','pad');
-    p.exigees.forEach(function(e){
-      var row=add(bp,'div','docline');
-      var lf=add(row,'div'); lf.style.flex='1 1 260px';
-      var tl=add(lf,'div'); add(tl,'span',null,e.label).style.fontWeight='600';
-      if(!e.obligatoire) add(tl,'span','chip c-teal','Facultative').style.marginLeft='8px';
-      if(e.piece){
-        var a=add(lf,'a',null,e.piece.nom); a.href='/api/files/'+e.piece.fichier; a.setAttribute('download',e.piece.nom); a.title='SHA-256 '+e.piece.sha256;
-        add(lf,'div','muted','Déposée le '+e.piece.depose+(e.piece.expire?' · valable jusqu’au '+e.piece.expire:'')+(e.piece.motif?' · refus : '+e.piece.motif:''));
+      /* Actions sur le statut, en tête */
+      var act=add(c,'div','prt-actions');
+      function bouton(lab, statut, msg, titre, cls){
+        var bt=add(act,'button','btn btn-sm '+(cls||'btn-ghost'),lab); fk(bt,'prt-'+statut);
+        bt.addEventListener('click',function(){
+          demander(msg,function(motif){ agir('POST',enc(p.id)+'/statut',{statut:statut, motif:motif},'Partenaire '+p.id+' : '+lab.toLowerCase()+'.'); },titre,lab,'Motif');
+        });
       }
-      var x=ETATS_PIECE[e.etat]||[e.etat,'c-grey']; add(row,'span','chip '+x[1],x[0]);
-      if(e.piece && e.etat==='a_verifier' && p.statut!=='verification'){
-        var bv=add(row,'button','btn btn-primary btn-sm','Valider'); fk(bv,'prt-pv-'+e.id);
-        bv.addEventListener('click',function(){ agir('PUT',enc(p.id)+'/pieces/'+enc(e.id),{statut:'valide'},'Pièce validée.'); });
-        var br=add(row,'button','btn btn-ghost btn-sm','Refuser'); fk(br,'prt-pr-'+e.id);
-        br.addEventListener('click',function(){ demander('Le partenaire devra déposer une nouvelle pièce.',function(motif){ agir('PUT',enc(p.id)+'/pieces/'+enc(e.id),{statut:'refuse',motif:motif},'Pièce refusée.'); },'Refuser la pièce « '+e.label+' » ?','Refuser','Motif'); });
-      }
-    });
-    add(add(kp,'div','panel-foot'),'span','muted','Pendant l’instruction, les pièces sont validées en bloc au dernier niveau du parcours ; ensuite, chaque pièce renouvelée se valide ici.');
+      if(p.statut==='suspendu') bouton('Réactiver','actif','Le partenaire retrouve son statut d’avant la suspension'+(p.avantSuspension==='reference'||!p.avantSuspension?' (référencé : ses pièces doivent être validées et en cours de validité).':'.'),'Réactiver '+p.raisonSociale+' ?','btn-primary');
+      else if(p.statut!=='exclu') bouton('Suspendre','suspendu','Le partenaire ne pourra plus ni soumettre son dossier ni déposer d’offre là où le référencement est exigé, jusqu’à sa réactivation.','Suspendre '+p.raisonSociale+' ?');
+      if(p.statut!=='exclu') bouton('Exclure','exclu','L’exclusion est définitive : le partenaire ne pourra plus jamais être consulté.','Exclure '+p.raisonSociale+' ?','btn-danger');
+      else add(act,'span','muted','Partenaire exclu : plus aucune action possible.');
+      if(p.decision){ var w2=add(c,'div','note'); add(w2,'strong',null,'Dernière décision ('+p.decision.at+') : '); w2.appendChild(document.createTextNode((STATUTS_PARTENAIRE[p.decision.vers]||[p.decision.vers])[0]+' — '+p.decision.motif)); }
+      if(p.rejet && p.statut==='rejete'){ var w=add(c,'div','warn'); add(w,'strong',null,'Rejeté ('+p.rejet.role+') : '); w.appendChild(document.createTextNode(p.rejet.motif)); }
 
-    evaluationsPartenaire(zone,p);
-    circuitPartenaire(zone,p,function(row,e,i){
-      var ba=add(row,'button','btn btn-primary btn-sm','Franchir'); fk(ba,'prt-app-'+i);
-      ba.addEventListener('click',function(){
-        ask('Cette décision est horodatée, nominative et consignée à la piste d’audit.',function(){ agir('POST',enc(p.id)+'/approbations/'+i,{},'Étape « '+e.role+' » franchie.'); },'Franchir l’étape « '+e.role+' » ?','Franchir');
+      /* Fiche, modifiable par les achats */
+      var sf=add(c,'div','fen-section'); add(sf,'h3',null,'Fiche entreprise');
+      var f=add(sf,'div','frm'), ch2={}, fige=p.statut==='exclu';
+      function champ(cle, lab, val){
+        var w=add(f,'div'), idc='prt-f-'+cle; add(w,'label',null,lab).setAttribute('for',idc);
+        var i=add(w,'input'); i.type='text'; i.id=idc; i.value=val||''; fk(i,idc); i.disabled=fige; ch2[cle]=i;
+      }
+      champ('raisonSociale','Raison sociale',p.raisonSociale);
+      champ('pays','Pays (code à deux lettres)',p.pays);
+      champ('immatriculation','Immatriculation (RCCM ou équivalent)',p.immatriculation);
+      champ('adresse','Adresse',p.adresse);
+      champ('cnom','Contact — nom',(p.contact||{}).nom);
+      champ('cemail','Contact — courriel',(p.contact||{}).email);
+      champ('ctel','Contact — téléphone',(p.contact||{}).tel);
+      champ('domaines','Domaines d’activité (séparés par des virgules)',(p.domaines||[]).join(', '));
+      add(sf,'div','muted','Fiche créée le '+(p.cree||'—')+'.').style.marginTop='8px';
+      if(!fige){
+        add(pied,'span','muted','Les modifications sont consignées à l’historique du partenaire.');
+        var en=add(pied,'button','btn btn-primary','Enregistrer la fiche'); fk(en,'prt-enregistrer');
+        en.addEventListener('click',function(){
+          en.disabled=true;
+          agir('PUT',enc(p.id),{ raisonSociale:ch2.raisonSociale.value, pays:ch2.pays.value, immatriculation:ch2.immatriculation.value, adresse:ch2.adresse.value,
+            contact:{ nom:ch2.cnom.value, email:ch2.cemail.value, tel:ch2.ctel.value },
+            domaines:ch2.domaines.value.split(',').map(function(x){ return x.trim(); }).filter(Boolean) },'Fiche de '+p.id+' enregistrée.');
+        });
+      }
+
+      if((p.questions||[]).length){
+        var sq=add(c,'div','fen-section'); add(sq,'h3',null,'Réponses au questionnaire');
+        p.questions.forEach(function(q){ var row=add(sq,'div','docline'); add(row,'div','muted',q.label); add(row,'div',null,valeurReponse(q,(p.reponses||{})[q.id])); });
+      }
+
+      /* Pièces administratives */
+      var sp=add(c,'div','fen-section'); add(sp,'h3',null,'Pièces administratives');
+      p.exigees.forEach(function(e){
+        var row=add(sp,'div','docline');
+        var lf=add(row,'div'); lf.style.flex='1 1 260px';
+        var tl=add(lf,'div'); add(tl,'span',null,e.label).style.fontWeight='600';
+        if(!e.obligatoire) add(tl,'span','chip c-teal','Facultative').style.marginLeft='8px';
+        if(e.piece){
+          var a=add(lf,'a',null,e.piece.nom); a.href='/api/files/'+e.piece.fichier; a.setAttribute('download',e.piece.nom); a.title='SHA-256 '+e.piece.sha256;
+          add(lf,'div','muted','Déposée le '+e.piece.depose+(e.piece.expire?' · valable jusqu’au '+e.piece.expire:'')+(e.piece.motif?' · refus : '+e.piece.motif:''));
+        }
+        var x=ETATS_PIECE[e.etat]||[e.etat,'c-grey']; add(row,'span','chip '+x[1],x[0]);
+        if(e.piece && e.etat==='a_verifier' && p.statut!=='verification' && p.statut!=='exclu'){
+          var bv=add(row,'button','btn btn-primary btn-sm','Valider'); fk(bv,'prt-pv-'+e.id);
+          bv.addEventListener('click',function(){ agir('PUT',enc(p.id)+'/pieces/'+enc(e.id),{statut:'valide'},'Pièce validée.'); });
+          var br=add(row,'button','btn btn-ghost btn-sm','Refuser'); fk(br,'prt-pr-'+e.id);
+          br.addEventListener('click',function(){ demander('Le partenaire devra déposer une nouvelle pièce.',function(motif){ agir('PUT',enc(p.id)+'/pieces/'+enc(e.id),{statut:'refuse',motif:motif},'Pièce refusée.'); },'Refuser la pièce ?','Refuser','Motif'); });
+        }
       });
-      var br=add(row,'button','btn btn-ghost btn-sm','Rejeter'); fk(br,'prt-rej-'+i);
-      br.addEventListener('click',function(){
-        demander('Le dossier retourne au partenaire, qui pourra le corriger et le soumettre de nouveau.',function(motif){ agir('POST',enc(p.id)+'/rejet',{motif:motif},'Dossier rejeté.'); },'Rejeter le dossier de '+p.raisonSociale+' ?','Rejeter','Motif du rejet');
+
+      evaluationsPartenaire(c,p);
+      circuitPartenaire(c,p,function(row,e,i){
+        var ba=add(row,'button','btn btn-primary btn-sm','Franchir'); fk(ba,'prt-app-'+i);
+        ba.addEventListener('click',function(){
+          ask('Cette décision est horodatée, nominative et consignée à la piste d’audit.',function(){ agir('POST',enc(p.id)+'/approbations/'+i,{},'Étape « '+e.role+' » franchie.'); },'Franchir l’étape « '+e.role+' » ?','Franchir');
+        });
+        var br=add(row,'button','btn btn-ghost btn-sm','Rejeter'); fk(br,'prt-rej-'+i);
+        br.addEventListener('click',function(){
+          demander('Le dossier retourne au partenaire, qui pourra le corriger et le soumettre de nouveau.',function(motif){ agir('POST',enc(p.id)+'/rejet',{motif:motif},'Dossier rejeté.'); },'Rejeter le dossier ?','Rejeter','Motif');
+        });
       });
-    });
-    historiquePartenaire(zone,p);
+      historiquePartenaire(c,p);
+    }, { large:true, fermer:function(){ UI.partenaire=null; majUrl(); } });
   }
   charger();
 }

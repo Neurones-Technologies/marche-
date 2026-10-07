@@ -71,8 +71,11 @@ r.use('/:id', (req, res, next) => {
 
 r.put('/:id', (req, res) => {
   const p = req.partenaire, d = req.body || {};
-  if (!req.titulaire) return err(res, 403, 'PARTNER_NOT_OWNER', 'Seul le partenaire complète sa fiche.');
-  if (!['candidat', 'rejete', 'reference', 'suspendu'].includes(p.statut)) return err(res, 409, 'PARTNER_LOCKED', 'La fiche ne se modifie pas pendant l’instruction du dossier.');
+  // le partenaire complète sa fiche ; les achats (habilitation de référencement) la corrigent à tout moment, sauf exclusion
+  const parAchats = !req.titulaire && gere(req);
+  if (!req.titulaire && !parAchats) return err(res, 403, 'PARTNER_NOT_OWNER', 'Seul le partenaire complète sa fiche.');
+  if (p.statut === 'exclu') return err(res, 409, 'PARTNER_EXCLUDED', 'Partenaire exclu : sa fiche ne se modifie plus.');
+  if (!parAchats && !['candidat', 'rejete', 'reference', 'suspendu'].includes(p.statut)) return err(res, 409, 'PARTNER_LOCKED', 'La fiche ne se modifie pas pendant l’instruction du dossier.');
   const champs = {
     raisonSociale: String(d.raisonSociale != null ? d.raisonSociale : p.raisonSociale).trim(),
     pays: String(d.pays != null ? d.pays : p.pays).trim().toUpperCase(),
@@ -86,14 +89,14 @@ r.put('/:id', (req, res) => {
   if (champs.immatriculation.length > 80 || champs.adresse.length > 300) return err(res, 422, 'PARTNER_INVALID', 'Texte trop long.');
   // un partenaire référencé qui change d'identité légale repasse par l'instruction
   const identite = champs.raisonSociale !== p.raisonSociale || champs.pays !== p.pays || champs.immatriculation !== p.immatriculation;
-  if (identite && ['reference', 'suspendu'].includes(p.statut)) return err(res, 409, 'PARTNER_IDENTITY_LOCKED', 'Raison sociale, pays et immatriculation d’un partenaire référencé ne se modifient que par le service des achats.');
+  if (identite && !parAchats && ['reference', 'suspendu'].includes(p.statut)) return err(res, 409, 'PARTNER_IDENTITY_LOCKED', 'Raison sociale, pays et immatriculation d’un partenaire référencé ne se modifient que par le service des achats.');
   // réponses aux questions du formulaire de référencement (complètes seulement à la soumission)
   if (d.reponses !== undefined) {
     const v = F.verifierReponses(d.reponses, false);
     if (v.erreur) return err(res, 422, 'PARTNER_INVALID', v.erreur);
     champs.reponses = v.reponses;
   }
-  db.transaction(() => { Object.assign(p, champs); journal(req, p, 'fiche modifiée'); partenaireSave(p); })();
+  db.transaction(() => { Object.assign(p, champs); journal(req, p, parAchats ? 'fiche modifiée par les achats' : 'fiche modifiée'); partenaireSave(p); })();
   res.json({ partenaire: vue(p) });
 });
 
@@ -273,22 +276,28 @@ r.post('/:id/rejet', (req, res) => {
   res.json({ partenaire: vue(p) });
 });
 
-/** Suspension, réactivation ou exclusion d'un partenaire référencé (achats), toujours motivées. */
-const TRANSITIONS = { suspendu: ['reference'], reference: ['suspendu'], exclu: ['reference', 'suspendu', 'candidat', 'rejete'] };
+/** Suspension, réactivation ou exclusion d'un partenaire (achats), toujours motivées. Un partenaire suspendu, quel que soit
+    son statut, ne peut plus soumettre ni déposer ; réactivé (« reference » ou « actif »), il retrouve son statut d'avant
+    (référencé : pièces à jour exigées). L'exclusion est définitive. */
+const TRANSITIONS = { suspendu: ['reference', 'candidat', 'rejete', 'verification'], reference: ['suspendu'], actif: ['suspendu'],
+  exclu: ['reference', 'suspendu', 'candidat', 'rejete', 'verification'] };
 r.post('/:id/statut', (req, res) => {
   const p = req.partenaire, { statut } = req.body || {}, motif = String((req.body || {}).motif || '').trim();
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Référencer les partenaires » requise.');
   if (!TRANSITIONS[statut] || !TRANSITIONS[statut].includes(p.statut)) return err(res, 409, 'PARTNER_TRANSITION', `Passage de « ${p.statut} » à « ${statut} » impossible.`);
   if (!motif || motif.length > 1000) return err(res, 422, 'REASON_REQUIRED', 'La décision doit être motivée (1 000 caractères au plus).');
-  if (statut === 'reference') {
+  // réactivation : le statut d'avant la suspension (référencé par défaut, pour les suspensions antérieures)
+  const vers = statut === 'actif' || statut === 'reference' ? (p.avantSuspension || 'reference') : statut;
+  if (vers === 'reference') {
     const ko = vue(p).exigees.filter((e) => e.obligatoire && e.etat !== 'valide');
     if (ko.length) return err(res, 422, 'PIECES_MISSING', 'Réactivation impossible : pièces à jour requises — ' + ko.map((e) => e.label).join(' ; ') + '.');
   }
   db.transaction(() => {
     const avant = p.statut;
-    p.statut = statut;
-    p.decision = { de: avant, vers: statut, motif, by: req.user.id, at: frDate() };
-    journal(req, p, `${statut === 'reference' ? 'réactivé' : statut} — motif : ${motif}`);
+    if (vers === 'suspendu') p.avantSuspension = avant; else if (avant === 'suspendu') delete p.avantSuspension;
+    p.statut = vers;
+    p.decision = { de: avant, vers, motif, by: req.user.id, at: frDate() };
+    journal(req, p, `${avant === 'suspendu' && vers !== 'exclu' ? 'réactivé' : vers} — motif : ${motif}`);
     partenaireSave(p);
   })();
   res.json({ partenaire: vue(p) });

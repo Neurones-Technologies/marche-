@@ -398,7 +398,8 @@ window.addEventListener('scroll',function(){ if(SUIVI_SECTIONS) requestAnimation
    rappelé à chaque rendu tant qu'elle est ouverte, pour qu'elle suive l'état (une confirmation, une note, une
    réponse…) ; il doit donc relire l'état à chaque appel et renvoyer false si l'élément n'existe plus. titre peut être
    une fonction. Les saisies en cours sont conservées d'un rendu à l'autre. La fenêtre se ferme par Échap, la croix,
-   un clic à côté, ou un changement d'écran. o.large : fenêtre large (document, offre détaillée). */
+   un clic à côté, ou un changement d'écran. o.large : fenêtre large (document, offre détaillée) ; o.fermer : appelée à
+   la fermeture (par exemple pour rendre à l'adresse la liste). */
 UI.fenetre = null;
 function ouvrirFenetre(titre, remplir, o){
   fermerFenetre();
@@ -411,7 +412,7 @@ function ouvrirFenetre(titre, remplir, o){
   var h=add(hd,'h2','fen-titre'); h.id='fen-titre';
   var x=add(hd,'button','icon-btn fen-fermer'); x.type='button'; icon(x,'x'); x.setAttribute('aria-label','Fermer'); x.title='Fermer'; fk(x,'fen-fermer');
   var corps=add(bx,'div','fen-corps'), pied=add(bx,'div','fen-pied');
-  var f = UI.fenetre = { titre:titre, remplir:remplir, ov:ov, bx:bx, corps:corps, pied:pied, h:h, prev:prev, vue:state.view };
+  var f = UI.fenetre = { titre:titre, remplir:remplir, ov:ov, bx:bx, corps:corps, pied:pied, h:h, prev:prev, vue:state.view, fermer:o.fermer };
   x.addEventListener('click',fermerFenetre);
   ov.addEventListener('mousedown',function(e){ if(e.target===ov) fermerFenetre(); });
   f.touche=function(e){
@@ -454,6 +455,7 @@ function fermerFenetre(){
   if(f.ov.parentNode) f.ov.parentNode.removeChild(f.ov);
   document.body.classList.remove('fen-ouverte');
   if(f.prev && f.prev.focus && document.body.contains(f.prev)) try{ f.prev.focus(); }catch(e){}
+  if(f.fermer) f.fermer();
 }
 /* Champ en lecture dans une fenêtre : libellé, puis valeur (texte ou nœud). */
 function champLecture(parent, lab, val){

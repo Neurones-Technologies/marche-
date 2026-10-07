@@ -211,6 +211,31 @@ test('suspension, réactivation, exclusion : motivées, transitions contrôlées
   assert.equal(v.json.ok, true);
 });
 
+test('achats : fiche modifiable, suspension quel que soit le statut, réactivation au statut d’avant', async () => {
+  const liste = (await call('GET', '/api/partenaires', null, achats)).json.partenaires;
+  const sotrap = liste.find((p) => p.id === 'PRT-0001');
+  // les achats corrigent la fiche, identité comprise, même d'un partenaire référencé
+  const r = await call('PUT', '/api/partenaires/PRT-0001', { raisonSociale: 'SOTRAP Ingénierie SA (siège)', adresse: 'Abidjan, Cocody' }, achats);
+  ok(r);
+  assert.equal(r.json.partenaire.raisonSociale, 'SOTRAP Ingénierie SA (siège)');
+  assert.ok(r.json.partenaire.historique.some((h) => /modifiée par les achats/.test(h.action)));
+  // un partenaire exclu ne se modifie plus
+  const exclu = liste.find((p) => p.statut === 'exclu');
+  refusé(await call('PUT', `/api/partenaires/${exclu.id}`, { adresse: 'x' }, achats), 409, 'PARTNER_EXCLUDED');
+  // un dossier non référencé se suspend aussi ; réactivé, il retrouve son statut
+  const cand = liste.find((p) => ['candidat', 'rejete', 'verification'].includes(p.statut) && p.id !== exclu.id);
+  if (cand) {
+    ok(await call('POST', `/api/partenaires/${cand.id}/statut`, { statut: 'suspendu', motif: 'Doute sur l’identité.' }, achats));
+    const re = await call('POST', `/api/partenaires/${cand.id}/statut`, { statut: 'actif', motif: 'Identité vérifiée.' }, achats);
+    ok(re);
+    assert.equal(re.json.partenaire.statut, cand.statut);
+  }
+  // un partenaire référencé suspendu ne redevient référencé qu'avec des pièces valides (aucune dans la démonstration)
+  assert.equal(sotrap.statut, 'reference');
+  ok(await call('POST', '/api/partenaires/PRT-0001/statut', { statut: 'suspendu', motif: 'Contrôle.' }, achats));
+  refusé(await call('POST', '/api/partenaires/PRT-0001/statut', { statut: 'actif', motif: 'Contrôle levé.' }, achats), 422, 'PIECES_MISSING');
+});
+
 test('formulaire de référencement : défini par l’organisation, contrôlé à l’écriture', async () => {
   const st = await getState(admin);
   const f = st.formulaireReferencement;
