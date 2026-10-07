@@ -192,8 +192,17 @@ function rechargerApres(message){
   // les registres ont changé en profondeur : on repart du tableau de bord, état rechargé
   fermerFenetre(); toast(message); setTimeout(function(){ location.href='/tableau-de-bord'; },900);
 }
-var resetBtn=document.getElementById('btn-reset-all');
-resetBtn.addEventListener('click',function(){
+/* Boutons « Données fictives » et « Vider les données », en tête des écrans « Utilisateurs et accès » : réservés aux
+   habilitations paramètres ou rôles, dans un espace où la réinitialisation est permise. */
+function boutonsDonnees(h){
+  if(!(can('params.edit')||can('roles.edit')) || !MP.espace().reinitialisable) return;
+  var w=add(h,'div','acces-donnees');
+  var bf=add(w,'button','btn btn-ghost','Données fictives'); fk(bf,'btn-fictives'); bf.title='Ajouter des données fictives, zone par zone';
+  bf.addEventListener('click',ouvrirFictives);
+  var bv=add(w,'button','btn btn-ghost','Vider les données'); fk(bv,'btn-vider'); bv.title='Effacer des données, zone par zone, en gardant les paramètres';
+  bv.addEventListener('click',ouvrirVider);
+}
+function ouvrirFictives(){
   fenetreZones({ cle:'fictives', titre:'Ajouter des données fictives', bouton:'Ajouter', tout:true, zones:ZONES_FICTIVES,
     intro:'Les données fictives s’ajoutent à celles qui existent déjà ; rien n’est effacé. Choisissez les zones à remplir.',
     piedGauche:function(pied){
@@ -218,10 +227,9 @@ resetBtn.addEventListener('click',function(){
         rechargerApres('Ajouté : '+m.join(', ')+'.');
       }).catch(function(e){ rendre(); toast(e.message||'Ajout impossible.'); });
     } });
-});
-/* Vider les données : zones choisies ; paramètres et comptes conservés. */
-var viderBtn=document.getElementById('btn-vider');
-viderBtn.addEventListener('click',function(){
+}
+/* Vider les données : zones choisies ; paramètres conservés. */
+function ouvrirVider(){
   fenetreZones({ cle:'vider', titre:'Vider des données', bouton:'Vider', danger:true, confirmation:true, zones:ZONES_VIDER,
     intro:'Choisissez les zones à effacer. Les paramètres de l’organisation et les comptes sont toujours conservés.',
     force:function(coche, k){
@@ -233,7 +241,7 @@ viderBtn.addEventListener('click',function(){
       MP.api('POST','/api/admin/vider',{ confirmation:'VIDER', zones:zones }).then(function(){ rechargerApres('Données effacées.'); })
         .catch(function(e){ rendre(); toast(e.message||'Effacement impossible.'); });
     } });
-});
+}
 window.MarchePlus = {
   start:function(p, opts){
     PIECES_OK=false; state=null; synced={}; applyServer(p,false);
@@ -248,7 +256,7 @@ window.MarchePlus = {
     demarrerVerrou(!!(opts && opts.fromLogin)); // verrou.js
     // arrivée dans un espace qui vient d'être créé (plateforme) : un mot d'accueil, puis l'adresse sans paramètre
     if(/[?&]bienvenue=1/.test(location.search)){ try{ history.replaceState(null,'',location.pathname); }catch(e){} setTimeout(function(){ toast('Bienvenue dans votre espace Marché+.'); },400); }
-    resetBtn.style.display = viderBtn.style.display = (can('params.edit')||can('roles.edit')) && MP.espace().reinitialisable ? '' : 'none'; render();
+    render();
   },
   poll:poll,
   nouvelleVersion:nouvelleVersion,
@@ -257,7 +265,6 @@ window.MarchePlus = {
     state=null; synced={};
     document.getElementById('navs').textContent='';
     document.getElementById('phase-chip').style.display='none';
-    resetBtn.style.display=viderBtn.style.display='none';
     var m=document.getElementById('main'); m.textContent=''; m.classList.remove('avec-sommaire');
     var c=add(m,'div','card empty');
     add(c,'h2',null,'Aucun appel d’offres ouvert');

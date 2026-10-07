@@ -156,7 +156,7 @@ function annulerDelegation(d, apres){
 /* ============ Utilisateurs et accès › Suppléances (administration) ============ */
 function vSuppleances(m){
   if(!can('roles.edit')) return denyBox(m,'roles.edit');
-  var h=add(m,'div','head'); add(add(h,'div'),'h1',null,'Utilisateurs et accès');
+  var h=add(m,'div','head'); add(add(h,'div'),'h1',null,'Utilisateurs et accès'); boutonsDonnees(h);
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
   function charger(){
     MP.api('GET','/api/suppleances').then(function(r){

@@ -12,7 +12,7 @@ function avatar(parent, nom, grand){ var a=add(parent,'span','av'+(grand?' av-lg
 function vComptes(m){
   if(!can('roles.edit')) return denyBox(m,'roles.edit');
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,'Utilisateurs et accès');
+  add(l,'h1',null,'Utilisateurs et accès'); boutonsDonnees(h);
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
   var me0=state.me;
   function majUtilisateurs(){ return MP.api('GET',MP.url('/state')).then(function(p){ state.users=p.state.users; synced.users=JSON.stringify(p.state.users); }); }
@@ -117,7 +117,7 @@ function vComptes(m){
 function vRoles(m){
   if(!can('roles.edit')) return denyBox(m,'roles.edit');
   var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,'Utilisateurs et accès');
+  add(l,'h1',null,'Utilisateurs et accès'); boutonsDonnees(h);
 
   var rk=Object.keys(state.roles);
 
