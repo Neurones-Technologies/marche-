@@ -72,6 +72,7 @@ function buildState(req) {
     // questions : publiées sans leur auteur ; réclamations : les siennes seulement
     st.qa = (st.qa || []).map((q) => ({ id: q.id, question: q.question, t: q.t, reponse: q.reponse, tRep: q.tRep, mienne: q.par === req.user.id }));
     st.reclamations = (st.reclamations || []).filter((x) => equipe.includes(x.par));
+    st.additifs = (st.additifs || []).map(({ par, ...x }) => x); // sans le nom de l'agent qui l'a publié
     // son offre en cours : ce qu'il a déposé, pour la relire, la modifier ou la retirer avant l'échéance
     const o = req.pid ? req.store.offers().find((x) => equipe.includes(x.depotPar)) : null;
     st.monOffre = o ? { id: o.id, name: o.name, iso: o.iso, devise: o.devise, montant: o.montant, prixLots: o.prixLots, lots: o.lots || [],
@@ -141,18 +142,8 @@ function ecrire(req, changes) {
         const regle = (x) => ((kvGet('notifRules') || { value: {} }).value || {})[x.ev] || { roles: [] };
         // une règle qui vise les fournisseurs (rôle soum) ne vise que ceux de la procédure : partenaires consultés et
         // auteurs d'une offre, jamais tous les comptes fournisseurs de l'espace (attribution, publication, additifs…)
-        let concernes = null;
-        const fournisseursConcernes = () => {
-          if (concernes) return concernes;
-          concernes = new Set();
-          if (req.pid) {
-            const { partenaireGet } = require('../db');
-            require('../consultation').consultation((kk) => req.store.get(kk)).partenaires
-              .forEach((pid) => ((partenaireGet(pid) || {}).comptes || []).forEach((u) => concernes.add(u)));
-            req.store.offers().forEach((o) => { if (o.depotPar) equipeDe(o.depotPar).forEach((u) => concernes.add(u)); });
-          }
-          return concernes;
-        };
+        const concernes = {};
+        const fournisseursConcernes = (ev) => concernes[ev] || (concernes[ev] = comptesConcernes(req, ev));
         const out = [];
         for (const x of changes[k]) {
           if (!x || !x.id) continue;
@@ -163,7 +154,7 @@ function ecrire(req, changes) {
             const r = regle(x).roles;
             out.push({ id: String(x.id).slice(0, 40), ev: String(x.ev), lab: String(x.lab || '').slice(0, 120), titre: String(x.titre || '').slice(0, 250),
               corps: String(x.corps || '').slice(0, 5000), t: frDate(), roles: r.filter((z) => z !== 'soum'),
-              ids: r.includes('soum') ? [...fournisseursConcernes()] : [], lu: [] });
+              ids: r.includes('soum') ? [...fournisseursConcernes(x.ev)] : [], lu: [] });
             continue;
           }
           if (k === 'emails') {
@@ -172,7 +163,7 @@ function ecrire(req, changes) {
             // l'événement, avec leur adresse réelle (jamais une adresse fournie par le navigateur)
             const ids = [...new Set((Array.isArray(x.ids) ? x.ids : []).map(String))].slice(0, 50), roles = regle(x).roles;
             const comptes = ids.length ? db.prepare(`SELECT id, nom, email, role FROM users WHERE active=1 AND id IN (${ids.map(() => '?').join(',')})`).all(...ids)
-              .filter((u) => roles.includes(u.role) && (u.role !== 'soum' || fournisseursConcernes().has(u.id))) : [];
+              .filter((u) => roles.includes(u.role) && (u.role !== 'soum' || fournisseursConcernes(x.ev).has(u.id))) : [];
             const e = { id: String(x.id).slice(0, 40), ev: String(x.ev || '').slice(0, 40), de: mail.actif() ? mail.expediteur() : String(x.de || '').slice(0, 120),
               ids: comptes.map((u) => u.id), a: comptes.map((u) => u.email), noms: comptes.map((u) => u.nom),
               objet: String(x.objet || '').slice(0, 250), corps: String(x.corps || '').slice(0, 20000), t: frDate(),
@@ -205,19 +196,37 @@ function expedier(e) {
   }).catch((err) => console.error('Courriel', e.id, err));
 }
 
+/* Événements qui portent sur le résultat ou sur une offre : réservés aux entreprises qui ont déposé. */
+const EV_RESULTAT = ['attribution', 'standstill', 'infructueux', 'clarif.envoyee'];
+/** Comptes des entreprises concernées par un événement de la procédure : auteurs d'une offre (leur équipe) ; pour une
+    publication (dossier, additif), aussi les partenaires consultés, ou tous les comptes fournisseurs actifs quand
+    l'appel d'offres est ouvert à toute entreprise. */
+function comptesConcernes(req, ev) {
+  const ids = new Set();
+  if (!req.pid) return ids;
+  req.store.offers().forEach((o) => { if (o.depotPar) equipeDe(o.depotPar).forEach((u) => ids.add(u)); });
+  if (EV_RESULTAT.includes(ev)) return ids;
+  const { partenaireGet } = require('../db'), co = require('../consultation').consultation((k) => req.store.get(k));
+  if (co.mode === 'ouvert') db.prepare("SELECT id FROM users WHERE role='soum' AND active=1").all().forEach((u) => ids.add(u.id));
+  co.partenaires.forEach((pid) => ((partenaireGet(pid) || {}).comptes || []).forEach((u) => ids.add(u)));
+  return ids;
+}
 /** Annonce d'un événement par le serveur, selon sa règle (notifRules) : notification, et courriel aux comptes actifs des
-    rôles visés. Pour les actions d'un prestataire, qui n'émet lui-même ni notification ni courriel. */
-function annoncer(ev, lab, titre, corps, ref) {
+    rôles visés. Pour les actions d'un prestataire, qui n'émet lui-même ni notification ni courriel. Avec req, une règle
+    qui vise les fournisseurs ne vise que ceux de la procédure (jamais tous les comptes fournisseurs de l'espace). */
+function annoncer(ev, lab, titre, corps, ref, req) {
   const r = ((kvGet('notifRules') || { value: {} }).value || {})[ev];
   if (!r) return;
+  const cibles = req && r.roles.includes('soum') ? comptesConcernes(req, ev) : null;
+  const roles = cibles ? r.roles.filter((x) => x !== 'soum') : r.roles.slice();
   const id = Date.now() + Math.random().toString(36).slice(2, 6), kvSet = require('../db').kvSet;
   if (r.inapp) {
     const cur = (kvGet('notifs') || { value: [] }).value;
-    cur.unshift({ id: 'n' + id, ev, lab, titre, corps, t: frDate(), roles: r.roles.slice(), lu: [] });
+    cur.unshift({ id: 'n' + id, ev, lab, titre, corps, t: frDate(), roles, ...(cibles ? { ids: [...cibles] } : {}), lu: [] });
     kvSet('notifs', cur.slice(0, 120), 'serveur');
   }
   if (r.email) {
-    const comptes = db.prepare('SELECT id, nom, email, role FROM users WHERE active=1').all().filter((u) => r.roles.includes(u.role)).slice(0, 50);
+    const comptes = db.prepare('SELECT id, nom, email, role FROM users WHERE active=1').all().filter((u) => roles.includes(u.role) || (cibles && cibles.has(u.id))).slice(0, 50);
     const org = (kvGet('org') || { value: {} }).value || {};
     const e = { id: 'm' + id, ev, de: mail.actif() ? mail.expediteur() : ((kvGet('mailFrom') || {}).value || ''), ids: comptes.map((u) => u.id), a: comptes.map((u) => u.email),
       noms: comptes.map((u) => u.nom), objet: '[' + ref + '] ' + titre, corps: corps + '\n\n—\n' + (org.nom || '') + ' — plateforme Marché+\nCe message est généré automatiquement ; ne pas y répondre.',
@@ -265,6 +274,34 @@ r.post('/questions', (req, res) => {
   auditAppend(req.user.id, whoLabel(req.user), 'Question posée sur le dossier', req.pid);
   annoncer('question.recue', 'Question reçue d’un candidat', 'Question reçue — ' + (cdc.ref || ''), question, cdc.ref || '');
   res.status(201).json({ ok: true, question: { id: q.id, question, t: q.t, mienne: true } });
+});
+
+/** Additif au dossier publié : objet, texte, report éventuel de la date limite (obligatoire à moins de 5 jours de
+    l'échéance). Il fait partie du dossier (PDF) et est diffusé aux seules entreprises concernées. */
+const ADDITIF_REPORT_JOURS = 5;
+r.post('/additifs', (req, res) => {
+  if (!req.can('qa.answer')) return res.status(403).json({ error: 'Habilitation « Répondre aux candidats et publier des additifs » requise.', code: 'FORBIDDEN' });
+  const d = req.body || {}, cdc = req.store.get('cdc') || {}, ech = R.echeanceDepot(cdc);
+  if (!cdc.cdcPublie) return res.status(409).json({ error: 'Le dossier n’est pas publié.', code: 'NOT_PUBLISHED' });
+  if (ech && Date.now() > ech) return res.status(409).json({ error: 'La date limite de dépôt est passée : le dossier ne se modifie plus.', code: 'DEADLINE_PASSED' });
+  const objet = texte(d.objet, 200), corps = texte(d.texte, 5000), report = d.report ? String(d.report) : null;
+  if (objet.length < 5) return res.status(422).json({ error: 'Indiquez l’objet de l’additif.', code: 'ADDENDUM_INVALID' });
+  if (corps.length < 10) return res.status(422).json({ error: 'Rédigez le texte de l’additif.', code: 'ADDENDUM_INVALID' });
+  if (report && (!/^\d{4}-\d{2}-\d{2}$/.test(report) || report <= String(cdc.ouverture || '') || report <= new Date().toISOString().slice(0, 10)))
+    return res.status(422).json({ error: 'La nouvelle date limite doit être postérieure à la date actuelle et à la date limite en vigueur.', code: 'REPORT_INVALID' });
+  if (!report && ech && ech - Date.now() < ADDITIF_REPORT_JOURS * 86400000)
+    return res.status(422).json({ error: `À moins de ${ADDITIF_REPORT_JOURS} jours de la date limite, un additif impose de la reporter.`, code: 'REPORT_REQUIRED' });
+  const liste = req.store.get('additifs') || [];
+  const a = { n: liste.length + 1, objet, texte: corps, t: frDate(), par: whoLabel(req.user), report, ancienneDate: report ? cdc.ouverture : null };
+  const fr = (x) => x.split('-').reverse().join('/');
+  db.transaction(() => {
+    ecrireCle(req, 'additifs', liste.concat([a]));
+    if (report) ecrireCle(req, 'cdc', { ...cdc, ouverture: report });
+    auditAppend(req.user.id, whoLabel(req.user), `Additif n° ${a.n} publié — ${objet}` + (report ? ` — date limite reportée du ${fr(cdc.ouverture)} au ${fr(report)}` : ''), req.pid);
+  })();
+  annoncer('additif.publie', 'Additif publié au dossier', `Additif n° ${a.n} au dossier ${cdc.ref || ''}`,
+    objet + (report ? ` — La date limite de dépôt est reportée au ${fr(report)} à 10 h 00.` : ''), cdc.ref || '', req);
+  res.status(201).json({ additif: a, rev: getRev() });
 });
 
 /** Réponse du fournisseur à une demande de clarification qui vise son offre. */

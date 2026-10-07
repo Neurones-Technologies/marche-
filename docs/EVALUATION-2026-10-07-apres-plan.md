@@ -98,14 +98,14 @@ utilisée pour rédiger le CCTP, lire les offres papier et proposer les notes. I
 
 ## Prochaines étapes proposées
 
-| # | Travail | Axes | Nature |
-|---|---|---|---|
-| 1 | Configurer Microsoft 365 pour l'envoi réel des courriels | S5, S9, A25 | Configuration |
-| 2 | Mettre en place la copie des sauvegardes hors du serveur et tester une restauration | A25 | Exploitation |
-| 3 | Additifs visibles dans l'espace du fournisseur et intégrés au dossier PDF | S12 | Développement court |
-| 4 | Rappels automatiques avant l'échéance aux entreprises consultées qui n'ont pas déposé | S13 | Développement court |
-| 5 | Lettre de résultat imprimable (PDF) pour chaque fournisseur | A17 | Développement court |
-| 6 | Réponse en groupement (cotraitance) | S17 | Développement, si le besoin existe |
-| 7 | Retour du statut de paiement depuis l'ERP | S24 | Selon l'ERP du client |
+| # | Travail | Axes | Nature | Statut |
+|---|---|---|---|---|
+| 1 | Configurer Microsoft 365 pour l'envoi réel des courriels | S5, S9, A25 | Configuration | À faire (exploitant) |
+| 2 | Mettre en place la copie des sauvegardes hors du serveur et tester une restauration | A25 | Exploitation | À faire (exploitant) |
+| 3 | Additifs visibles dans l'espace du fournisseur et intégrés au dossier PDF | S12 | Développement court | Fait |
+| 4 | Rappels automatiques avant l'échéance aux entreprises consultées qui n'ont pas déposé | S13 | Développement court | À faire |
+| 5 | Lettre de résultat imprimable (PDF) pour chaque fournisseur | A17 | Développement court | À faire |
+| 6 | Réponse en groupement (cotraitance) | S17 | Développement, si le besoin existe | En attente |
+| 7 | Retour du statut de paiement depuis l'ERP | S24 | Selon l'ERP du client | En attente |
 
 Le volet marchés publics (pli scellé, commission d'ouverture, publication DGMP…) reste en attente.

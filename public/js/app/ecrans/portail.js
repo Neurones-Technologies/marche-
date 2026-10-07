@@ -89,6 +89,7 @@ function vPortail(m){
   add(b0,'p','muted','Avis, règlement de la consultation, clauses administratives et techniques, bordereau des prix et formulaires.');
   var vd=add(b0,'button','btn btn-primary btn-sm','Consulter le dossier'); vd.style.marginTop='10px'; fk(vd,'portail-dossier');
   vd.addEventListener('click',function(){ go('cdc'); });
+  vPortailAdditifs(m);
   vPortailQuestions(m);
   // offre en cours : on la relit, la modifie ou la retire ; le formulaire de dépôt ne revient qu'après retrait
   if(state.monOffre){ vPortailMonOffre(m,clos); vPortailAccuses(m); vPortailSuivi(m); return; }

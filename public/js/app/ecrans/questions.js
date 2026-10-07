@@ -29,10 +29,10 @@ function vQA(m){
       {lab:'N°', num:true, val:function(x){ return x.i+1; }},
       {lab:'Objet', rendu:function(x,td){ add(td,'div','dt-extrait',x.a.objet); }},
       {lab:'Publié le', val:function(x){ return x.a.t; }},
-      {lab:'Incidence', rendu:function(x,td){ chipCellule(td, x.a.report?'Report au '+x.a.report:'Précision', x.a.report?'c-amber':'c-grey'); }}
+      {lab:'Incidence', rendu:function(x,td){ chipCellule(td, x.a.report?'Report au '+dateLongue(x.a.report):'Précision', x.a.report?'c-amber':'c-grey'); }}
     ],
     recherche:function(x){ return x.a.objet; },
-    nouveau: can('qa.answer') ? { lab:'Publier un additif', action:publierAdditif } : null,
+    nouveau: can('qa.answer') && state.cdc.cdcPublie && !(R.echeanceDepot(state.cdc) && Date.now()>R.echeanceDepot(state.cdc)) ? { lab:'Publier un additif', action:publierAdditif } : null,
     actions:function(x,td){ boutonDetail(td,function(){ ouvrirAdditif(x.i); },'add-ouvrir-'+x.i); }
   });
 
@@ -105,17 +105,29 @@ function ouvrirQuestion(i){
   });
 }
 
+/* Publication d'un additif : objet, texte, report éventuel de la date limite (imposé à moins de 5 jours de l'échéance).
+   Le serveur l'ajoute au dossier, reporte la date et prévient les seules entreprises concernées. */
 function publierAdditif(){
-  ask("L'additif sera diffusé à tous les candidats ayant retiré le dossier et fera partie intégrante du dossier d'appel d'offres. S'il modifie substantiellement la préparation des offres, reportez la date limite en conséquence.",
-    function(){
-      var rep2 = state.additifs.length===0 ? '29/10/2026' : null;
-      state.additifs.push({objet:'Précision sur les pièces exigées des soumissionnaires hors UEMOA',
-        t:new Date().toLocaleString('fr-FR'), report:rep2});
-      if(rep2) state.cdc.ouverture='2026-10-29';
-      logit('Additif publié au dossier d’appel d’offres');
-      notify('additif.publie','Additif publié','Un additif modifie le dossier '+REF()+'.'+(rep2?' La date limite de dépôt est reportée au '+rep2+'.':''));
-      save(); render();
-    },"Publier un additif ?","Publier");
+  var ech=R.echeanceDepot(state.cdc), proche=ech && ech-Date.now()<5*86400000;
+  ouvrirFenetre('Publier un additif', function(c,p){
+    add(c,'p','muted','L’additif fait partie du dossier (il est ajouté au PDF) et il est communiqué aux entreprises consultées et à celles qui ont déposé une offre.');
+    var d1=add(c,'div','fen-champ'); add(d1,'label','fen-lab','Objet').htmlFor='add-objet';
+    var ob=add(d1,'input'); ob.type='text'; ob.id='add-objet'; ob.maxLength=200; fk(ob,'add-objet'); ob.style.width='100%';
+    var d2=add(c,'div','fen-champ'); add(d2,'label','fen-lab','Texte de l’additif (paragraphes séparés par une ligne vide)').htmlFor='add-texte';
+    var tx=add(d2,'textarea'); tx.id='add-texte'; tx.rows=8; tx.maxLength=5000; fk(tx,'add-texte'); tx.style.width='100%';
+    var d3=add(c,'div','fen-champ'); add(d3,'label','fen-lab','Nouvelle date limite de dépôt'+(proche?' (obligatoire : échéance à moins de 5 jours)':' (facultatif)')).htmlFor='add-report';
+    var rp=add(d3,'input'); rp.type='date'; rp.id='add-report'; fk(rp,'add-report'); rp.min=state.cdc.ouverture||'';
+    add(d3,'div','muted','Date limite en vigueur : '+dateLongue(state.cdc.ouverture)+' à 10 h 00.');
+    var go=add(p,'button','btn btn-primary','Publier l’additif'); fk(go,'add-publier');
+    go.addEventListener('click',function(){
+      if(ob.value.trim().length<5 || tx.value.trim().length<10){ toast('Indiquez l’objet et le texte de l’additif.'); return; }
+      if(proche && !rp.value){ toast('À moins de 5 jours de l’échéance, reportez la date limite.'); rp.focus(); return; }
+      go.disabled=true;
+      MP.api('POST',MP.url('/additifs'),{ objet:ob.value.trim(), texte:tx.value.trim(), report:rp.value||null }).then(function(r){
+        fermerFenetre(); toast('Additif n° '+r.additif.n+' publié.'); return relireEtat();
+      }).catch(function(e){ go.disabled=false; toast(e.message||'Publication impossible.'); });
+    });
+  });
 }
 
 function ouvrirAdditif(i){
@@ -125,7 +137,9 @@ function ouvrirAdditif(i){
     chipCellule(ch,'Publié le '+a.t,'c-grey');
     chipCellule(ch, a.report?'Report de délai':'Précision', a.report?'c-amber':'c-grey');
     champLecture(c,'Objet',a.objet);
-    champLecture(c,'Incidence sur la date limite', a.report ? 'Date limite de dépôt reportée au '+a.report+'.' : 'Sans incidence sur la date limite.');
+    if(a.texte) champLecture(c,'Texte',a.texte);
+    if(a.par) champLecture(c,'Publié par',a.par);
+    champLecture(c,'Incidence sur la date limite', a.report ? 'Date limite de dépôt reportée au '+dateLongue(a.report)+(a.ancienneDate?' (au lieu du '+dateLongue(a.ancienneDate)+')':'')+'.' : 'Sans incidence sur la date limite.');
     add(c,'p','muted','Un additif publié moins de 5 jours avant la date limite impose un report.').style.marginTop='16px';
   });
 }

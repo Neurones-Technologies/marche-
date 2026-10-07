@@ -93,6 +93,18 @@ function definitionDossier(){
     }
   });
 
+  /* Additifs publiés : ils font partie du dossier et priment sur les pièces qu'ils modifient */
+  var adds=state.additifs||[];
+  if(adds.length){
+    contenu.push({ text:'Additifs', style:'h1', tocItem:true, tocStyle:{ bold:true }, tocMargin:[0,8,0,0], pageBreak:'before' });
+    contenu.push({ text:'Les additifs ci-dessous modifient ou précisent le dossier. En cas de contradiction, l’additif le plus récent prévaut.', style:'corps' });
+    adds.forEach(function(a,i){
+      contenu.push({ text:'Additif n° '+(a.n||i+1)+' — '+a.objet, style:'h2', tocItem:true, tocStyle:{ fontSize:9.5, color:COUL_PDF.gris }, tocMargin:[14,2,0,0] });
+      contenu.push({ text:'Publié le '+a.t+(a.report ? ' — date limite de dépôt reportée au '+dateLongue(a.report)+' à 10 h 00' : ''), fontSize:9, color:COUL_PDF.gris, margin:[0,0,0,6] });
+      String(a.texte||'').split(/\n\s*\n/).forEach(function(x){ if(x.trim()) contenu.push({ text:x.trim(), style:'corps' }); });
+    });
+  }
+
   return {
     pageSize:'A4', pageMargins:[50,70,50,60],
     info:{ title:'Dossier d’appel d’offres '+REF(), author:c.autorite||org.nom||'', subject:c.objet||'' },

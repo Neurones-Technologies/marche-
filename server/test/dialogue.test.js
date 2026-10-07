@@ -75,3 +75,23 @@ test('réclamations : déposées par un fournisseur ayant remis une offre, répo
   assert.ok(vue.notifs.some((n) => n.titre === 'Réponse à votre réclamation'));
   assert.equal((await patch(sotrap, { reclamations: [] })).status, 403); // jamais la clé entière
 });
+
+test('additifs : publiés par l’acheteur, report de la date limite, diffusés aux seuls concernés, visibles du fournisseur', async () => {
+  const achats = await login('y.koffi@bal.ci'), sotrap = await login('contact.sotrap@bal.ci');
+  const s = await getState(achats);
+  assert.equal((await call('POST', '/api/procedures/p1/additifs', { objet: 'Précision', texte: 'Texte de l’additif.' }, sotrap)).status, 403);
+  assert.equal((await call('POST', '/api/procedures/p1/additifs', { objet: 'Ok', texte: 'court' }, achats)).status, 422);
+  const avant = s.cdc.ouverture, report = new Date(Date.parse(avant) + 7 * 86400000).toISOString().slice(0, 10);
+  assert.equal((await call('POST', '/api/procedures/p1/additifs', { objet: 'Report', texte: 'Report de la date limite.', report: avant }, achats)).json.code, 'REPORT_INVALID');
+  const r = await call('POST', '/api/procedures/p1/additifs', { objet: 'Précision sur le lot 2', texte: 'Les baies sont fournies avec leurs unités de distribution.\n\nLe reste est inchangé.', report }, achats);
+  assert.equal(r.status, 201, JSON.stringify(r.json));
+  const apres = await getState(achats);
+  assert.equal(apres.cdc.ouverture, report);
+  assert.ok(apres.audit.some((e) => /Additif n° \d+ publié — Précision sur le lot 2/.test(e.a)));
+  const vu = await getState(sotrap);
+  const a = vu.additifs.find((x) => x.objet === 'Précision sur le lot 2');
+  assert.ok(a && a.texte.includes('unités de distribution'));
+  assert.equal(a.par, undefined);
+  const n = vu.notifs.find((x) => x.ev === 'additif.publie' && /Additif n°/.test(x.titre));
+  assert.ok(n && !(n.roles || []).includes('soum')); // ciblée par compte, pas sur tous les fournisseurs
+});

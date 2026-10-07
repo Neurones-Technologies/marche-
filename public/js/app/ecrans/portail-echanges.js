@@ -34,6 +34,20 @@ function vPortailResultat(m){
   else if(r.statut!=='infructueux') add(b,'p','muted','Vous pouvez adresser une réclamation motivée ci-dessous si vous contestez cette décision.');
 }
 
+/* Additifs au dossier : ce qui modifie ou précise le dossier depuis sa publication (repris aussi dans le PDF). */
+function vPortailAdditifs(m){
+  var adds=state.additifs||[];
+  if(!adds.length) return;
+  var b=carteEchange(m,'Additifs au dossier ('+adds.length+')');
+  add(b,'p','muted','Ils font partie du dossier et priment sur les pièces qu’ils modifient. Tenez-en compte dans votre offre.');
+  adds.slice().reverse().forEach(function(a,k){
+    var e=add(b,'div','echange');
+    var t=add(e,'div','echange-tete'); add(t,'strong',null,'Additif n° '+(a.n||adds.length-k)+' — '+a.objet); add(t,'span','muted','Publié le '+a.t);
+    if(a.report) chipCellule(t,'Date limite reportée au '+dateLongue(a.report),'c-amber');
+    String(a.texte||'').split(/\n\s*\n/).forEach(function(x){ if(x.trim()) add(e,'p',null,x.trim()); });
+  });
+}
+
 /* Questions et réponses : publiées sans leur auteur ; on pose la sienne jusqu'à 3 jours avant l'échéance. */
 function vPortailQuestions(m){
   var b=carteEchange(m,'Questions et réponses');
