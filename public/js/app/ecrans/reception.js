@@ -56,12 +56,12 @@ function ouvrirPli(id){
     bar.setAttribute('role','img'); bar.setAttribute('aria-label','Confiance de lecture : '+avg+' %');
     var pieces=o.pieces||[];
     if(o.externe) champLecture(c,'Reçue hors plateforme', 'le '+o.depot+(o.externe.lecture==='ia'?' — lue par l’IA puis relue':' — saisie à la main'));
-    listeFichiersPli(c, o.externe ? 'Document reçu' : 'Offre technique et financière', pieces.filter(function(f){ return f.offre; }), o.externe || o.submitted ? 'Ni mémoire technique ni bordereau des prix joint.' : 'Offre de démonstration : aucun document réel.');
+    listeFichiersPli(c, o.externe ? 'Document reçu' : 'Offre technique et financière', pieces.filter(function(f){ return f.offre; }), o.externe || o.submitted ? 'Ni offre technique ni offre financière jointe.' : 'Offre de démonstration : aucun document réel.');
     listeFichiersPli(c,'Pièces administratives', pieces.filter(function(f){ return !f.offre; }),'Aucune pièce jointe enregistrée.');
   }, { large:true });
 }
 /* Fichiers d'un pli, téléchargeables ; l'empreinte SHA-256 en infobulle. */
-var LIB_DOCS_OFFRE = { memoire:'Mémoire technique', bordereau:'Bordereau des prix', 'offre-recue':'Offre reçue' };
+var LIB_DOCS_OFFRE = { memoire:'Offre technique', bordereau:'Offre financière', 'offre-recue':'Offre reçue' };
 function listeFichiersPli(c, titre, liste, vide){
   var sec=add(c,'div','fen-section'); add(sec,'h3',null,titre);
   if(!liste.length){ add(sec,'p','muted',vide); return; }

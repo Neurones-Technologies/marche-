@@ -252,7 +252,7 @@ const paysList = { CI: 'Côte d’Ivoire', BF: 'Burkina Faso', SN: 'Sénégal', 
 const sepMilliers = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const QUESTIONS_JOURS_AVANT = 3; // questions reçues jusqu'à 3 jours avant la date limite de dépôt
 // documents de l'offre elle-même, joints depuis le portail à côté des pièces administratives
-const DOCS_OFFRE = { memoire: 'Mémoire technique', bordereau: 'Bordereau des prix' };
+const DOCS_OFFRE = { memoire: 'Offre technique', bordereau: 'Offre financière' };
 const estFournisseur = (req) => req.can('portail.use') && !req.can('offres.read');
 const texte = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
 const ecrireCle = (req, k, v) => { req.store.set(k, v, req.user.id); require('../db').bumpRev(); };

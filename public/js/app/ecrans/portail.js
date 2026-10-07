@@ -12,8 +12,8 @@ function delaiRestant(ms){
 }
 /* Documents de l'offre elle-même (le serveur les rattache au pli au dépôt). */
 var DOCS_OFFRE = [
-  { id:'memoire', label:'Mémoire technique', aide:'Méthodologie, organisation, moyens et planning proposés (PDF ou Word)', accept:'.pdf,.docx' },
-  { id:'bordereau', label:'Bordereau des prix', aide:'Détail chiffré des prix par lot et par poste (Excel ou PDF)', accept:'.xlsx,.pdf' }
+  { id:'memoire', label:'Offre technique', aide:'Mémoire technique : compréhension du besoin, méthodologie, organisation, moyens et planning (PDF ou Word)', accept:'.pdf,.docx' },
+  { id:'bordereau', label:'Offre financière', aide:'Lettre de soumission et bordereau des prix chiffré par lot et par poste (Excel ou PDF)', accept:'.xlsx,.pdf' }
 ];
 /* Une ligne de fichier du dépôt : libellé, aide, fichier joint (nom, taille, empreinte), joindre, remplacer, retirer. */
 function ligneFichier(parent, doc, aide, sinon){
@@ -229,7 +229,7 @@ function vPortail(m, etape){
   if(!d.lots.length) errs.push('Aucun lot sélectionné.');
   req.forEach(function(x){ if(!d.docs[x.id] && !couvertes[R.pieceReferencement(x,(state.formulaireReferencement||{}).pieces)]) errs.push('Pièce manquante : '+x.label+'.'); });
   if(clos) errs.push('La date limite de dépôt est dépassée.');
-  DOCS_OFFRE.forEach(function(x){ if(!(d.files||{})[x.id]) warns.push(x.label+' non joint : l’acheteur ne pourra juger votre offre que sur les montants déclarés.'); });
+  DOCS_OFFRE.forEach(function(x){ if(!(d.files||{})[x.id]) warns.push(x.label+' non jointe : l’acheteur ne pourra juger votre offre que sur les informations saisies.'); });
   if(Number(d.delai) > c.delaiMax) warns.push('Délai proposé ('+d.delai+' j) supérieur au plafond du cahier des charges ('+c.delaiMax+' j).');
   if(Number(d.garantie) && Number(d.garantie) < c.garantieMin) warns.push('Garantie proposée ('+d.garantie+' mois) inférieure au minimum exigé ('+c.garantieMin+' mois).');
   if(Number(d.refsCount) && Number(d.refsCount) < 3) warns.push('Références déclarées : '+d.refsCount+' pour 3 exigées.');
