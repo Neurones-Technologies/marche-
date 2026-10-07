@@ -95,7 +95,7 @@ function vEchanges(m){
 
   var k=add(cote,'section','card chat'); k.setAttribute('aria-label','Conversation avec l’acheteur');
   var ph=add(k,'div','panel-head'); add(ph,'span',null,'Conversation');
-  add(ph,'span','muted chat-aide','Questions et réponses : visibles de toutes les entreprises consultées, sans nom. Clarifications et réclamations : entre l’acheteur et vous.');
+  add(ph,'span','muted chat-aide','Vos questions et leurs réponses sont partagées avec les autres entreprises, sans votre nom. Vos réclamations et vos réponses aux clarifications ne sont lues que par l’acheteur.');
   var fil=add(k,'div','chat-fil'); fil.setAttribute('role','log'); fil.setAttribute('aria-live','polite');
   var msgs=filEchanges();
   if(!msgs.length) add(fil,'p','muted chat-vide','Aucun échange pour l’instant. Posez une question sur le dossier ci-dessous : la réponse de l’acheteur apparaîtra ici.');
@@ -123,7 +123,7 @@ function vEchanges(m){
   var limite=ech ? ech-QUESTIONS_JOURS_AVANT*86400000 : null, questionOuverte=!limite || Date.now()<=limite;
   var reclamation=(state.receipts||[]).length>0;
   var sa=add(k,'div','chat-saisie');
-  if(!questionOuverte && !reclamation) add(sa,'p','muted','Les questions sont closes '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.');
+  if(!questionOuverte && !reclamation) add(sa,'p','muted','Il n’est plus possible de poser de question : elles s’arrêtent '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.');
   else saisieEchange(sa, limite, questionOuverte, reclamation);
   var pied=add(m,'div','ao-etape-pied');
   add(pied,'span','muted', state.monOffre ? 'Votre offre est déposée.' : 'Dossier lu ? Préparez votre offre.');
@@ -148,7 +148,8 @@ function saisieEchange(sa, limite, questionOuverte, reclamation){
   tx.setAttribute('aria-label', rec ? 'Exposé de la réclamation' : 'Votre question');
   var env=add(ligne,'button','btn btn-primary','Envoyer'); fk(env, rec?'pt-rec-go':'pt-question-go');
   add(sa,'div','muted chat-aide', rec ? 'La réclamation et la réponse de l’acheteur restent entre lui et votre entreprise.'
-    : 'Questions reçues jusqu’au '+(limite?new Date(limite).toLocaleDateString('fr-FR',{ day:'numeric', month:'long' }):'—')+'. La réponse est communiquée à toutes les entreprises consultées.');
+    : (limite ? 'Vous pouvez poser vos questions jusqu’au '+new Date(limite).toLocaleDateString('fr-FR',{ day:'numeric', month:'long' })+' (3 jours avant la date limite). ' : '')
+      +'Pour l’équité entre les candidats, l’acheteur répond à toutes les entreprises consultées, sans dire qui a posé la question.');
   env.addEventListener('click',function(){
     var v=tx.value.trim();
     if(rec){
