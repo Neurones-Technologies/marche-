@@ -36,9 +36,9 @@ function vPortailResultat(m){
 function paysLettre(iso){ return ({ CI:'Côte d’Ivoire', BF:'Burkina Faso', SN:'Sénégal', ML:'Mali', NE:'Niger', TG:'Togo', BJ:'Bénin', GW:'Guinée-Bissau' })[iso] || iso; }
 
 /* Parcours du fournisseur sur un appel d'offres, en trois étapes : 1. cahier des charges et échanges avec l'acheteur ;
-   2. préparation de l'offre ; 3. soumission (contrôle, dépôt, puis offre déposée et résultat). */
+   2. montage de l'offre ; 3. soumission (contrôle, dépôt, puis offre déposée et résultat). */
 function clarifsEnAttente(){ return (state.clarifs||[]).filter(function(x){ return x.statut==='envoyee'; }).length; }
-var ETAPES_FOURNISSEUR = [['echanges','Cahier des charges & échanges'],['portail','Préparation de l’offre'],['soumission','Soumission']];
+var ETAPES_FOURNISSEUR = [['echanges','Cahier des charges & échanges'],['portail','Monter mon offre'],['soumission','Soumission']];
 function etapesFournisseur(m, actif){
   var d=state.draft||{}, o=state.monOffre;
   var prepare = !!o || ((d.lots||[]).length>0 && d.lots.every(function(id){ return Number((d.prixLots||{})[id])>0; }) && !!Number(d.delai));
@@ -125,8 +125,8 @@ function vEchanges(m){
   if(!questionOuverte && !reclamation) add(sa,'p','muted','Il n’est plus possible de poser de question : elles s’arrêtent '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.');
   else saisieEchange(sa, limite, questionOuverte, reclamation);
   var pied=add(m,'div','ao-etape-pied');
-  add(pied,'span','muted', state.monOffre ? 'Votre offre est déposée.' : 'Dossier lu ? Préparez votre offre.');
-  var nx=add(pied,'button','btn btn-primary', state.monOffre ? 'Voir mon offre →' : 'Préparer mon offre →'); fk(nx,'vers-preparation');
+  add(pied,'span','muted', state.monOffre ? 'Votre offre est déposée.' : 'Dossier lu ? Montez votre offre.');
+  var nx=add(pied,'button','btn btn-primary', state.monOffre ? 'Voir mon offre →' : 'Monter mon offre →'); fk(nx,'vers-preparation');
   nx.addEventListener('click',function(){ go(state.monOffre ? 'soumission' : 'portail'); });
 }
 /* Saisie d'une question (jusqu'à 3 jours avant l'échéance) ou d'une réclamation (après un dépôt), sous la conversation. */

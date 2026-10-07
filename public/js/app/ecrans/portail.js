@@ -111,7 +111,7 @@ function vPortail(m, etape){
   var mp=state.monPartenaire;
   if(mp && !String(d.name||'').trim()){ d.name=mp.raisonSociale||''; if(mp.pays && /^[A-Z]{2}$/.test(mp.pays)) d.iso=mp.pays; uem=isUemoa(d); loc=isLocal(d); }
 
-  var h=add(m,'div','head'); add(add(h,'div'),'h1',null, etape==='soumission' ? 'Soumission de l’offre' : 'Préparation de l’offre');
+  var h=add(m,'div','head'); add(add(h,'div'),'h1',null, etape==='soumission' ? 'Soumission de l’offre' : 'Monter mon offre');
   var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
   if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
   etapesFournisseur(m, etape==='soumission' ? 'soumission' : 'portail');
@@ -280,7 +280,7 @@ function vPortail(m, etape){
 
   if(etape==='soumission'){
     vPortailAccuses(m);
-    var rp=add(add(m,'div','ao-etape-pied'),'button','btn btn-ghost','← Revenir à la préparation'); fk(rp,'vers-preparation');
+    var rp=add(add(m,'div','ao-etape-pied'),'button','btn btn-ghost','← Revenir à « Monter mon offre »'); fk(rp,'vers-preparation');
     rp.addEventListener('click',function(){ go('portail'); });
     return;
   }
