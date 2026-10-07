@@ -165,6 +165,7 @@ function telechargerDossierPdf(){
 /* Écran du dossier publié : la page de garde en vignette, le document entier à la demande. */
 function vDossierPublie(m){
   var c=state.cdc, org=state.org||{}, th=themeDossier(c), illu=ILLUSTRATIONS[th]||ILLUSTRATIONS.generique;
+  if(fournisseurSeul() && viewAllowed('portail')) retourListe(m,'Retour à l’appel d’offres',function(){ go('portail'); },'retour-portail');
   var carte=add(m,'section','card doc-carte'); carte.setAttribute('aria-label','Dossier d’appel d’offres');
   var barre=add(carte,'div','doc-barre');
   add(barre,'span','doc-barre-lab','Dossier d’appel d’offres — '+REF());

@@ -131,6 +131,7 @@ function etapeDe(vue){ for(var i=0;i<ETAPES.length;i++) if(ETAPES[i].vues.indexO
 function vuesPermises(etape){ return etape.vues.filter(viewAllowed); }
 /* Écran où reprendre une procédure : le dernier ouvert, sinon le premier écran de l'étape en cours. */
 function vueProcedureCourante(){
+  if(fournisseurSeul() && viewAllowed('portail')) return 'portail'; // le fournisseur arrive sur sa page de l'appel d'offres
   if(UI.derniereVueProc && viewAllowed(UI.derniereVueProc)) return UI.derniereVueProc;
   var st=etapesStatut();
   for(var i=0;i<ETAPES.length;i++){ var v=vuesPermises(ETAPES[i]); if(v.length && (st[ETAPES[i].id]==='now' || st[ETAPES[i].id]==='blocked')) return v[0]; }
@@ -138,7 +139,9 @@ function vueProcedureCourante(){
 }
 /* Le cadre (frise, sous-onglets) s'adresse à ceux qui conduisent la procédure ; un prestataire ou un demandeur
    n'en voit qu'un ou deux écrans, sans cadre. */
-function avecCadreProcedure(){ return VIEWS.filter(function(v){ return v.grp==='Procédure' && vueVisible(v); }).length>=3; }
+function avecCadreProcedure(){ return !fournisseurSeul() && VIEWS.filter(function(v){ return v.grp==='Procédure' && vueVisible(v); }).length>=3; }
+/* Compte d'une entreprise qui répond (portail), sans rôle d'acheteur : il ne voit ni le parcours interne ni la vue d'ensemble. */
+function fournisseurSeul(){ return can('portail.use') && !can('offres.read') && !can('cdc.edit'); }
 
 /* En-tête, frise des étapes et sous-onglets ; retourne le conteneur où l'écran se dessine. */
 function cadreProcedureHaut(m){

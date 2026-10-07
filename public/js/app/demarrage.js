@@ -86,7 +86,8 @@ function render(){
   var chip=document.getElementById('phase-chip');
   if(avecProcedure()){ var ph=phase(); chip.textContent=ph.k; chip.className='chip '+ph.c; }
   // la phase figure dans l'en-tête des écrans de procédure ; la pastille du haut ne sert plus que sans ce cadre
-  chip.style.display = !avecProcedure() || !vueDeProcedure(state.view) || avecCadreProcedure() ? 'none' : '';
+  // … et la phase interne ne concerne pas l'entreprise qui répond
+  chip.style.display = !avecProcedure() || !vueDeProcedure(state.view) || avecCadreProcedure() || fournisseurSeul() ? 'none' : '';
   if(!viewAllowed(state.view)) state.view=homeView();
   var lbl=null;
   for(var i=0;i<VIEWS.length;i++) if(VIEWS[i].id===state.view) lbl=VIEWS[i].label;
@@ -147,6 +148,16 @@ resetBtn.addEventListener('click',function(){
     }).catch(function(e){ toast(e.message||'Réinitialisation impossible.'); });
   }, 'Réinitialiser la démonstration ?', 'Tout effacer');
 });
+/* Vider les données : registres, échanges, pièces et budget effacés ; paramètres et comptes conservés. */
+var viderBtn=document.getElementById('btn-vider');
+viderBtn.addEventListener('click',function(){
+  demander("Tous les appels d'offres, offres, demandes d'achat, commandes, partenaires, pièces déposées, lignes budgétaires et la piste d'audit seront effacés. Les paramètres de l'organisation et les comptes sont conservés. Cette action est irréversible : saisissez VIDER pour confirmer.",
+    function(texte){
+      if(texte.trim().toUpperCase()!=='VIDER'){ toast('Confirmation incorrecte : rien n’a été effacé.'); return; }
+      MP.api('POST','/api/admin/vider',{ confirmation:'VIDER' }).then(function(){ toast('Données effacées.'); setTimeout(function(){ location.href='/tableau-de-bord'; },600); })
+        .catch(function(e){ toast(e.message||'Effacement impossible.'); });
+    }, 'Vider toutes les données ?', 'Vider', 'Confirmation');
+});
 window.MarchePlus = {
   start:function(p, opts){
     PIECES_OK=false; state=null; synced={}; applyServer(p,false);
@@ -161,7 +172,7 @@ window.MarchePlus = {
     demarrerVerrou(!!(opts && opts.fromLogin)); // verrou.js
     // arrivée dans un espace qui vient d'être créé (plateforme) : un mot d'accueil, puis l'adresse sans paramètre
     if(/[?&]bienvenue=1/.test(location.search)){ try{ history.replaceState(null,'',location.pathname); }catch(e){} setTimeout(function(){ toast('Bienvenue dans votre espace Marché+.'); },400); }
-    resetBtn.style.display = (can('params.edit')||can('roles.edit')) && MP.espace().reinitialisable ? '' : 'none'; render();
+    resetBtn.style.display = viderBtn.style.display = (can('params.edit')||can('roles.edit')) && MP.espace().reinitialisable ? '' : 'none'; render();
   },
   poll:poll,
   nouvelleVersion:nouvelleVersion,
@@ -170,7 +181,7 @@ window.MarchePlus = {
     state=null; synced={};
     document.getElementById('navs').textContent='';
     document.getElementById('phase-chip').style.display='none';
-    resetBtn.style.display='none';
+    resetBtn.style.display=viderBtn.style.display='none';
     var m=document.getElementById('main'); m.textContent=''; m.classList.remove('avec-sommaire');
     var c=add(m,'div','card empty');
     add(c,'h2',null,'Aucun appel d’offres ouvert');

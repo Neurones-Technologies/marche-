@@ -49,7 +49,15 @@ r.get('/registre', requireAuth, (req, res) => {
     const ctx = ctxDe(p.id), ph = phase(p, ctx), cdc = ctx.cdc || {};
     const ligne = { id: p.id, ref: cdc.ref, objet: cdc.objet, type: cdc.procedure, profil: P.profil(R.profilId(ctx)).lab,
       phase: ph, archive: p.archive, creee: p.creee, publieeLe: ctx.cadre ? ctx.cadre.at : null };
-    if (!voitTout(req)) return ligne; // soumissionnaire, demandeur : pas de données internes
+    if (!voitTout(req)) {
+      // soumissionnaire : la date limite et l'état de l'offre de son entreprise (pas de données internes)
+      if (req.can('portail.use')) {
+        const eq = require('../db').equipeDe(req.user.id);
+        Object.assign(ligne, { dateLimite: cdc.ouverture || null, autorite: cdc.autorite || null,
+          monOffre: ctx.offers.some((o) => o.depotPar && eq.includes(o.depotPar)) });
+      }
+      return ligne;
+    }
     const win = R.allApproved(ctx.approvals) ? R.ranking(ctx)[0] : null;
     const cmd = commandes.filter((c) => c.procedure.id === p.id && c.statut !== 'annulee');
     const b = cdc.besoin ? besoins.find((x) => x.id === cdc.besoin) : null;

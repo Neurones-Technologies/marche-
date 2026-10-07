@@ -1,6 +1,6 @@
 /* Routes de l'instance, hors procédure : vérification de la chaîne d'audit, réinitialisation de la démonstration. */
 const express = require('express');
-const { auditVerify, auditJournal, proceduresAll, resetDemo } = require('../db');
+const { auditVerify, auditJournal, proceduresAll, resetDemo, viderDonnees } = require('../db');
 const { requireAuth, needPerm, whoLabel } = require('../auth');
 const cfg = require('../config');
 
@@ -20,6 +20,17 @@ r.post('/admin/reset', needPerm('params.edit', 'roles.edit'), (req, res) => {
   if (!require('../espaces').reinitialisable()) return res.status(403).json({ error: 'Réinitialisation désactivée dans cet espace.' });
   resetDemo(req.user.id, whoLabel(req.user));
   res.json({ ok: true });
+});
+
+/** Vide les données de l'espace (par exemple les données fictives de la démonstration), en gardant ses paramètres
+    et ses comptes. Mêmes droits et même garde que la réinitialisation ; confirmation explicite exigée. */
+r.post('/admin/vider', needPerm('params.edit', 'roles.edit'), (req, res) => {
+  if (!require('../espaces').reinitialisable()) return res.status(403).json({ error: 'Opération désactivée dans cet espace.' });
+  if ((req.body || {}).confirmation !== 'VIDER') return res.status(422).json({ error: 'Confirmation attendue : saisissez VIDER.', code: 'CONFIRMATION_REQUIRED' });
+  const fichiers = viderDonnees(req.user.id, whoLabel(req.user));
+  const { diskPath } = require('./files'), fs = require('fs');
+  for (const id of fichiers) { try { fs.unlinkSync(diskPath(id)); } catch (e) { /* déjà absent */ } }
+  res.json({ ok: true, fichiers: fichiers.length });
 });
 
 module.exports = r;

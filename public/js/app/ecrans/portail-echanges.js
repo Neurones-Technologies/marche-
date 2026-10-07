@@ -44,6 +44,7 @@ function vPortailAdditifs(m){
   var adds=state.additifs||[];
   if(!adds.length) return;
   var b=carteEchange(m,'Additifs au dossier ('+adds.length+')');
+  b.parentNode.id='portail-additifs';
   add(b,'p','muted','Ils font partie du dossier et priment sur les pièces qu’ils modifient. Tenez-en compte dans votre offre.');
   adds.slice().reverse().forEach(function(a,k){
     var e=add(b,'div','echange');

@@ -46,6 +46,41 @@ function ligneFichier(parent, doc, aide, sinon){
     });
   }
 }
+/* Fiche de l'appel d'offres : ce qu'il faut savoir avant de répondre, l'échéance, l'état de son offre, le dossier. */
+function ficheAppelOffres(m, clos, reste){
+  var c=state.cdc, adds=(state.additifs||[]).length;
+  var k=add(m,'section','card ao-fiche'); k.setAttribute('aria-label','Appel d’offres '+REF());
+  var tete=add(k,'div','ao-fiche-tete');
+  var g=add(tete,'div','ao-fiche-titre');
+  var ch=add(g,'div','fen-chips'); chipCellule(ch,REF(),'c-grey');
+  add(g,'h2',null,c.objet||'');
+  add(g,'div','muted',[c.autorite, c.procedure].filter(Boolean).join(' · '));
+  var e=add(tete,'div','ao-echeance'+(clos?' clos':''));
+  add(e,'div','ao-echeance-lab', clos ? 'Dépôts clos depuis le' : 'Date limite de dépôt');
+  add(e,'div','ao-echeance-date', dateLongue(c.ouverture)+' à 10 h 00');
+  if(!clos && reste!=null) add(e,'div','ao-echeance-reste','Clôture '+delaiRestant(reste));
+  var b=add(k,'div','pad');
+  grilleLecture(b,[
+    ['Devise de soumission', c.deviseSoumission], ['Langue', c.langue],
+    ['Caution de soumission', c.caution!=='' && c.caution!=null && Number(c.caution)>0 ? c.caution+' % du montant de l’offre' : 'Non exigée'],
+    ['Délai d’exécution maximal', c.delaiMax ? c.delaiMax+' jours' : null], ['Garantie minimale', c.garantieMin ? c.garantieMin+' mois' : null]
+  ]);
+  if((c.lots||[]).length){
+    add(b,'div','stat-k','Lots — vous pouvez répondre à un ou plusieurs').style.marginTop='12px';
+    var ul=add(b,'ul','ao-lots'); c.lots.forEach(function(l){ add(ul,'li',null,l.nom); });
+  }
+  var pied=add(k,'div','panel-foot ao-fiche-pied');
+  var o=state.monOffre;
+  chipCellule(pied, o ? 'Votre offre est déposée' : (clos ? 'Aucune offre déposée' : 'Votre offre n’est pas encore déposée'), o ? 'c-green' : (clos ? 'c-grey' : 'c-amber'));
+  if(adds){ var la=add(pied,'button','btn btn-ghost btn-sm',adds+' additif'+(adds>1?'s':'')+' au dossier'); fk(la,'ao-additifs');
+    la.addEventListener('click',function(){ var z=document.getElementById('portail-additifs'); if(z) z.scrollIntoView({ behavior:'smooth', block:'start' }); }); }
+  var act=add(pied,'div','ao-fiche-actions');
+  var tl=add(act,'button','btn btn-ghost btn-sm','Télécharger le dossier (PDF)'); fk(tl,'ao-pdf'); tl.setAttribute('data-consult','');
+  tl.addEventListener('click',telechargerDossierPdf);
+  var vd=add(act,'button','btn btn-primary btn-sm','Consulter le dossier'); fk(vd,'portail-dossier'); vd.setAttribute('data-consult','');
+  vd.addEventListener('click',function(){ go('cdc'); });
+}
+
 function vPortail(m){
   var c=state.cdc, d=state.draft;
   if(!d.files) d.files={};
@@ -65,34 +100,22 @@ function vPortail(m){
   function paysNom(iso){ for(var i=0;i<PAYS.length;i++) if(PAYS[i][0]===iso) return PAYS[i][1]; return iso; }
   var uem = isUemoa(d), loc = isLocal(d);
 
-  var band=add(m,'div','card'); band.style.cssText='border-color:var(--violet);border-width:2px;margin-bottom:18px';
-  var bp=add(band,'div','pad');
-  var bt=add(bp,'div'); bt.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap';
-  add(bt,'span','chip c-violet','Espace soumissionnaire');
-  add(bt,'strong',null,'Portail de dépôt des offres');
-  add(bp,'p','muted',"Cet écran présente ce que voit l'entreprise qui répond, et non l'acheteur. En exploitation réelle, il s'agit d'une application distincte, avec son authentification propre : l'acheteur n'a accès à aucun brouillon tant qu'un pli n'est pas déposé. Les deux espaces sont réunis ici pour les besoins de la démonstration.").style.marginTop='4px';
 
   if (!c.cdcPublie) return locked(m,"Le portail n'accepte les dépôts qu'une fois le cahier des charges publié.",'cdc','Aller au cahier des charges');
 
-  var h=add(m,'div','head'); var l=add(h,'div');
-  add(l,'h1',null,c.objet);
+  // l'entreprise référencée : sa raison sociale et son pays, repris de sa fiche
+  var mp=state.monPartenaire;
+  if(mp && !String(d.name||'').trim()){ d.name=mp.raisonSociale||''; if(mp.pays && /^[A-Z]{2}$/.test(mp.pays)) d.iso=mp.pays; uem=isUemoa(d); loc=isLocal(d); }
+
+  var h=add(m,'div','head'); add(add(h,'div'),'h1',null,'Répondre à l’appel d’offres');
   var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
-  add(h,'span','chip '+(clos?'c-red':'c-amber'), clos ? 'Dépôts clos depuis le '+dateLongue(c.ouverture)+' à 10 h 00' : 'Clôture '+delaiRestant(reste)+' — le '+dateLongue(c.ouverture)+' à 10 h 00');
-  if(clos){ var fin=add(m,'div','warn'); fin.style.marginBottom='18px'; add(fin,'strong',null,'Date limite dépassée. '); fin.appendChild(document.createTextNode('Les dépôts sont clos : aucune offre ni pièce ne peut plus être transmise.')); }
+  if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
+  ficheAppelOffres(m, clos, reste);
+  if(clos){ var fin=add(m,'div','warn'); fin.style.margin='18px 0'; add(fin,'strong',null,'Date limite dépassée. '); fin.appendChild(document.createTextNode('Les dépôts sont clos : aucune offre ni pièce ne peut plus être transmise.')); }
 
   vPortailResultat(m); // dès l'attribution prononcée
-
-  /* Dossier à retirer (carte enveloppée : hors de la numérotation des sections du dépôt) */
-  var k0=add(add(m,'div'),'div','card'); k0.style.marginBottom='18px';
-  add(k0,'div','panel-head','Dossier d\u2019appel d\u2019offres');
-  var b0=add(k0,'div','pad');
-  add(b0,'p','muted','Avis, règlement de la consultation, clauses administratives et techniques, bordereau des prix et formulaires.');
-  var vd=add(b0,'button','btn btn-primary btn-sm','Consulter le dossier'); vd.style.marginTop='10px'; fk(vd,'portail-dossier');
-  vd.addEventListener('click',function(){ go('cdc'); });
-  vPortailAdditifs(m);
-  vPortailQuestions(m);
   // offre en cours : on la relit, la modifie ou la retire ; le formulaire de dépôt ne revient qu'après retrait
-  if(state.monOffre){ vPortailMonOffre(m,clos); vPortailAccuses(m); vPortailSuivi(m); return; }
+  if(state.monOffre){ vPortailMonOffre(m,clos); vPortailAccuses(m); vPortailAdditifs(m); vPortailQuestions(m); vPortailSuivi(m); return; }
 
   /* Identification */
   var k1=add(m,'div','card'); k1.style.marginTop='18px';
@@ -240,6 +263,8 @@ function vPortail(m){
   });
 
   vPortailAccuses(m);
+  vPortailAdditifs(m);
+  vPortailQuestions(m);
   vPortailSuivi(m); // demandes de clarification et réclamations
 }
 

@@ -1017,3 +1017,25 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
   .budget-ligne { grid-template-columns: 1fr 1fr; }
   .budget-barre { flex-basis: 100%; }
 }
+
+/* Portail du fournisseur : fiche de l'appel d'offres */
+.ao-fiche { margin-bottom: 18px; }
+.ao-fiche-tete { display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-5) var(--space-5) var(--space-3); }
+.ao-fiche-titre { flex: 1 1 360px; min-width: 0; }
+.ao-fiche-titre h2 { margin: var(--space-2) 0 4px; font-size: 20px; line-height: 1.3; }
+.ao-echeance { flex: 0 0 auto; align-self: flex-start; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); background: var(--color-accent-soft); text-align: right; }
+.ao-echeance.clos { background: var(--color-surface-2); }
+.ao-echeance-lab { font-size: var(--fs-small); color: var(--color-text-muted); }
+.ao-echeance-date { font-weight: var(--fw-strong); font-size: 16px; }
+.ao-echeance-reste { font-size: var(--fs-small); color: var(--color-accent); font-weight: var(--fw-strong); margin-top: 2px; }
+.ao-lots { margin: 6px 0 0; padding-left: 18px; }
+.ao-lots li + li { margin-top: 2px; }
+.ao-fiche-pied { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.ao-fiche-actions { margin-left: auto; display: flex; gap: var(--space-2); flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .ao-echeance { text-align: left; width: 100%; }
+  .ao-fiche-actions { margin-left: 0; width: 100%; }
+}
+
+/* Pied du menu : réinitialiser / vider les données */
+.side-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }

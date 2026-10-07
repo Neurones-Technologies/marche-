@@ -39,7 +39,7 @@ function vProcedures(m){
     var phases={}; list.forEach(function(p){ phases[p.phase.id]=p.phase; });
     var interne = list.some(function(p){ return 'offres' in p; });
     var colonnes=[
-      {lab:'Référence', rendu:function(p,td){ add(td,'strong','nowrap',p.ref); if(p.id===MP.pid()){ var d=add(td,'div'); d.style.marginTop='4px'; chipCellule(d,'Ouverte','c-teal'); } }},
+      {lab:'Référence', rendu:function(p,td){ add(td,'strong','nowrap',p.ref); if(p.id===MP.pid() && !fournisseurSeul()){ var d=add(td,'div'); d.style.marginTop='4px'; chipCellule(d,'Ouverte','c-teal'); } }},
       {lab:'Objet', rendu:function(p,td){ var o=add(td,'div','dt-extrait',p.objet||''); o.style.minWidth='180px'; o.title=p.objet||''; if(p.type) add(td,'div','muted',p.type); }},
       {lab:'Publiée le', val:function(p){ return p.publieeLe ? String(p.publieeLe).split(' ')[0] : '—'; }}
     ];
@@ -48,12 +48,27 @@ function vProcedures(m){
       {lab:'Titulaire', val:function(p){ return p.titulaire||'—'; }},
       {lab:'Montant attribué', num:true, val:function(p){ return p.montantAttribue ? xof(p.montantAttribue) : '—'; }}
     ]);
-    colonnes.push({lab:'Phase', rendu:function(p,td){ chipCellule(td, p.phase.lab, COUL[p.phase.id]); }});
+    var fournisseur = !interne && list.some(function(p){ return 'monOffre' in p; });
+    if(fournisseur){
+      // le fournisseur : l'échéance, son offre, et l'état vu de son côté (pas les phases internes de l'acheteur)
+      colonnes=colonnes.filter(function(x){ return x.lab!=='Publiée le'; }).concat([
+        {lab:'Date limite', rendu:function(p,td){ if(!p.dateLimite){ td.textContent='—'; return; }
+          add(td,'div','nowrap',dateLongue(p.dateLimite)+' · 10 h');
+          var e=R.echeanceDepot({ ouverture:p.dateLimite }), r=e-Date.now(); if(r>0) add(td,'div','muted',delaiRestant(r)); }},
+        {lab:'Votre offre', rendu:function(p,td){ chipCellule(td, p.monOffre ? 'Déposée' : 'Non déposée', p.monOffre ? 'c-green' : 'c-grey'); }}
+      ]);
+      var ETAT_F={ publiee:['Ouvert au dépôt','c-amber'], evaluation:['Offres en examen','c-blue'], approbation:['Offres en examen','c-blue'],
+        attribuee:['Attribué','c-teal'], signee:['Attribué','c-teal'], infructueuse:['Infructueux','c-red'], archivee:['Archivé','c-grey'] };
+      colonnes.push({lab:'État', rendu:function(p,td){
+        var e=R.echeanceDepot({ ouverture:p.dateLimite }), clos=p.phase.id==='publiee' && e && e<=Date.now();
+        var x=clos ? ['Dépôts clos','c-grey'] : (ETAT_F[p.phase.id]||[p.phase.lab,'c-grey']); chipCellule(td,x[0],x[1]); }});
+    } else colonnes.push({lab:'Phase', rendu:function(p,td){ chipCellule(td, p.phase.lab, COUL[p.phase.id]); }});
     tableau(zone,{ cle:'procedures', lignes:list, colonnes:colonnes,
       vide: can('cdc.edit') ? 'Aucune procédure : utilisez « Nouvelle procédure », ou partez d\u2019une demande d\u2019achat validée.' : 'Aucun appel d\u2019offres n\u2019est ouvert pour le moment.',
       recherche:function(p){ return [p.ref, p.objet, p.titulaire, p.besoin && p.besoin.service, p.besoin && p.besoin.id].join(' '); },
       filtres:[
-        { lab:'Phase', options:Object.keys(phases).sort(function(a,b){ return phases[a].rang-phases[b].rang; }).map(function(id){ return [id, phases[id].lab]; }), test:function(p,v){ return p.phase.id===v; } },
+        fournisseur ? { lab:'Votre offre', options:[['oui','Déposée'],['non','Non déposée']], test:function(p,v){ return !!p.monOffre === (v==='oui'); } }
+          : { lab:'Phase', options:Object.keys(phases).sort(function(a,b){ return phases[a].rang-phases[b].rang; }).map(function(id){ return [id, phases[id].lab]; }), test:function(p,v){ return p.phase.id===v; } },
         { lab:'Année', options:annees.map(function(a){ return [a,a]; }), test:function(p,v){ return String(p.publieeLe||p.creee||'').indexOf(v)>=0; } }
       ],
       nouveau: can('cdc.edit') ? { lab:'Nouvelle procédure', action:nouvelleProcedure } : null,

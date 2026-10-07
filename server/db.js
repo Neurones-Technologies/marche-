@@ -600,6 +600,23 @@ db.transaction(function migrate() {
 })();
 }
 
+/** Vide les données de l'espace (fictives ou non) : registres, échanges, pièces, budget et journal. Les paramètres de
+    l'organisation (profil, rôles, circuits, formulaires, seuils, règles de notification) et les comptes sont
+    conservés ; les comptes fournisseurs perdent leur fiche partenaire. Retourne les identifiants des fichiers à effacer
+    du disque. */
+function viderDonnees(uid, who) {
+  let fichiers = [];
+  const tx = db.transaction(() => {
+    fichiers = db.prepare('SELECT id FROM files').all().map((f) => f.id);
+    db.exec('DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins; '
+      + 'DELETE FROM commandes; DELETE FROM partenaires; DELETE FROM files; DELETE FROM brouillons; DELETE FROM jetons; UPDATE users SET partenaire_id=NULL;');
+    for (const [k, v] of Object.entries({ notifs: [], emails: [], delegations: [], affectations: [], budget: { lignes: [] } })) if (kvGet(k)) kvSet(k, v, 'vidage');
+    bumpRev();
+    auditAppend(uid, who, 'Données effacées : appels d’offres, offres, demandes d’achat, commandes, partenaires, pièces et budget ; paramètres et comptes conservés');
+  });
+  tx();
+  return fichiers;
+}
 function resetDemo(uid, who) {
   const tx = db.transaction(() => {
     seedAll(false);
@@ -618,5 +635,5 @@ module.exports = {
   commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero,
   partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, equipeDe, marques, jetonCreer, jetonUtiliser,
   proceduresAll, procedureGet, procedureCreate, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero,
-  resetDemo, slug, frDate, seed,
+  resetDemo, viderDonnees, slug, frDate, seed,
 };
