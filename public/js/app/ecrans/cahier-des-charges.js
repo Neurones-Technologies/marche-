@@ -145,7 +145,8 @@ function vCDC(m){
   add(w5,'strong',null,'Pourquoi ce bloc compte pour les offres étrangères. ');
   w5.appendChild(document.createTextNode("Une offre hors zone peut paraître moins-disante et se révéler plus chère une fois la retenue à la source et les droits d'entrée intégrés. Le cahier des charges doit dire explicitement qui les supporte, sinon la comparaison entre offres locales et étrangères n'a pas de base commune."));
 
-  /* Préférence */
+  /* Préférence (marchés publics, ou règles qui l'autorisent) */
+  if(preferencePossible()){
   var k6=add(m,'div','card'); k6.style.marginTop='18px';
   add(k6,'div','panel-head','7 · Préférence communautaire UEMOA');
   var b6=add(k6,'div','pad');
@@ -176,10 +177,12 @@ function vCDC(m){
     : 'Le profil « '+MPProfils.profil(R.profilId(RCTX())).lab+' » n’autorise pas de marge de préférence.').style.marginTop='12px';
   add(b6,'p','muted',"Mécanisme : les offres de soumissionnaires établis hors de l'espace communautaire sont majorées du taux retenu pour les seuls besoins de la comparaison. Le prix contractuel du titulaire reste son prix d'offre.").style.marginTop='12px';
 
+  }
+
   /* Pièces propres à l'offre, saisies à la main pour cet appel d'offres. Celles du référencement restent exigées des
      entreprises non référencées (dossier publié, article 2.4) sans être redemandées à un partenaire référencé. */
   var k7=add(m,'div','card'); k7.style.marginTop='18px';
-  add(k7,'div','panel-head','8 · Pièces à joindre à chaque offre');
+  add(k7,'div','panel-head',(preferencePossible()?'8':'7')+' · Pièces à joindre à chaque offre');
   var b7=add(k7,'div','pad');
   var pr7=(state.formulaireReferencement||{}).pieces||[], imposees=CADRE().piecesImposees||[];
   state.docDefs=state.docDefs||[];

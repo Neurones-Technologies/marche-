@@ -129,6 +129,7 @@ function vDashboard(m){
   var fo=add(oth,'div','panel-foot');
   add(fo,'span','muted','Toutes les procédures, y compris archivées, sont dans l’écran Procédures.');
 
+  if(!preferencePossible()) return;
   var n=add(m,'div','note');
   add(n,'strong',null,'Préférence communautaire. ');
   n.appendChild(document.createTextNode(

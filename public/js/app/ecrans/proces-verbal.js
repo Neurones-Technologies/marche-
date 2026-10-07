@@ -74,8 +74,8 @@ function remplirPV(pv){
   if(ec.length){ var u0=add(s2,'ul'); ec.forEach(function(o){ var mis=missingDocs(o);
     add(u0,'li',null, o.name+' — '+(mis.length? mis.map(function(d){return d.label;}).join(' ; ') : 'écartée par décision du comité')); }); }
 
-  /* 3. Préférence communautaire */
-  add(section('Préférence communautaire'),'p',null, c.prefActive
+  /* 3. Préférence communautaire (seulement si les règles la prévoient) */
+  if(preferencePossible()) add(section('Préférence communautaire'),'p',null, c.prefActive
     ? 'Une marge de préférence de '+c.prefTaux+' % a été appliquée en faveur des soumissionnaires établis dans l’espace UEMOA, aux seules fins de comparaison des offres.'
     : 'Aucune marge de préférence communautaire n’a été appliquée.');
 

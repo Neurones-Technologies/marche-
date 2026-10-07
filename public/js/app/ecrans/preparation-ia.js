@@ -131,7 +131,9 @@ function sectionRemplie(p, s){
   if(s.id==='specs') return p.specs.length>0;
   return s.champs.some(function(c){ return p[c[0]]!=null && p[c[0]]!==''; });
 }
-function choixParDefaut(p){ var o={}; SECTIONS_IA.forEach(function(s){ o[s.id]=sectionRemplie(p,s); }); return o; }
+/* Sections proposées : sans la préférence quand les règles de la procédure ne la prévoient pas. */
+function sectionsIA(){ return SECTIONS_IA.filter(function(s){ return s.id!=='pref' || preferencePossible(); }); }
+function choixParDefaut(p){ var o={}; sectionsIA().forEach(function(s){ o[s.id]=sectionRemplie(p,s); }); return o; }
 function valeurIA(k, v){
   if(v==null || v==='') return '—';
   if(k==='prefActive') return v?'Activée':'Désactivée';
@@ -152,7 +154,7 @@ function ouvrirPropositionIA(){
     }
     add(corps,'p','muted','Cochez les sections à reprendre : elles remplacent le contenu actuel du formulaire. Les autres restent inchangées.').style.marginTop='12px';
     var liste=add(corps,'div','consult-liste'); liste.style.maxHeight='none';
-    SECTIONS_IA.forEach(function(s){
+    sectionsIA().forEach(function(s){
       var vide=!sectionRemplie(p,s);
       var l=add(liste,'label','consult-choix'+(ia.choix[s.id]?' on':'')); l.style.alignItems='flex-start';
       var c=add(l,'input'); c.type='checkbox'; c.checked=!!ia.choix[s.id]; c.disabled=vide; fk(c,'ia-sec-'+s.id);
@@ -173,7 +175,7 @@ function ouvrirPropositionIA(){
 function appliquerIA(p, choix){
   var c=state.cdc, faites=[];
   if(c.cdcPublie){ toast('Le cahier des charges est publié : il ne peut plus être remplacé.'); return; }
-  SECTIONS_IA.forEach(function(s){
+  sectionsIA().forEach(function(s){
     if(!choix[s.id] || !sectionRemplie(p,s)) return;
     if(s.id==='lots') c.lots=p.lots.map(function(x,i){ return { id:'l'+Date.now().toString(36)+i, nom:x.nom, montant:x.montant||'— XOF' }; });
     else if(s.id==='specs') c.specs=p.specs.slice();

@@ -147,6 +147,9 @@ function optionsProfils(select){
     var op=add(select,'option',null,pr.lab+(attente?' — en attente':'')); op.value=id; op.disabled=attente;
   });
 }
+/* Préférence géographique (règle des marchés publics) : proposée seulement si les règles de la procédure l'autorisent,
+   ou si elle est déjà active (pour pouvoir la retirer). */
+function preferencePossible(){ return !!(state && state.cdc) && (!!CADRE().preferenceAutorisee || !!state.cdc.prefActive); }
 function avecCadreProcedure(){ return !fournisseurSeul() && VIEWS.filter(function(v){ return v.grp==='Procédure' && vueVisible(v); }).length>=3; }
 /* Compte d'une entreprise qui répond (portail), sans rôle d'acheteur : il ne voit ni le parcours interne ni la vue d'ensemble. */
 function fournisseurSeul(){ return can('portail.use') && !can('offres.read') && !can('cdc.edit'); }

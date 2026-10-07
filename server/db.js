@@ -470,7 +470,7 @@ function seedAll(withUsers = true, options = null) {
     for (const [k, v] of Object.entries(org)) kvSet(k, v, 'seed');
     if (demo) {
       // procédure de démonstration : AO-2026-014, telle que dans le prototype, avec ses offres
-      const demo = procDefaults({ ...clone(seed.CDC), cctp: clone(CCTP_EXEMPLE), ligneBudget: 'b-dsi-inv', ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
+      const demo = procDefaults({ ...clone(seed.CDC), ...(cfg.marchesPublics ? {} : { prefActive: false, prefTaux: 0 }), cctp: clone(CCTP_EXEMPLE), ligneBudget: 'b-dsi-inv', ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
       seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
       procedureInsert('p1', demo, 'seed');
       seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));
@@ -596,7 +596,11 @@ db.transaction(function migrate() {
     for (const p of db.prepare('SELECT id FROM procedures').all()) {
       const c = pkvGet(p.id, 'cdc');
       if (!c || c.value.cdcPublie) continue;
-      if (c.value.profil && P.profil(c.value.profil).public) pkvSet(p.id, 'cdc', { ...c.value, profil: 'prive' }, 'migration');
+      let v = c.value;
+      if (v.profil && P.profil(v.profil).public) v = { ...v, profil: 'prive' };
+      // préférence géographique (règle des marchés publics) : retirée si les règles de l'organisation ne l'autorisent plus
+      if (v.prefActive && !R.cadre({ cdc: v, org: (kvGet('org') || {}).value || {} }).preferenceAutorisee) v = { ...v, prefActive: false };
+      if (v !== c.value) pkvSet(p.id, 'cdc', v, 'migration');
     }
   }
   // 07/10/2026 : budget et engagement. Sans ligne budgétaire, le contrôle des crédits reste inactif.

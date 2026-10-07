@@ -43,7 +43,7 @@ function vEvaluation(m){
     });
   });
 
-  var banner=add(m,'div', c.prefActive?'warn':'note'); banner.style.marginTop='0';
+  var banner=add(preferencePossible() ? m : el('div'), 'div', c.prefActive?'warn':'note'); banner.style.marginTop='0'; // sans préférence possible : rien à dire
   banner.style.marginBottom='18px';
   if(c.prefActive){
     add(banner,'strong',null,'Préférence communautaire active — '+c.prefTaux+' %. ');

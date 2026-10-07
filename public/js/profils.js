@@ -70,7 +70,7 @@
       regles: {
         recoursActif: { v: false, impose: false },
         delaiRecoursJours: { v: 0, impose: false, min: 0, max: 60 },
-        preferenceAutorisee: { v: true, impose: false },
+        preferenceAutorisee: { v: false, impose: false },
         preferenceTauxMax: { v: 25, impose: false, min: 0, max: 25 },
         zonePreference: { v: UEMOA, impose: false },
         paysLocal: { v: 'CI', impose: false },

@@ -56,7 +56,7 @@ test('achats privés : après dépublication, le client choisit ses règles', as
   assert.equal(s.cadre, null);
   const org = clone(s.org);
   org.reglages = { recoursActif: false, delaiRecoursJours: 0, separationFonctions: false, niveauxApprobationMin: 1 };
-  ok(await patch(admin, { org, cdc: { ...s.cdc, profil: 'prive' } }));
+  ok(await patch(admin, { org, cdc: { ...s.cdc, profil: 'prive', prefActive: false } })); // achats privés : pas de préférence géographique par défaut
   s = await getState(admin);
   ok(await patch(admin, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } })); // SOTRAP consultée (achats privés)
   ok(await patch(admin, { docDefs: s.docDefs.filter((d) => d.id !== 'cnps') })); // achats privés : pièce non imposée

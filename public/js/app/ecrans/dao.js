@@ -78,12 +78,12 @@ function buildDAO(){
       "La grille de notation en vigueur pour la présente consultation est la suivante : "+state.criteria.map(function(x){return x.label+" ("+x.weight+" %)";}).join(" ; ")+".",
       "Une offre qui ne satisfait pas une spécification minimale du CCTP est écartée sans être notée, quelle que soit la qualité du reste de la proposition. Les spécifications minimales sont celles expressément désignées comme telles au CCTP."
     ]),
-    A('2.6',"Préférence communautaire et comparaison des offres",'admin', c.prefActive ? [
+    A('2.6', preferencePossible() ? "Préférence communautaire et comparaison des offres" : "Comparaison des offres",'admin', c.prefActive ? [
       "Une marge de préférence de "+c.prefTaux+" % est appliquée en faveur des soumissionnaires établis dans l'espace UEMOA. Pour les seuls besoins de la comparaison, le montant des offres présentées par des soumissionnaires établis hors de cet espace est majoré de ce taux.",
       "Cette majoration est une opération de comparaison et non de négociation : elle ne modifie ni le montant de l'offre, ni le prix du marché en cas d'attribution. Le montant contractuel demeure celui figurant à l'acte d'engagement de l'attributaire.",
       "Les offres libellées en devises étrangères sont converties en francs CFA au taux de change en vigueur à la date d'ouverture des plis, taux qui demeure figé pour toute la durée de l'évaluation. Cette règle vaut quelle que soit l'évolution ultérieure des cours."
     ] : [
-      "Aucune marge de préférence communautaire n'est appliquée dans le cadre de la présente consultation. Les offres sont comparées à leur contre-valeur en francs CFA, sans correction tenant au lieu d'établissement du soumissionnaire.",
+      preferencePossible() ? "Aucune marge de préférence communautaire n'est appliquée dans le cadre de la présente consultation. Les offres sont comparées à leur contre-valeur en francs CFA, sans correction tenant au lieu d'établissement du soumissionnaire." : "Les offres sont comparées à leur contre-valeur en francs CFA.",
       "Les offres libellées en devises étrangères sont converties en francs CFA au taux de change en vigueur à la date d'ouverture des plis, taux qui demeure figé pour toute la durée de l'évaluation."
     ]),
     A('2.7',"Attribution, recours et abandon de la procédure",'admin',[

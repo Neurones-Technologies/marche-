@@ -200,9 +200,9 @@ function vParamsCadre(m,o){
   }
   bloc('Validation de l’attribution','Combien de personnes doivent valider avant qu’un marché soit attribué.',
     ['niveauxApprobationMin','separationFonctions']);
-  bloc('Contestation','Après l’attribution, les entreprises non retenues peuvent contester la décision pendant un délai, avant la signature du marché.',
+  if(state.marchesPublics || eff.recoursActif) bloc('Contestation','Après l’attribution, les entreprises non retenues peuvent contester la décision pendant un délai, avant la signature du marché.',
     eff.recoursActif ? ['recoursActif','delaiRecoursJours'] : ['recoursActif']);
-  bloc('Préférence géographique','Pour comparer les prix, les offres des entreprises établies hors des pays favorisés sont majorées d’un pourcentage, choisi dans chaque appel d’offres sans dépasser le maximum fixé ici. Le prix payé ne change pas.',
+  if(state.marchesPublics || eff.preferenceAutorisee) bloc('Préférence géographique','Pour comparer les prix, les offres des entreprises établies hors des pays favorisés sont majorées d’un pourcentage, choisi dans chaque appel d’offres sans dépasser le maximum fixé ici. Le prix payé ne change pas.',
     eff.preferenceAutorisee ? ['preferenceAutorisee','preferenceTauxMax','zonePreference'] : ['preferenceAutorisee']);
   bloc('Entreprises locales','Les entreprises établies dans ce pays fournissent, en plus, les pièces propres au pays (attestation de sécurité sociale…).',
     ['paysLocal']);

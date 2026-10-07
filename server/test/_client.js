@@ -49,7 +49,7 @@ async function remplir(cookie, pid) {
   const seed = require('../seed/seed.json');
   const s = (await call('GET', `/api/procedures/${pid}/state`, null, cookie)).json.state;
   const { ref, objet, profil, autorite } = s.cdc;
-  const r = await call('PATCH', `/api/procedures/${pid}/state`, { changes: { cdc: { ...seed.CDC, ref, objet, profil, autorite, cdcPublie: false, ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, criteria: seed.CRITERIA } }, cookie);
+  const r = await call('PATCH', `/api/procedures/${pid}/state`, { changes: { cdc: { ...seed.CDC, ref, objet, profil, autorite, cdcPublie: false, prefActive: profil === 'prive' ? false : seed.CDC.prefActive, ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, criteria: seed.CRITERIA } }, cookie);
   assert.equal(r.status, 200, JSON.stringify(r.json));
   return (await call('GET', `/api/procedures/${pid}/state`, null, cookie)).json.state;
 }
