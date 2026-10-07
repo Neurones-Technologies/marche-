@@ -47,7 +47,7 @@ function ligneFichier(parent, doc, aide, sinon){
   }
 }
 /* Fiche de l'appel d'offres : ce qu'il faut savoir avant de répondre, l'échéance, l'état de son offre, le dossier. */
-function ficheAppelOffres(m, clos, reste){
+function ficheAppelOffres(m, clos, reste, compact){
   var c=state.cdc, adds=(state.additifs||[]).length;
   var k=add(m,'section','card ao-fiche'); k.setAttribute('aria-label','Appel d’offres '+REF());
   var tete=add(k,'div','ao-fiche-tete');
@@ -59,6 +59,7 @@ function ficheAppelOffres(m, clos, reste){
   add(e,'div','ao-echeance-lab', clos ? 'Dépôts clos depuis le' : 'Date limite de dépôt');
   add(e,'div','ao-echeance-date', dateLongue(c.ouverture)+' à 10 h 00');
   if(!clos && reste!=null) add(e,'div','ao-echeance-reste','Clôture '+delaiRestant(reste));
+  if(compact){ k.classList.add('compact'); return; } // écran « Échanges » : l'en-tête seul
   var b=add(k,'div','pad');
   grilleLecture(b,[
     ['Devise de soumission', c.deviseSoumission], ['Langue', c.langue],
@@ -73,7 +74,7 @@ function ficheAppelOffres(m, clos, reste){
   var o=state.monOffre;
   chipCellule(pied, o ? 'Votre offre est déposée' : (clos ? 'Aucune offre déposée' : 'Votre offre n’est pas encore déposée'), o ? 'c-green' : (clos ? 'c-grey' : 'c-amber'));
   if(adds){ var la=add(pied,'button','btn btn-ghost btn-sm',adds+' additif'+(adds>1?'s':'')+' au dossier'); fk(la,'ao-additifs');
-    la.addEventListener('click',function(){ var z=document.getElementById('portail-additifs'); if(z) z.scrollIntoView({ behavior:'smooth', block:'start' }); }); }
+    la.addEventListener('click',function(){ go('echanges'); }); }
   var act=add(pied,'div','ao-fiche-actions');
   var tl=add(act,'button','btn btn-ghost btn-sm','Télécharger le dossier (PDF)'); fk(tl,'ao-pdf'); tl.setAttribute('data-consult','');
   tl.addEventListener('click',telechargerDossierPdf);
@@ -111,11 +112,15 @@ function vPortail(m){
   var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
   if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
   ficheAppelOffres(m, clos, reste);
+  ongletsFournisseur(m,'portail');
+  var nc=clarifsEnAttente();
+  if(nc){ var wc=add(m,'div','warn'); wc.style.marginBottom='18px'; add(wc,'strong',null,'L’acheteur attend votre réponse. ');
+    wc.appendChild(document.createTextNode(nc+' demande(s) de clarification sur votre offre : répondez dans l’onglet « Échanges ».')); }
   if(clos){ var fin=add(m,'div','warn'); fin.style.margin='18px 0'; add(fin,'strong',null,'Date limite dépassée. '); fin.appendChild(document.createTextNode('Les dépôts sont clos : aucune offre ni pièce ne peut plus être transmise.')); }
 
   vPortailResultat(m); // dès l'attribution prononcée
   // offre en cours : on la relit, la modifie ou la retire ; le formulaire de dépôt ne revient qu'après retrait
-  if(state.monOffre){ vPortailMonOffre(m,clos); vPortailAccuses(m); vPortailAdditifs(m); vPortailQuestions(m); vPortailSuivi(m); return; }
+  if(state.monOffre){ vPortailMonOffre(m,clos); vPortailAccuses(m); return; }
 
   /* Identification */
   var k1=add(m,'div','card'); k1.style.marginTop='18px';
@@ -263,9 +268,6 @@ function vPortail(m){
   });
 
   vPortailAccuses(m);
-  vPortailAdditifs(m);
-  vPortailQuestions(m);
-  vPortailSuivi(m); // demandes de clarification et réclamations
 }
 
 /* Accusés de dépôt du fournisseur ; un dépôt retiré reste tracé. */

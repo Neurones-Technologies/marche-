@@ -11,7 +11,7 @@ var ROUTES_VUES = { accueil:'tableau-de-bord', besoins:'demandes-achat', procedu
   suppleances:'utilisateurs/suppleances', journal:'audit', params:'parametres', regles:'alertes', envois:'alertes/envois' };
 var ROUTES_PROCEDURE = { dashboard:'vue-ensemble', cdc:'cahier-des-charges', prestataires:'prestataires', criteres:'criteres', qa:'questions',
   reception:'reception', depouille:'depouillement', conformite:'conformite', clarifs:'clarifications', evaluation:'evaluation',
-  decision:'decision', recours:'cloture', pv:'proces-verbal', audit:'journal', portail:'depot' };
+  decision:'decision', recours:'cloture', pv:'proces-verbal', audit:'journal', portail:'depot', echanges:'echanges' };
 /* Écrans qui affichent un élément sous leur liste : l'élément entre dans l'adresse. */
 var DETAILS = { besoins:'besoin', commandes:'commande', partenaires:'partenaire' };
 

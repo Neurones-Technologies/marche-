@@ -1,7 +1,7 @@
-/* Marché+ — Portail du fournisseur : ses échanges avec l'acheteur sur une consultation. Le résultat (dès l'attribution
-   prononcée), les questions et réponses (questions posées jusqu'à 3 jours avant l'échéance), les demandes de clarification
-   qui visent son offre, et ses réclamations. Chaque envoi passe par une route dédiée du serveur, qui pose l'auteur, la
-   date et le statut ; l'état est ensuite relu.
+/* Marché+ — Portail du fournisseur : l'écran « Échanges », conversation avec l'acheteur sur une consultation (additifs,
+   questions et réponses, demandes de clarification qui visent son offre, réclamations), et la carte du résultat de
+   l'écran « Mon offre ». Chaque envoi passe par une route dédiée du serveur, qui pose l'auteur, la date et le statut ;
+   l'état est ensuite relu.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
@@ -14,12 +14,6 @@ function envoyerPortail(bouton, methode, chemin, corps, message){
   return MP.api(methode, MP.url(chemin), corps).then(function(){ toast(message); return relireEtat(); })
     .catch(function(e){ bouton.disabled=false; toast(e.message||'Envoi impossible.'); });
 }
-/* Carte hors de la numérotation des sections du dépôt. */
-function carteEchange(m, titre){
-  var k=add(add(m,'div'),'div','card'); k.style.marginTop='18px';
-  add(k,'div','panel-head',titre);
-  return add(k,'div','pad');
-}
 
 /* Résultat de la consultation pour le fournisseur, dès l'attribution prononcée. */
 var RESULTATS = { retenue:['Offre retenue','c-green'], non_retenue:['Offre non retenue','c-grey'], ecartee:['Offre écartée','c-red'], infructueux:['Consultation infructueuse','c-amber'] };
@@ -31,7 +25,7 @@ function vPortailResultat(m){
   var b=add(k,'div','pad');
   add(b,'p',null,r.motif);
   if(r.statut==='retenue') add(b,'p','muted','L’acheteur vous contactera pour la suite : mise au point et bon de commande.');
-  else if(r.statut!=='infructueux') add(b,'p','muted','Vous pouvez adresser une réclamation motivée ci-dessous si vous contestez cette décision.');
+  else if(r.statut!=='infructueux') add(b,'p','muted','Si vous contestez cette décision, adressez une réclamation motivée depuis l’onglet « Échanges ».');
   var o=state.monOffre||{}, mp=state.monPartenaire||{};
   var bl=add(b,'button','btn btn-ghost btn-sm','Télécharger la lettre (PDF)'); fk(bl,'ma-lettre');
   bl.addEventListener('click',function(){
@@ -39,87 +33,111 @@ function vPortailResultat(m){
   });
 }
 
-/* Additifs au dossier : ce qui modifie ou précise le dossier depuis sa publication (repris aussi dans le PDF). */
-function vPortailAdditifs(m){
-  var adds=state.additifs||[];
-  if(!adds.length) return;
-  var b=carteEchange(m,'Additifs au dossier ('+adds.length+')');
-  b.parentNode.id='portail-additifs';
-  add(b,'p','muted','Ils font partie du dossier et priment sur les pièces qu’ils modifient. Tenez-en compte dans votre offre.');
-  adds.slice().reverse().forEach(function(a,k){
-    var e=add(b,'div','echange');
-    var t=add(e,'div','echange-tete'); add(t,'strong',null,'Additif n° '+(a.n||adds.length-k)+' — '+a.objet); add(t,'span','muted','Publié le '+a.t);
-    if(a.report) chipCellule(t,'Date limite reportée au '+dateLongue(a.report),'c-amber');
-    String(a.texte||'').split(/\n\s*\n/).forEach(function(x){ if(x.trim()) add(e,'p',null,x.trim()); });
-  });
-}
-
 function paysLettre(iso){ return ({ CI:'Côte d’Ivoire', BF:'Burkina Faso', SN:'Sénégal', ML:'Mali', NE:'Niger', TG:'Togo', BJ:'Bénin', GW:'Guinée-Bissau' })[iso] || iso; }
 
-/* Questions et réponses : publiées sans leur auteur ; on pose la sienne jusqu'à 3 jours avant l'échéance. */
-function vPortailQuestions(m){
-  var b=carteEchange(m,'Questions et réponses');
-  var qa=state.qa||[];
-  if(!qa.length) add(b,'p','muted','Aucune question pour l’instant. Les questions et leurs réponses sont communiquées à toutes les entreprises consultées, sans le nom de leur auteur.');
-  var liste=add(b,'div','echanges');
-  qa.forEach(function(q){
-    var e=add(liste,'div','echange');
-    var t=add(e,'div','echange-tete'); add(t,'strong',null,'Question'); add(t,'span','muted',q.t||'');
-    if(q.mienne) chipCellule(t,'Votre question','c-violet');
-    add(e,'p',null,q.question);
-    if(q.reponse){ var rp=add(e,'div','echange-reponse'); add(rp,'strong',null,'Réponse de l’acheteur'); add(rp,'p',null,q.reponse); }
-    else add(e,'p','muted','En attente de réponse.');
-  });
-  var ech=R.echeanceDepot(state.cdc), limite=ech ? ech-QUESTIONS_JOURS_AVANT*86400000 : null;
-  if(limite && Date.now()>limite){ add(b,'p','muted','Les questions sont closes '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.').style.marginTop='12px'; return; }
-  var lb=add(b,'label',null,'Votre question'); lb.setAttribute('for','pt-question'); lb.style.marginTop='14px';
-  var ta=add(b,'textarea'); ta.id='pt-question'; ta.rows=3; ta.maxLength=2000; fk(ta,'pt-question'); ta.style.width='100%';
-  ta.placeholder='Votre question sur le dossier (elle sera publiée sans votre nom, avec la réponse).';
-  var go=add(add(b,'div','echange-actions'),'button','btn btn-ghost','Envoyer la question'); fk(go,'pt-question-go');
-  if(limite) add(go.parentNode,'span','muted','Questions reçues jusqu’au '+new Date(limite).toLocaleDateString('fr-FR',{ day:'numeric', month:'long' })+'.');
-  go.addEventListener('click',function(){
-    var v=ta.value.trim(); if(v.length<10){ toast('Votre question est trop courte.'); ta.focus(); return; }
-    envoyerPortail(go,'POST','/questions',{ question:v },'Question envoyée à l’acheteur.');
+/* Onglets du fournisseur sur un appel d'offres : son offre, et ses échanges avec l'acheteur. */
+function clarifsEnAttente(){ return (state.clarifs||[]).filter(function(x){ return x.statut==='envoyee'; }).length; }
+function ongletsFournisseur(m, actif){
+  var nav=add(m,'nav','ao-onglets'); nav.setAttribute('aria-label','Appel d’offres '+REF());
+  [['portail','Mon offre'],['echanges','Échanges']].forEach(function(o){
+    var b=add(nav,'button','ao-onglet'+(o[0]===actif?' on':''),o[1]); b.type='button'; fk(b,'onglet-'+o[0]);
+    if(o[0]===actif) b.setAttribute('aria-current','page');
+    if(o[0]==='echanges'){ var n=clarifsEnAttente(); if(n){ var bd=add(b,'span','ao-onglet-n',String(n)); bd.title=n+' demande(s) de clarification en attente de votre réponse'; } }
+    b.addEventListener('click',function(){ if(o[0]!==actif) go(o[0]); });
   });
 }
 
-/* Après le dépôt : demandes de clarification qui visent son offre, et réclamations. */
-function vPortailSuivi(m){
-  var cl=state.clarifs||[];
-  if(cl.length){
-    var b=carteEchange(m,'Demandes de clarification');
-    add(b,'p','muted','L’acheteur vous demande de préciser un point de votre offre. Votre réponse ne peut modifier ni votre prix ni le contenu de votre offre.');
-    cl.forEach(function(x){
-      var e=add(b,'div','echange');
-      var t=add(e,'div','echange-tete'); add(t,'strong',null,x.objet); add(t,'span','muted','Reçue le '+x.t+(x.echeance?' · réponse attendue avant le '+x.echeance:''));
-      add(e,'p',null,x.question);
-      if(x.statut!=='envoyee'){ var rp=add(e,'div','echange-reponse'); add(rp,'strong',null,'Votre réponse — '+(x.tRep||'')); add(rp,'p',null,x.reponse||''); return; }
-      var ta=add(e,'textarea'); ta.rows=3; ta.maxLength=5000; fk(ta,'pt-clarif-'+x.i); ta.style.width='100%'; ta.setAttribute('aria-label','Votre réponse à : '+x.objet);
-      var go=add(add(e,'div','echange-actions'),'button','btn btn-primary btn-sm','Envoyer ma réponse'); fk(go,'pt-clarif-go-'+x.i);
-      go.addEventListener('click',function(){
-        var v=ta.value.trim(); if(!v){ toast('La réponse est vide.'); ta.focus(); return; }
-        envoyerPortail(go,'PUT','/clarifications/'+x.i+'/reponse',{ reponse:v },'Réponse envoyée à l’acheteur.');
-      });
-    });
-  }
-  if(!(state.receipts||[]).length) return; // réclamation réservée à qui a déposé une offre
-  var br=carteEchange(m,'Réclamations');
-  (state.reclamations||[]).forEach(function(x){
-    var e=add(br,'div','echange');
-    var t=add(e,'div','echange-tete'); add(t,'strong',null,x.objet); add(t,'span','muted','Adressée le '+x.t);
-    chipCellule(t, x.statut==='traitee'?'Réponse reçue':'En cours d’examen', x.statut==='traitee'?'c-green':'c-amber');
-    add(e,'p',null,x.texte);
-    if(x.reponse){ var rp=add(e,'div','echange-reponse'); add(rp,'strong',null,'Réponse de l’acheteur — '+(x.tRep||'')); add(rp,'p',null,x.reponse); }
+/* Date d'un échange (« 07/10/2026 13:14:34 » ou « 07/10/2026 »), pour ordonner la conversation. */
+function dateEchange(t){
+  var x=/^(\d{2})\/(\d{2})\/(\d{4})(?:\D+(\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(String(t||''));
+  return x ? Date.UTC(+x[3],+x[2]-1,+x[1],+(x[4]||0),+(x[5]||0),+(x[6]||0)) : 0;
+}
+/* Les messages de la conversation, du plus ancien au plus récent. */
+function filEchanges(){
+  var f=[];
+  (state.additifs||[]).forEach(function(a,i){ f.push({ t:a.t, de:'acheteur', type:'Additif n° '+(a.n||i+1), titre:a.objet, texte:a.texte, report:a.report }); });
+  (state.qa||[]).forEach(function(q){
+    f.push({ t:q.t, de:q.mienne?'vous':'autre', type:'Question', texte:q.question });
+    if(q.reponse) f.push({ t:q.tRep||q.t, de:'acheteur', type:'Réponse publiée', cite:q.question, texte:q.reponse });
   });
-  var d=add(br,'details','echange-nouvelle'); if(!(state.reclamations||[]).length) d.open=false;
-  add(d,'summary',null,'Adresser une réclamation');
-  var lo=add(d,'label',null,'Objet'); lo.setAttribute('for','pt-rec-objet');
-  var ob=add(d,'input'); ob.type='text'; ob.id='pt-rec-objet'; ob.maxLength=200; fk(ob,'pt-rec-objet');
-  var lt=add(d,'label',null,'Exposé de la réclamation'); lt.setAttribute('for','pt-rec-texte');
-  var tx=add(d,'textarea'); tx.id='pt-rec-texte'; tx.rows=4; tx.maxLength=3000; fk(tx,'pt-rec-texte'); tx.style.width='100%';
-  var go=add(add(d,'div','echange-actions'),'button','btn btn-ghost','Adresser la réclamation'); fk(go,'pt-rec-go');
-  go.addEventListener('click',function(){
-    if(ob.value.trim().length<3 || tx.value.trim().length<10){ toast('Indiquez l’objet et le détail de votre réclamation.'); return; }
-    envoyerPortail(go,'POST','/reclamations',{ objet:ob.value.trim(), texte:tx.value.trim() },'Réclamation adressée à l’acheteur.');
+  (state.clarifs||[]).forEach(function(x){
+    f.push({ t:x.t, de:'acheteur', type:'Demande de clarification', titre:x.objet, texte:x.question, clarif:x.statut==='envoyee'?x:null, echeance:x.echeance });
+    if(x.reponse) f.push({ t:x.tRep||x.t, de:'vous', type:'Votre réponse', cite:x.objet, texte:x.reponse });
+  });
+  (state.reclamations||[]).forEach(function(x){
+    f.push({ t:x.t, de:'vous', type:'Réclamation', titre:x.objet, texte:x.texte });
+    if(x.reponse) f.push({ t:x.tRep||x.t, de:'acheteur', type:'Réponse à votre réclamation', cite:x.objet, texte:x.reponse });
+  });
+  return f.map(function(x,i){ x.ordre=i; return x; }).sort(function(a,b){ return (dateEchange(a.t)-dateEchange(b.t)) || (a.ordre-b.ordre); });
+}
+
+/* Écran « Échanges » : la conversation avec l'acheteur, et la saisie d'une question ou d'une réclamation. */
+var AUTEURS_ECHANGE = { acheteur:'Acheteur', vous:'Vous', autre:'Une entreprise consultée' };
+function vEchanges(m){
+  var c=state.cdc;
+  if (!c.cdcPublie) return locked(m,"Les échanges s'ouvrent une fois le dossier publié.",'cdc','Aller au dossier');
+  var h=add(m,'div','head'); add(add(h,'div'),'h1',null,'Échanges avec l’acheteur');
+  var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
+  if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
+  ficheAppelOffres(m, clos, reste, true);
+  ongletsFournisseur(m,'echanges');
+
+  var k=add(m,'section','card chat'); k.setAttribute('aria-label','Conversation avec l’acheteur');
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,'Conversation');
+  add(ph,'span','muted chat-aide','Questions et réponses : visibles de toutes les entreprises consultées, sans nom. Clarifications et réclamations : entre l’acheteur et vous.');
+  var fil=add(k,'div','chat-fil'); fil.setAttribute('role','log'); fil.setAttribute('aria-live','polite');
+  var msgs=filEchanges();
+  if(!msgs.length) add(fil,'p','muted chat-vide','Aucun échange pour l’instant. Posez une question sur le dossier ci-dessous : la réponse de l’acheteur apparaîtra ici.');
+  msgs.forEach(function(x){
+    var b=add(fil,'div','chat-msg de-'+x.de);
+    var t=add(b,'div','chat-tete'); add(t,'strong',null,AUTEURS_ECHANGE[x.de]); add(t,'span','chat-type',x.type); add(t,'span','muted',x.t||'');
+    if(x.cite) add(b,'div','chat-cite',x.cite.length>140 ? x.cite.slice(0,140)+'…' : x.cite);
+    if(x.titre) add(b,'div','chat-titre',x.titre);
+    String(x.texte||'').split(/\n\s*\n/).forEach(function(p){ if(p.trim()) add(b,'p',null,p.trim()); });
+    if(x.report) chipCellule(b,'Date limite reportée au '+dateLongue(x.report),'c-amber');
+    if(x.clarif){
+      // demande de clarification en attente : réponse dans la bulle
+      add(b,'div','chat-note','Votre réponse ne peut modifier ni votre prix ni le contenu de votre offre.'+(x.echeance?' Réponse attendue avant le '+x.echeance+'.':''));
+      var ta=add(b,'textarea'); ta.rows=3; ta.maxLength=5000; fk(ta,'pt-clarif-'+x.clarif.i); ta.setAttribute('aria-label','Votre réponse à : '+x.titre);
+      var go2=add(add(b,'div','chat-actions'),'button','btn btn-primary btn-sm','Répondre'); fk(go2,'pt-clarif-go-'+x.clarif.i);
+      go2.addEventListener('click',function(){
+        var v=ta.value.trim(); if(!v){ toast('La réponse est vide.'); ta.focus(); return; }
+        envoyerPortail(go2,'PUT','/clarifications/'+x.clarif.i+'/reponse',{ reponse:v },'Réponse envoyée à l’acheteur.');
+      });
+    }
+  });
+  setTimeout(function(){ fil.scrollTop=fil.scrollHeight; },0);
+
+  /* Saisie : une question (jusqu'à 3 jours avant l'échéance) ou une réclamation (après un dépôt) */
+  var limite=ech ? ech-QUESTIONS_JOURS_AVANT*86400000 : null, questionOuverte=!limite || Date.now()<=limite;
+  var reclamation=(state.receipts||[]).length>0;
+  var sa=add(k,'div','chat-saisie');
+  if(!questionOuverte && !reclamation){ add(sa,'p','muted','Les questions sont closes '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.'); return; }
+  UI.typeEchange = UI.typeEchange && ((UI.typeEchange==='question' && questionOuverte) || (UI.typeEchange==='reclamation' && reclamation)) ? UI.typeEchange : (questionOuverte?'question':'reclamation');
+  var types=add(sa,'div','chat-types'); types.setAttribute('role','radiogroup'); types.setAttribute('aria-label','Type de message');
+  [['question','Question sur le dossier',questionOuverte],['reclamation','Réclamation',reclamation]].forEach(function(o){
+    if(!o[2]) return;
+    var b=add(types,'button','pill'+(UI.typeEchange===o[0]?' on':''),o[1]); b.type='button'; b.setAttribute('role','radio'); b.setAttribute('aria-checked',UI.typeEchange===o[0]?'true':'false'); fk(b,'chat-type-'+o[0]);
+    b.addEventListener('click',function(){ UI.typeEchange=o[0]; render(); });
+  });
+  var rec=UI.typeEchange==='reclamation';
+  var ob=null;
+  if(rec){ ob=add(sa,'input'); ob.type='text'; ob.maxLength=200; ob.placeholder='Objet de la réclamation'; ob.setAttribute('aria-label','Objet de la réclamation'); fk(ob,'pt-rec-objet'); }
+  var ligne=add(sa,'div','chat-ligne');
+  var tx=add(ligne,'textarea'); tx.rows=2; tx.maxLength=rec?3000:2000; fk(tx, rec?'pt-rec-texte':'pt-question');
+  tx.placeholder = rec ? 'Exposez votre réclamation : ce que vous contestez et pourquoi.' : 'Votre question sur le dossier (publiée sans votre nom, avec la réponse).';
+  tx.setAttribute('aria-label', rec ? 'Exposé de la réclamation' : 'Votre question');
+  var env=add(ligne,'button','btn btn-primary','Envoyer'); fk(env, rec?'pt-rec-go':'pt-question-go');
+  add(sa,'div','muted chat-aide', rec ? 'La réclamation et la réponse de l’acheteur restent entre lui et votre entreprise.'
+    : 'Questions reçues jusqu’au '+(limite?new Date(limite).toLocaleDateString('fr-FR',{ day:'numeric', month:'long' }):'—')+'. La réponse est communiquée à toutes les entreprises consultées.');
+  env.addEventListener('click',function(){
+    var v=tx.value.trim();
+    if(rec){
+      if(!ob.value.trim() || v.length<10){ toast('Indiquez l’objet et le détail de votre réclamation.'); return; }
+      envoyerPortail(env,'POST','/reclamations',{ objet:ob.value.trim(), texte:v },'Réclamation adressée à l’acheteur.');
+    } else {
+      if(v.length<10){ toast('Votre question est trop courte.'); tx.focus(); return; }
+      envoyerPortail(env,'POST','/questions',{ question:v },'Question envoyée à l’acheteur.');
+    }
   });
 }
