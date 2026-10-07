@@ -16,6 +16,9 @@ test('préparation : dossier publié, pièces de SOTRAP jointes', async () => {
 });
 
 test('prix par lot : un montant par lot soumissionné, le total en est la somme', async () => {
+  // offre technique jointe : elle suit le pli, marquée comme document de l'offre
+  ok(await upload('memoire', 'memoire.pdf', PDF, sotrap), 201);
+  ok(await upload('bordereau', 'bordereau.xlsx', Buffer.from('PK\x03\x04 xlsx'), sotrap), 201);
   const base = { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', delai: 90, lots: ['l1', 'l2'] };
   const manque = await call('POST', '/api/procedures/p1/offers', { ...base, prixLots: { l1: 30000000 } }, sotrap);
   assert.equal(manque.status, 422);
@@ -26,4 +29,11 @@ test('prix par lot : un montant par lot soumissionné, le total en est la somme'
   assert.deepEqual(r.json.offer.prixLots, { l1: 30000000, l2: 20000000 }); // lot hors offre ignoré
   assert.deepEqual(r.json.offer.lots, ['l1', 'l2']);
   assert.ok(r.json.offer.fields.some((f) => /^Prix — Lot 1/.test(f.k)));
+  const docsOffre = r.json.offer.pieces.filter((p) => p.offre).map((p) => p.doc).sort();
+  assert.deepEqual(docsOffre, ['bordereau', 'memoire']);
+  assert.ok(r.json.offer.pieces.some((p) => p.doc === 'registre' && !p.offre));
+  // l'acheteur télécharge le mémoire technique joint au pli
+  const mem = r.json.offer.pieces.find((p) => p.doc === 'memoire');
+  const dl = await call('GET', '/api/files/' + mem.id, null, achats);
+  assert.equal(dl.status, 200);
 });

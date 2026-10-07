@@ -90,7 +90,7 @@ Durées indicatives. Le marché public reste hors du plan.
 | | 6 | Résultat de la consultation : avis « retenu / non retenu » avec motif | S22, A17 | Fait |
 | | 7 | Réclamation depuis l'espace fournisseur | S23 | Fait |
 | 3 — L'offre du fournisseur | 8 | Prix par lot | S15 | Fait |
-| | 9 | Mémoire technique et bordereau chiffré joints à l'offre | S16 | À faire |
+| | 9 | Mémoire technique et bordereau chiffré joints à l'offre | S16 | Fait |
 | | 10 | Modification ou retrait de l'offre avant la date limite | S19 | À faire |
 | | 11 | Plusieurs collaborateurs par entreprise | S7 | À faire |
 | 4 — Qualité du travail de l'acheteur | 12 | Clauses techniques propres à chaque achat (rédigées par l'IA) | A4 | À faire |

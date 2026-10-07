@@ -50,15 +50,21 @@ function ouvrirPli(id){
     var bar=el('div','bar'); var sp=add(bar,'span'); sp.style.width=avg+'%'; if(avg<seuilC) sp.style.background='var(--amber-line)';
     champLecture(c,'Confiance de lecture — '+avg+' %',bar).parentNode.style.maxWidth='320px';
     bar.setAttribute('role','img'); bar.setAttribute('aria-label','Confiance de lecture : '+avg+' %');
-    var sec=add(c,'div','fen-section'); add(sec,'h3',null,'Pièces déposées');
-    if(!o.pieces || !o.pieces.length) add(sec,'p','muted','Aucune pièce jointe enregistrée.');
-    else {
-      var pc=add(sec,'div'); pc.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
-      o.pieces.forEach(function(f){
-        var a=add(pc,'a','pill',f.name+' · '+taille(f.size)); a.href='/api/files/'+f.id; a.setAttribute('download',f.name); a.title='SHA-256 '+f.sha256;
-        a.setAttribute('aria-label','Télécharger '+f.name);
-      });
-    }
+    var pieces=o.pieces||[];
+    listeFichiersPli(c,'Offre technique et financière', pieces.filter(function(f){ return f.offre; }),'Ni mémoire technique ni bordereau des prix joint.');
+    listeFichiersPli(c,'Pièces administratives', pieces.filter(function(f){ return !f.offre; }),'Aucune pièce jointe enregistrée.');
   }, { large:true });
+}
+/* Fichiers d'un pli, téléchargeables ; l'empreinte SHA-256 en infobulle. */
+var LIB_DOCS_OFFRE = { memoire:'Mémoire technique', bordereau:'Bordereau des prix' };
+function listeFichiersPli(c, titre, liste, vide){
+  var sec=add(c,'div','fen-section'); add(sec,'h3',null,titre);
+  if(!liste.length){ add(sec,'p','muted',vide); return; }
+  var pc=add(sec,'div'); pc.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+  liste.forEach(function(f){
+    var a=add(pc,'a','pill',(LIB_DOCS_OFFRE[f.doc] ? LIB_DOCS_OFFRE[f.doc]+' — ' : '')+f.name+' · '+taille(f.size));
+    a.href='/api/files/'+f.id; a.setAttribute('download',f.name); a.title='SHA-256 '+f.sha256;
+    a.setAttribute('aria-label','Télécharger '+f.name);
+  });
 }
 function offreParId(id){ for(var i=0;i<SEED_OFFERS.length;i++) if(SEED_OFFERS[i].id===id) return SEED_OFFERS[i]; return null; }

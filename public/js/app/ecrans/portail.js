@@ -10,6 +10,42 @@ function delaiRestant(ms){
   var min=Math.floor(ms/60000), j=Math.floor(min/1440), h=Math.floor((min%1440)/60), mn=min%60;
   return 'dans '+(j ? j+' j '+h+' h' : (h ? h+' h '+String(mn).padStart(2,'0') : mn+' min'));
 }
+/* Documents de l'offre elle-même (le serveur les rattache au pli au dépôt). */
+var DOCS_OFFRE = [
+  { id:'memoire', label:'Mémoire technique', aide:'Méthodologie, organisation, moyens et planning proposés (PDF ou Word)', accept:'.pdf,.docx' },
+  { id:'bordereau', label:'Bordereau des prix', aide:'Détail chiffré des prix par lot et par poste (Excel ou PDF)', accept:'.xlsx,.pdf' }
+];
+/* Une ligne de fichier du dépôt : libellé, aide, fichier joint (nom, taille, empreinte), joindre, remplacer, retirer. */
+function ligneFichier(parent, doc, aide, sinon){
+  var d=state.draft, meta=(d.files||{})[doc.id], on=!!meta;
+  var row=add(parent,'div','docline');
+  var lf=add(row,'div');
+  add(lf,'div',null,doc.label).style.fontWeight='600';
+  add(lf,'div','muted',aide);
+  if(on) add(lf,'div','muted','Fichier : '+meta.name+' ('+taille(meta.size)+') · empreinte '+meta.sha256.slice(0,12)+'…').title=meta.sha256;
+  else if(sinon) add(lf,'div','muted',sinon);
+  var act=add(row,'div'); act.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+  var inp=el('input'); inp.type='file'; inp.accept=doc.accept||'.pdf,.png,.jpg,.jpeg,.docx,.xlsx'; inp.hidden=true; inp.setAttribute('aria-label','Choisir le fichier : '+doc.label);
+  act.appendChild(inp);
+  var btn=add(act,'button','pill'+(on?' on':''), on?'Remplacer le fichier':'Joindre le fichier'); fk(btn,'doc-'+doc.id);
+  btn.addEventListener('click',function(){ inp.click(); });
+  inp.addEventListener('change',function(){
+    var f=inp.files&&inp.files[0]; if(!f) return;
+    if(f.size>10*1024*1024){ toast('Fichier trop volumineux (10 Mo maximum).'); return; }
+    btn.disabled=true; btn.textContent='Envoi…';
+    MP.upload(MP.url('/files?doc=')+encodeURIComponent(doc.id), f).then(function(m){
+      d.files=d.files||{}; d.files[doc.id]=m; d.docs[doc.id]=true; toast('Fichier joint : '+doc.label+'.'); save(); render();
+    }).catch(function(e){ toast(e.message||'Envoi impossible.'); render(); });
+  });
+  if(on){
+    var rm=add(act,'button','btn btn-ghost btn-sm','Retirer');
+    rm.setAttribute('aria-label','Retirer le fichier : '+doc.label);
+    rm.addEventListener('click',function(){
+      MP.api('DELETE',MP.url('/files/'+meta.id)).then(function(){ delete d.files[doc.id]; d.docs[doc.id]=false; save(); render(); })
+        .catch(function(e){ toast(e.message||'Suppression impossible.'); });
+    });
+  }
+}
 function vPortail(m){
   var c=state.cdc, d=state.draft;
   if(!d.files) d.files={};
@@ -109,6 +145,9 @@ function vPortail(m){
   fld(f2,"Délai d'exécution (jours)",'input',d.delai,function(v){ d.delai=v; },'number');
   fld(f2,'Garantie proposée (mois)','input',d.garantie,function(v){ d.garantie=v; },'number');
   fld(f2,'Nombre de références similaires','input',d.refsCount,function(v){ d.refsCount=v; },'number');
+  // documents de l'offre : ils accompagnent les montants et sont transmis à l'acheteur avec le pli
+  add(p2,'div','stat-k','Documents de l’offre').style.margin='18px 0 4px';
+  DOCS_OFFRE.forEach(function(x){ ligneFichier(p2, x, x.aide, ''); });
 
   /* Pièces */
   var k3=add(m,'div','card'); k3.style.marginTop='18px';
@@ -124,36 +163,11 @@ function vPortail(m){
   // pièces validées au référencement : elles tiennent lieu de pièce du dossier (le serveur les reprend au dépôt)
   var mp=state.monPartenaire, couvertes=(mp && mp.statut==='reference' && mp.piecesValables) || {};
   req.forEach(function(doc){
-    var meta=(d.files||{})[doc.id], on=!!meta, cov=couvertes[R.pieceReferencement(doc,(state.formulaireReferencement||{}).pieces)];
-    var row=add(b3,'div','docline');
-    var lf=add(row,'div');
-    add(lf,'div',null,doc.label).style.fontWeight='600';
-    add(lf,'div','muted', doc.id==='caution' ? 'Montant : '+c.caution+' % du montant de l’offre' :
+    var cov=couvertes[R.pieceReferencement(doc,(state.formulaireReferencement||{}).pieces)];
+    ligneFichier(b3, doc, doc.id==='caution' ? 'Montant : '+c.caution+' % du montant de l’offre' :
       (doc.id==='contreGarantie' ? 'Émise ou contre-garantie par un établissement agréé dans l’UEMOA' :
-      (doc.id==='traduction' ? 'Traduction française certifiée conforme' : 'Pièce exigée au règlement de consultation')));
-    if(on) add(lf,'div','muted','Fichier : '+meta.name+' ('+taille(meta.size)+') · empreinte '+meta.sha256.slice(0,12)+'…').title=meta.sha256;
-    else if(cov) add(lf,'div','muted','Couverte par votre référencement : '+cov.nom+(cov.expire?' (valable jusqu\u2019au '+cov.expire+')':'')+'. Joindre un fichier ici remplace cette pièce pour cette offre.');
-    var act=add(row,'div'); act.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-    var inp=el('input'); inp.type='file'; inp.accept='.pdf,.png,.jpg,.jpeg,.docx,.xlsx'; inp.hidden=true; inp.setAttribute('aria-label','Choisir le fichier : '+doc.label);
-    act.appendChild(inp);
-    var btn=add(act,'button','pill'+(on?' on':''), on?'Remplacer le fichier':'Joindre la pièce'); fk(btn,'doc-'+doc.id);
-    btn.addEventListener('click',function(){ inp.click(); });
-    inp.addEventListener('change',function(){
-      var f=inp.files&&inp.files[0]; if(!f) return;
-      if(f.size>10*1024*1024){ toast('Fichier trop volumineux (10 Mo maximum).'); return; }
-      btn.disabled=true; btn.textContent='Envoi…';
-      MP.upload(MP.url('/files?doc=')+encodeURIComponent(doc.id), f).then(function(m){
-        d.files=d.files||{}; d.files[doc.id]=m; d.docs[doc.id]=true; toast('Pièce jointe enregistrée.'); save(); render();
-      }).catch(function(e){ toast(e.message||'Envoi impossible.'); render(); });
-    });
-    if(on){
-      var rm=add(act,'button','btn btn-ghost btn-sm','Retirer');
-      rm.setAttribute('aria-label','Retirer le fichier : '+doc.label);
-      rm.addEventListener('click',function(){
-        MP.api('DELETE',MP.url('/files/'+meta.id)).then(function(){ delete d.files[doc.id]; d.docs[doc.id]=false; save(); render(); })
-          .catch(function(e){ toast(e.message||'Suppression impossible.'); });
-      });
-    }
+      (doc.id==='traduction' ? 'Traduction française certifiée conforme' : 'Pièce exigée au règlement de consultation')),
+      cov ? 'Couverte par votre référencement : '+cov.nom+(cov.expire?' (valable jusqu\u2019au '+cov.expire+')':'')+'. Joindre un fichier ici remplace cette pièce pour cette offre.' : '');
   });
   var non = DOCS().filter(function(x){ return req.indexOf(x)<0; });
   if(non.length){
@@ -173,6 +187,7 @@ function vPortail(m){
   if(!d.lots.length) errs.push('Aucun lot sélectionné.');
   req.forEach(function(x){ if(!d.docs[x.id] && !couvertes[R.pieceReferencement(x,(state.formulaireReferencement||{}).pieces)]) errs.push('Pièce manquante : '+x.label+'.'); });
   if(clos) errs.push('La date limite de dépôt est dépassée.');
+  DOCS_OFFRE.forEach(function(x){ if(!(d.files||{})[x.id]) warns.push(x.label+' non joint : l’acheteur ne pourra juger votre offre que sur les montants déclarés.'); });
   if(Number(d.delai) > c.delaiMax) warns.push('Délai proposé ('+d.delai+' j) supérieur au plafond du cahier des charges ('+c.delaiMax+' j).');
   if(Number(d.garantie) && Number(d.garantie) < c.garantieMin) warns.push('Garantie proposée ('+d.garantie+' mois) inférieure au minimum exigé ('+c.garantieMin+' mois).');
   if(Number(d.refsCount) && Number(d.refsCount) < 3) warns.push('Références déclarées : '+d.refsCount+' pour 3 exigées.');

@@ -234,6 +234,8 @@ function notifierServeur({ ev, lab, titre, corps, roles = [], ids = [] }) {
    Un fournisseur n'écrit jamais les clés entières (qa, clarifs, reclamations) : il pose une question, répond à une
    demande de clarification qui vise son offre, dépose une réclamation ; l'auteur, la date et le statut sont posés ici. */
 const QUESTIONS_JOURS_AVANT = 3; // questions reçues jusqu'à 3 jours avant la date limite de dépôt
+// documents de l'offre elle-même, joints depuis le portail à côté des pièces administratives
+const DOCS_OFFRE = { memoire: 'Mémoire technique', bordereau: 'Bordereau des prix' };
 const estFournisseur = (req) => req.can('portail.use') && !req.can('offres.read');
 const texte = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
 const ecrireCle = (req, k, v) => { req.store.set(k, v, req.user.id); require('../db').bumpRev(); };
@@ -482,7 +484,9 @@ r.post('/offers', (req, res) => {
   };
   let receipt;
   db.transaction(() => {
-    offer.pieces = pending.filter((f) => docs[f.doc_id] === true).map((f) => ({ id: f.id, doc: f.doc_id, name: f.name, size: f.size, sha256: f.sha256 }))
+    // pièces administratives exigées, puis documents de l'offre (mémoire technique, bordereau des prix)
+    offer.pieces = pending.filter((f) => docs[f.doc_id] === true || DOCS_OFFRE[f.doc_id])
+      .map((f) => ({ id: f.id, doc: f.doc_id, name: f.name, size: f.size, sha256: f.sha256, ...(DOCS_OFFRE[f.doc_id] ? { offre: true } : {}) }))
       .concat(docDefs.filter((x) => exigees.has(x.id) && parRef(x)).map((x) => {
         const pc = partenaire.pieces[refDe(x)];
         return { id: pc.fichier, doc: x.id, name: pc.nom, size: pc.taille, sha256: pc.sha256, referencement: partenaire.id, expire: pc.expire };
