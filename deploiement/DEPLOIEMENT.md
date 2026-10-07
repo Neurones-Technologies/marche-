@@ -130,6 +130,11 @@ dans le volume.
 main `APP_URL`, `MAIL_MODE=graph` et les variables `M365_*` (procédure dans le README, « Courriels »), puis relancer
 le script. Garder `chmod 600` sur le `.env` : il contient alors le secret de l'application Entra ID.
 
+**Courriels par SMTP** : chaque organisation peut régler son propre serveur d'envoi dans Paramètres → Messagerie
+(serveur, port, sécurité, identifiant, mot de passe, adresse d'expédition, puis « Envoyer un courriel de test »). Il a
+priorité sur Microsoft 365. Le mot de passe est chiffré avec une clé tirée de `JWT_SECRET` : si `JWT_SECRET` change, le
+ressaisir. Un serveur situé sur le réseau interne (127.0.0.1, 10.x, 192.168.x…) est refusé, sauf `SMTP_RESEAU_LOCAL=1`.
+
 **IA de préparation (Claude, Anthropic)** : ajouter `ANTHROPIC_API_KEY=<clé>` au `.env` (clé créée sur platform.claude.com),
 puis relancer le script. Les documents chargés et les idées saisies sont envoyés à l'API d'Anthropic pour rédiger la
 proposition. Une demande coûte de l'ordre de 0,05 à 0,30 $ ; `IA_PAR_HEURE` (30 par défaut) limite les demandes par compte.

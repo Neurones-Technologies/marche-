@@ -1150,3 +1150,7 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .regle-bloc h3 { margin: 0 0 4px; font-size: 15px; }
 .regle-bloc > p { margin: 0 0 var(--space-2); }
 .regle-ligne > div > div:first-child { font-weight: var(--fw-strong); }
+
+/* Paramètres : messagerie SMTP */
+.smtp-actif { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-4); font-weight: var(--fw-strong); cursor: pointer; }
+.smtp-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }

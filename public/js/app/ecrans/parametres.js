@@ -115,8 +115,12 @@ function vParams(m){
   });
 
   var k6=add(m,'div','card'); k6.style.marginTop='18px';
-  add(k6,'div','panel-head','6 · Messagerie');
-  var f6=add(add(k6,'div','pad'),'div','frm');
+  var ph6=add(k6,'div','panel-head'); add(ph6,'span',null,'6 · Messagerie');
+  var b6=add(k6,'div','pad');
+  vParamsSmtp(b6, ph6);
+  add(b6,'h3',null,'Courriels simulés').style.margin='22px 0 4px';
+  add(b6,'p','muted','Tant qu’aucun envoi n’est configuré, les courriels sont seulement consignés dans la boîte d’envoi, avec ces valeurs.');
+  var f6=add(b6,'div','frm');
   champ(f6,'Adresse expéditrice',state.mailFrom,function(v){ state.mailFrom=v; });
   champ(f6,'Domaine des destinataires',state.mailSuffix,function(v){ state.mailSuffix=v; });
   vParamsCadre(m,o);
@@ -131,7 +135,7 @@ function vParams(m){
   var fc=add(add(kc,'div','pad'),'div','frm');
   champ(fc,'Préfixe des numéros',o.prefixeCommande||'BC',function(v){ o.prefixeCommande=String(v).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)||'BC'; logit('Préfixe des bons de commande : '+o.prefixeCommande); });
   add(add(kc,'div','panel-foot'),'span','muted','Numéros continus et sans trou, attribués par le serveur à l\u2019émission : '+(o.prefixeCommande||'BC')+'-'+new Date().getFullYear()+'-0001, puis 0002…');
-  add(add(k6,'div','panel-foot'),'span','muted','Aucun message n\u2019est réellement expédié dans cette maquette : la boîte d\u2019envoi restitue ce qui partirait.');
+
   vParamsBudget(m,15);
   vParamsSauvegardes(m,16);
 }
@@ -433,4 +437,60 @@ function vParamsSauvegardes(m, num){
     ['Sauvegardes conservées', e.nombre+' sur '+e.conserver]
   ]);
   add(add(k,'div','panel-foot'),'span','muted','Chaque sauvegarde copie la base et les pièces déposées, puis vérifie la copie. La restauration est faite par l’exploitant de la plateforme.');
+}
+
+/* Messagerie : serveur SMTP de l'organisation (routes /api/messagerie/smtp ; le mot de passe ne revient jamais). */
+UI.smtp = null;
+var MODES_ENVOI = { smtp:['Envoi par le serveur SMTP','c-green'], graph:['Envoi par Microsoft 365 (serveur)','c-green'], simule:['Courriels simulés','c-grey'] };
+function vParamsSmtp(b, ph){
+  var x=UI.smtp;
+  if(!x){ UI.smtp={ charge:true }; MP.api('GET','/api/messagerie/smtp').then(function(r){ UI.smtp={ conf:r.configuration, mode:r.mode, m365:r.microsoft365 }; render(); })
+    .catch(function(e){ UI.smtp={ erreur:e.message }; render(); }); add(b,'p','muted','Chargement…'); return; }
+  if(x.charge){ add(b,'p','muted','Chargement…'); return; }
+  if(x.erreur){ add(b,'p','muted',x.erreur); return; }
+  var c=x.conf, md=MODES_ENVOI[x.mode]||MODES_ENVOI.simule;
+  chipCellule(ph, md[0], md[1]);
+  add(b,'h3',null,'Serveur d’envoi (SMTP)').style.margin='0 0 4px';
+  add(b,'p','muted','Les courriels de la plateforme (notifications, invitations, rappels, mots de passe oubliés) partent de ce serveur une fois l’envoi activé.'
+    +(x.m365?' Sinon, Microsoft 365 configuré sur le serveur prend le relais.':''));
+  var f=add(b,'div','frm');
+  function champ(id, lab, type, val, attrs){
+    var w=add(f,'div'); add(w,'label',null,lab).setAttribute('for',id);
+    var i=add(w, type==='select'?'select':'input'); i.id=id; fk(i,id);
+    if(type==='select') attrs.forEach(function(o){ add(i,'option',null,o[1]).value=o[0]; }); else { i.type=type; Object.keys(attrs||{}).forEach(function(k){ i.setAttribute(k,attrs[k]); }); }
+    i.value=val==null?'':val; return i;
+  }
+  var hote=champ('smtp-hote','Serveur SMTP','text',c.hote,{ placeholder:'smtp.office365.com', maxlength:200, autocomplete:'off' });
+  var port=champ('smtp-port','Port','number',c.port,{ min:1, max:65535 });
+  var sec=champ('smtp-securite','Sécurité de la connexion','select',c.securite,[['starttls','STARTTLS (port 587)'],['ssl','SSL/TLS (port 465)'],['aucune','Aucune (déconseillé)']]);
+  sec.addEventListener('change',function(){ if(sec.value==='ssl' && Number(port.value)===587) port.value=465; if(sec.value==='starttls' && Number(port.value)===465) port.value=587; });
+  var util=champ('smtp-utilisateur','Identifiant','text',c.utilisateur,{ maxlength:200, autocomplete:'off' });
+  var mdp=champ('smtp-mdp','Mot de passe','password','',{ maxlength:500, autocomplete:'new-password', placeholder: c.motDePasseEnregistre ? 'Enregistré — laisser vide pour le garder' : '' });
+  var exp=champ('smtp-expediteur','Adresse d’expédition','email',c.expediteur,{ placeholder:'achats@votre-domaine.ci', maxlength:200 });
+  var nom=champ('smtp-nom','Nom affiché','text',c.nomExpediteur,{ placeholder:(state.org||{}).nom||'', maxlength:100 });
+  var act=add(b,'label','smtp-actif'); var cb=add(act,'input'); cb.type='checkbox'; cb.checked=c.actif; fk(cb,'smtp-actif');
+  act.appendChild(document.createTextNode(' Envoyer réellement les courriels par ce serveur'));
+  var pied=add(b,'div','smtp-actions');
+  var en=add(pied,'button','btn btn-primary btn-sm','Enregistrer'); fk(en,'smtp-enregistrer');
+  var te=add(pied,'button','btn btn-ghost btn-sm','Envoyer un courriel de test'); fk(te,'smtp-test');
+  if(c.motDePasseEnregistre){ var ef=add(pied,'button','btn btn-ghost btn-sm','Effacer le mot de passe'); fk(ef,'smtp-effacer');
+    ef.addEventListener('click',function(){ enregistrer({ effacerMotDePasse:true }, 'Mot de passe effacé.'); }); }
+  function corps(){ return { hote:hote.value.trim(), port:Number(port.value), securite:sec.value, utilisateur:util.value.trim(), motDePasse:mdp.value,
+    expediteur:exp.value.trim(), nomExpediteur:nom.value.trim(), actif:cb.checked }; }
+  function enregistrer(plus, message){
+    en.disabled=true;
+    return MP.api('PUT','/api/messagerie/smtp',Object.assign(corps(),plus||{})).then(function(r){
+      UI.smtp={ conf:r.configuration, mode:r.mode, m365:r.microsoft365 }; toast(message||'Messagerie enregistrée.'); render(); return true;
+    }).catch(function(e){ en.disabled=false; toast(e.message||'Enregistrement impossible.'); return false; });
+  }
+  en.addEventListener('click',function(){ enregistrer(); });
+  te.addEventListener('click',function(){
+    // le test porte sur la configuration enregistrée : on enregistre d'abord la saisie
+    enregistrer(null,'Messagerie enregistrée.').then(function(ok){
+      if(!ok) return;
+      toast('Envoi du courriel de test…');
+      MP.api('POST','/api/messagerie/smtp/test',{}).then(function(r){ toast('Courriel de test envoyé à '+r.a+'.'); })
+        .catch(function(e){ toast((e.data && e.data.erreur) || e.message || 'Envoi impossible.'); });
+    });
+  });
 }

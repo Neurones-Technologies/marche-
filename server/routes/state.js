@@ -30,6 +30,7 @@ function buildState(req) {
     audit: req.pid && (req.can('audit.read') || req.can('pv.read')) ? auditList(200, req.pid) : [],
   };
   delete st._sod; // historique de séparation des fonctions : interne au serveur
+  delete st.smtp; // messagerie : routes /api/messagerie/smtp seulement (mot de passe chiffré)
   // notifications et courriels : chacun ne reçoit que ce qui le concerne (l'administration et l'audit voient tout)
   const toutVoir = req.can('notif.manage') || req.can('audit.read');
   if (!toutVoir) {
