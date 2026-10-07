@@ -40,16 +40,21 @@ function ctx(req) {
   return { org, profil: P.profil(R.profilId(c)), cadre: R.cadre(c) };
 }
 
-/** Lance la proposition en tâche de fond ; répond 202 avec l'identifiant de la tâche. */
+/** Lance une demande à l'IA en tâche de fond ; répond 202 avec l'identifiant de la tâche. travail() rend une promesse
+    dont le résultat (sans modele ni jetons) est rendu tel quel à la lecture de la tâche. */
 function lancer(req, res, source, libelle) {
+  return lancerTravail(req, res, () => IA.proposerCdc(source, ctx(req)), `Cahier des charges proposé par l’IA — ${libelle}`);
+}
+function lancerTravail(req, res, travail, journal) {
   purger();
   const id = crypto.randomUUID(), uid = req.user.id, qui = whoLabel(req.user), pid = req.pid;
   const tache = { uid, pid, espace: contexte.espace(), etat: 'en_cours', t: Date.now() };
   TACHES.set(id, tache);
   // la suite s'exécute dans le contexte de la requête (base de l'espace) : le journal va à la bonne procédure
-  IA.proposerCdc(source, ctx(req)).then((out) => {
-    auditAppend(uid, qui, `Cahier des charges proposé par l’IA (${out.modele}) — ${libelle}`, pid);
-    Object.assign(tache, { etat: 'prete', proposition: out.proposition, modele: out.modele });
+  travail().then((out) => {
+    auditAppend(uid, qui, `${journal} (${out.modele})`, pid);
+    const { jetons, ...resultat } = out; // eslint-disable-line no-unused-vars
+    Object.assign(tache, { etat: 'prete', resultat });
   }).catch((e) => {
     if (!(e instanceof IA.ErreurIA)) console.error('IA', e);
     Object.assign(tache, { etat: 'erreur', status: e.status || 500, code: e.code || 'AI_ERROR', erreur: e instanceof IA.ErreurIA ? e.message : 'Erreur du service d’IA.' });
@@ -62,7 +67,7 @@ r.get('/taches/:id', (req, res) => {
   if (!x || x.uid !== req.user.id || x.pid !== req.pid || x.espace !== contexte.espace()) return err(res, 404, 'TASK_UNKNOWN', 'Demande introuvable ou expirée.');
   if (x.etat === 'en_cours') return res.json({ etat: 'en_cours', depuis: Math.round((Date.now() - x.t) / 1000) });
   if (x.etat === 'erreur') return res.status(x.status).json({ etat: 'erreur', error: x.erreur, code: x.code });
-  res.json({ etat: 'prete', proposition: x.proposition, modele: x.modele });
+  res.json({ etat: 'prete', ...x.resultat });
 });
 
 const corpsBrut = express.raw({ type: () => true, limit: cfg.maxFileMb * 1024 * 1024 });
@@ -84,6 +89,14 @@ r.post('/idee', limite, (req, res) => {
   if (idee.length < 15) return err(res, 422, 'IDEA_TOO_SHORT', 'Décrivez votre besoin en quelques phrases (15 caractères au moins).');
   if (idee.length > 4000) return err(res, 422, 'IDEA_TOO_LONG', 'Idée trop longue (4 000 caractères au plus) : chargez plutôt un document.');
   return lancer(req, res, { idee }, 'à partir d’une idée');
+});
+
+/** Clauses techniques (CCTP) propres à l'achat, rédigées à partir du cahier des charges enregistré. */
+r.post('/cctp', limite, (req, res) => {
+  const cdc = req.store.get('cdc') || {};
+  if (cdc.cdcPublie) return err(res, 409, 'CDC_PUBLISHED', 'Le dossier est publié : ses clauses ne se modifient plus.');
+  if (!String(cdc.objet || '').trim()) return err(res, 422, 'CDC_EMPTY', 'Renseignez d’abord l’objet du marché.');
+  return lancerTravail(req, res, () => IA.redigerCctp(cdc, ctx(req)), 'Clauses techniques (CCTP) rédigées par l’IA');
 });
 
 module.exports = r;

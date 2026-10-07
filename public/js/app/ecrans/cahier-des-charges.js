@@ -121,9 +121,12 @@ function vCDC(m){
     c.specs.push('Nouvelle spécification'); save(); render();
   });
 
+  /* Clauses techniques propres à l'achat (cctp.js) */
+  vCdcCctp(m,4);
+
   /* Conditions */
   var k4=add(m,'div','card'); k4.style.marginTop='18px';
-  add(k4,'div','panel-head','4 · Conditions administratives et financières');
+  add(k4,'div','panel-head','5 · Conditions administratives et financières');
   var f4=add(add(k4,'div','pad'),'div','frm');
   txt(f4,"Caution de soumission (% du montant)",c.caution,function(v){ c.caution=Number(v)||0; logit('Taux de caution porté à '+v+' %'); },'number');
   txt(f4,"Garantie minimale exigée (mois)",c.garantieMin,function(v){ c.garantieMin=Number(v)||0; logit('Garantie minimale portée à '+v+' mois'); },'number');
@@ -133,7 +136,7 @@ function vCDC(m){
 
   /* Fiscal */
   var k5=add(m,'div','card'); k5.style.marginTop='18px';
-  add(k5,'div','panel-head','5 · Régime fiscal et douanier');
+  add(k5,'div','panel-head','6 · Régime fiscal et douanier');
   var f5=add(add(k5,'div','pad'),'div','frm');
   txt(f5,"TVA applicable (%)",c.tva,function(v){ c.tva=Number(v)||0; },'number');
   txt(f5,"Retenue à la source — non-résidents (%)",c.retenueNonResident,function(v){ c.retenueNonResident=Number(v)||0; },'number');
@@ -144,7 +147,7 @@ function vCDC(m){
 
   /* Préférence */
   var k6=add(m,'div','card'); k6.style.marginTop='18px';
-  add(k6,'div','panel-head','6 · Préférence communautaire UEMOA');
+  add(k6,'div','panel-head','7 · Préférence communautaire UEMOA');
   var b6=add(k6,'div','pad');
   var row6=add(b6,'div'); row6.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap';
   var K=CADRE();
@@ -176,7 +179,7 @@ function vCDC(m){
   /* Pièces propres à l'offre, saisies à la main pour cet appel d'offres. Celles du référencement restent exigées des
      entreprises non référencées (dossier publié, article 2.4) sans être redemandées à un partenaire référencé. */
   var k7=add(m,'div','card'); k7.style.marginTop='18px';
-  add(k7,'div','panel-head','7 · Pièces à joindre à chaque offre');
+  add(k7,'div','panel-head','8 · Pièces à joindre à chaque offre');
   var b7=add(k7,'div','pad');
   var pr7=(state.formulaireReferencement||{}).pieces||[], imposees=CADRE().piecesImposees||[];
   state.docDefs=state.docDefs||[];

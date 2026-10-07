@@ -6,6 +6,8 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const cfg = require('./config');
 const seed = require('./seed/seed.json');
+// clauses techniques (CCTP) de l'appel d'offres de démonstration (réseau d'agences bancaires)
+const CCTP_EXEMPLE = require('./seed/cctp-exemple.json');
 const R = require('../public/js/regles.js');
 const P = require('../public/js/profils.js');
 const C = require('../public/js/circuits.js');
@@ -458,7 +460,7 @@ function seedAll(withUsers = true, options = null) {
     for (const [k, v] of Object.entries(org)) kvSet(k, v, 'seed');
     if (demo) {
       // procédure de démonstration : AO-2026-014, telle que dans le prototype, avec ses offres
-      const demo = procDefaults({ ...clone(seed.CDC), ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
+      const demo = procDefaults({ ...clone(seed.CDC), cctp: clone(CCTP_EXEMPLE), ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
       seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
       procedureInsert('p1', demo, 'seed');
       seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));
@@ -548,6 +550,12 @@ db.transaction(function migrate() {
   const modelePieces = (kvGet('docDefs') || { value: seed.DOC_DEFS }).value;
   for (const p of db.prepare('SELECT id FROM procedures').all()) {
     if (!db.prepare("SELECT 1 FROM pkv WHERE procedure_id=? AND key='docDefs'").get(p.id)) pkvSet(p.id, 'docDefs', clone(modelePieces), 'migration');
+  }
+  // 07/10/2026 : les clauses techniques (CCTP) deviennent propres à chaque achat (cdc.cctp). L'appel d'offres de
+  // démonstration garde celles qu'il affichait jusque-là ; les autres prennent le CCTP générique, à faire rédiger.
+  for (const p of db.prepare('SELECT id FROM procedures').all()) {
+    const c = pkvGet(p.id, 'cdc');
+    if (c && !c.value.cctp && c.value.ref === seed.CDC.ref && c.value.objet === seed.CDC.objet) pkvSet(p.id, 'cdc', { ...c.value, cctp: clone(CCTP_EXEMPLE) }, 'migration');
   }
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.
   if (kvGet('org') && !kvGet('circuitCommande')) kvSet('circuitCommande', clone(CIRCUIT_COMMANDE), 'migration');

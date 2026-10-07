@@ -1,0 +1,311 @@
+{
+ "source": "exemple",
+ "articles": [
+  {
+   "titre": "Contexte, périmètre et objectifs",
+   "paragraphes": [
+    "L'autorité contractante exploite un réseau d'agences bancaires réparties sur l'ensemble du territoire, comprenant des agences urbaines raccordées à la fibre optique, des agences de villes secondaires desservies par liaison radio ou cuivre, et des agences isolées dont la connectivité repose sur une liaison satellitaire de secours. Le présent marché a pour objet la modernisation de l'infrastructure réseau locale de ces agences.",
+    "Le périmètre couvre la fourniture, le transport, l'installation, le paramétrage, les essais, la mise en service, la documentation, la formation et la maintenance des équipements décrits ci-après. Il inclut la dépose et l'évacuation des équipements remplacés, ainsi que la reprise du câblage existant lorsque celui-ci ne satisfait pas les exigences de la présente pièce.",
+    "Les objectifs assignés au marché sont : porter la disponibilité du réseau d'agence à un niveau compatible avec l'activité bancaire de guichet ; segmenter les flux métier, monétique et bureautique ; réduire le délai de remise en service après incident ; et doter l'exploitant d'une supervision centralisée couvrant l'ensemble du parc.",
+    "Les quantités indiquées au détail quantitatif estimatif sont données à titre indicatif et pourront varier de plus ou moins vingt pour cent (20 %) sans que le titulaire puisse prétendre à une modification de ses prix unitaires."
+   ]
+  },
+  {
+   "titre": "Architecture cible et principes de conception",
+   "paragraphes": [
+    "L'architecture cible repose sur une topologie en étoile au niveau de chaque agence, avec un équipement de distribution unique assurant la commutation locale et le raccordement aux liaisons opérateur. Les agences de plus de vingt postes disposent de deux équipements de commutation en cascade, dimensionnés pour absorber la charge en cas de défaillance de l'un d'eux.",
+    "Le raccordement au réseau étendu est assuré par un routeur d'agence disposant d'au moins deux interfaces WAN actives, permettant une bascule automatique vers la liaison de secours sans intervention humaine et sans coupure de session supérieure à trente (30) secondes.",
+    "La segmentation logique est obligatoire et repose sur des réseaux locaux virtuels distincts pour : les postes de travail bureautiques, les applications métier bancaires, les automates et la monétique, la téléphonie sur IP, la vidéosurveillance, et l'administration des équipements. Aucun flux ne transite entre ces segments sans passer par un point de filtrage explicite.",
+    "La conception proposée est justifiée dans le mémoire technique par un schéma d'architecture par type d'agence, un plan d'adressage cohérent avec le plan existant, et une matrice des flux autorisés entre segments.",
+    "Le soumissionnaire propose une architecture homogène sur l'ensemble du parc. Les solutions reposant sur plusieurs gammes hétérogènes d'équipements pour une même fonction sont écartées, sauf justification technique circonstanciée acceptée par l'autorité contractante."
+   ]
+  },
+  {
+   "titre": "Contraintes d'environnement — climat, énergie et sûreté",
+   "paragraphes": [
+    "SPÉCIFICATION MINIMALE. Les matériels fonctionnent sans dégradation de performance dans une plage de température ambiante comprise entre 0 et 45 °C et une humidité relative pouvant atteindre 95 % sans condensation. Les équipements dont la plage de fonctionnement nominale est inférieure sont écartés, sauf à être livrés avec un dispositif de conditionnement d'air dédié chiffré dans l'offre.",
+    "Les matériels installés en zone sahélienne ou exposés à l'harmattan présentent un indice de protection contre la poussière au moins égal à IP 4X au niveau des entrées d'air, ou sont installés dans des baies équipées de filtres à poussière démontables et remplaçables sans outil. Le titulaire fournit un jeu de filtres de rechange par site.",
+    "L'alimentation électrique est réputée instable : le titulaire dimensionne ses équipements pour supporter des variations de tension comprises entre 170 et 260 volts, des microcoupures répétées et des retours de tension brutaux après reprise du groupe électrogène. Les alimentations acceptant une plage plus étroite sont protégées par un régulateur de tension chiffré dans l'offre.",
+    "Chaque site est équipé d'un onduleur dimensionné pour assurer une autonomie minimale de trente (30) minutes à pleine charge de l'ensemble des équipements réseau et de sécurité, avec bypass automatique et report d'alarme vers la supervision. Le calcul de dimensionnement est joint à l'offre.",
+    "Les équipements sont installés dans des locaux techniques fermant à clé, dans des baies verrouillables. Les ports non utilisés sont désactivés administrativement. Les câbles de brassage sont repérés aux deux extrémités selon une convention de nommage soumise à l'approbation de l'autorité contractante avant déploiement."
+   ]
+  },
+  {
+   "titre": "Exigences techniques — Lot 1 — Équipements actifs (switches, routeurs, pare-feux)",
+   "paragraphes": [
+    "Le présent chapitre définit les exigences applicables au lot 1 — équipements actifs (switches, routeurs, pare-feux), dont le montant estimatif s'établit à 45 000 000 XOF.",
+    "Les équipements actifs sont administrables, alimentés en courant alternatif et dotés d'alimentations redondées pour les agences de plus de vingt postes. Ils supportent le marquage de réseaux locaux virtuels selon la norme 802.1Q, la qualité de service à huit files d'attente, l'agrégation de liens et le contrôle d'accès au port selon la norme 802.1X.",
+    "Les commutateurs proposent au minimum vingt-quatre ports gigabit cuivre et deux ports optiques de liaison montante. La fourniture d'électricité par le port selon la norme 802.3at est exigée sur au moins la moitié des ports afin d'alimenter les téléphones IP, les caméras et les bornes sans fil, avec un budget de puissance total explicitement chiffré.",
+    "Les routeurs d'agence assurent le chiffrement des flux inter-sites, la bascule automatique entre liaisons, le marquage et la priorisation des flux applicatifs bancaires, et l'ouverture d'un tunnel de secours sur liaison satellitaire avec gestion de la latence associée.",
+    "Les matériels proposés ne font pas l'objet d'une annonce de fin de commercialisation à la date de remise des offres, et bénéficient d'un support constructeur garanti pendant au moins cinq (5) ans à compter de la réception provisoire. Une attestation du constructeur ou de son distributeur agréé est jointe à l'offre."
+   ]
+  },
+  {
+   "titre": "Exigences techniques — Lot 2 — Câblage structuré et baies de brassage",
+   "paragraphes": [
+    "Le présent chapitre définit les exigences applicables au lot 2 — câblage structuré et baies de brassage, dont le montant estimatif s'établit à 25 000 000 XOF.",
+    "Le câblage est réalisé en cuivre catégorie 6A blindé, avec une garantie système constructeur de vingt-cinq (25) ans couvrant les composants et les performances de la liaison. Les liaisons dépassant quatre-vingt-dix (90) mètres sont réalisées en fibre optique.",
+    "Chaque poste de travail est desservi par deux prises RJ45. Les liaisons vers les automates bancaires et les équipements monétiques sont physiquement distinctes et repérées par un code couleur dédié, afin d'interdire tout brassage accidentel avec le réseau bureautique.",
+    "Les baies de brassage sont de hauteur 42U, équipées de panneaux de brassage, de passe-câbles horizontaux, de deux unités de distribution électrique sur départs distincts, d'un éclairage intérieur et d'une sonde de température reportée à la supervision.",
+    "SPÉCIFICATION MINIMALE. Chaque lien cuivre installé fait l'objet d'un test de certification au moyen d'un appareil étalonné de moins de douze mois. Les rapports de certification, lien par lien, sont remis sous forme numérique exploitable et conditionnent la réception provisoire du lot."
+   ]
+  },
+  {
+   "titre": "Exigences techniques — Lot 3 — Installation, recette et formation",
+   "paragraphes": [
+    "Le présent chapitre définit les exigences applicables au lot 3 — installation, recette et formation, dont le montant estimatif s'établit à 15 000 000 XOF.",
+    "L'installation est réalisée sans interruption de l'activité de guichet. Les interventions nécessitant une coupure sont planifiées en dehors des heures d'ouverture et font l'objet d'une demande de changement approuvée au moins cinq (5) jours ouvrés à l'avance.",
+    "Chaque site fait l'objet d'une visite préalable contradictoire donnant lieu à un relevé d'existant et à une fiche de préparation validée par l'exploitant. Le déploiement est organisé par vagues géographiques, avec un site pilote dont la recette complète conditionne la poursuite du déploiement.",
+    "La formation porte sur l'exploitation courante, le diagnostic de premier niveau et les procédures de remise en service. Elle est dispensée en français, sur site, en groupes de huit personnes au maximum, et donne lieu à la remise d'un support pédagogique et à une évaluation individuelle des acquis.",
+    "Le titulaire assure un accompagnement renforcé pendant les quinze (15) jours ouvrés suivant la mise en service de chaque vague, avec présence sur site ou astreinte dédiée selon la criticité des agences concernées."
+   ]
+  },
+  {
+   "titre": "Exigences techniques — Lot 4 — Maintenance et support 3 ans",
+   "paragraphes": [
+    "Le présent chapitre définit les exigences applicables au lot 4 — maintenance et support 3 ans, dont le montant estimatif s'établit à 18 000 000 XOF.",
+    "La maintenance couvre la maintenance préventive, la maintenance corrective et la gestion des pièces de rechange pendant toute la durée du contrat, sur l'ensemble des sites déployés.",
+    "La maintenance préventive comprend au minimum deux visites annuelles par site, portant sur le nettoyage des filtres, le contrôle des serrages et des températures, la vérification des batteries d'onduleur, la mise à jour des micrologiciels validés et le contrôle de la sauvegarde des configurations. Chaque visite donne lieu à un rapport signé par l'exploitant du site.",
+    "Un stock de pièces de rechange est constitué et maintenu sur le territoire national, représentant au minimum dix pour cent (10 %) des équipements déployés par référence, avec un minimum d'une unité par référence. L'inventaire de ce stock est communiqué trimestriellement à l'autorité contractante.",
+    "Le titulaire s'engage sur la disponibilité des pièces pendant toute la durée du contrat. En cas d'obsolescence d'une référence, il propose un équipement de remplacement de caractéristiques au moins équivalentes, sans surcoût pour l'autorité contractante."
+   ]
+  },
+  {
+   "titre": "Normes, homologations et origine des matériels",
+   "paragraphes": [
+    "Les matériels sont neufs, d'origine, et n'ont fait l'objet d'aucun reconditionnement. Le soumissionnaire produit une attestation du constructeur ou de son distributeur agréé pour la zone, certifiant l'authenticité des matériels et l'ouverture des droits au support et aux mises à jour de sécurité.",
+    "Les équipements sont conformes aux normes internationales applicables en matière de compatibilité électromagnétique et de sécurité électrique, ainsi qu'aux exigences de l'autorité nationale de régulation des télécommunications lorsqu'ils comportent des fonctions radioélectriques. Les certificats correspondants sont joints.",
+    "Les interfaces d'administration, la documentation et les messages système sont disponibles en français ou en anglais. Lorsqu'ils ne sont disponibles qu'en anglais, le titulaire fournit un référentiel de traduction des messages d'alarme et des procédures d'exploitation critiques.",
+    "SPÉCIFICATION MINIMALE. Les équipements bénéficient de mises à jour de sécurité publiées par le constructeur pendant au moins cinq (5) ans. Les matériels en fin de support à la date de remise des offres sont écartés."
+   ]
+  },
+  {
+   "titre": "Sécurité des systèmes d'information bancaires",
+   "paragraphes": [
+    "L'administration des équipements s'effectue exclusivement par protocole chiffré, depuis un réseau d'administration dédié et isolé. Les protocoles d'administration en clair sont désactivés sur l'ensemble du parc, sans exception, y compris pendant les phases de déploiement.",
+    "Les comptes d'administration par défaut sont supprimés ou renommés et leurs mots de passe modifiés avant mise en service. L'authentification des administrateurs s'appuie sur un annuaire central avec traçabilité nominative des actions ; l'usage de comptes génériques partagés est proscrit.",
+    "Les segments portant des flux monétiques respectent les exigences de cloisonnement applicables aux données de porteurs de cartes : séparation physique ou logique stricte, filtrage explicite, journalisation des accès et interdiction de tout transit par le segment bureautique.",
+    "Les journaux des équipements sont exportés en temps réel vers un collecteur central, horodatés par une source de temps commune, et conservés pendant douze (12) mois au minimum. Le titulaire fournit la configuration permettant cet export et vérifie sa complétude lors de la recette.",
+    "Les configurations sont sauvegardées automatiquement après chaque modification et archivées de manière versionnée. Le titulaire remet une procédure documentée de restauration complète d'un équipement à partir de sa sauvegarde, testée en présence de l'exploitant lors de la recette."
+   ]
+  },
+  {
+   "titre": "Supervision, exploitation et indicateurs",
+   "paragraphes": [
+    "L'ensemble des équipements est supervisé depuis la plateforme centrale de l'autorité contractante au moyen du protocole SNMP version 3, à l'exclusion des versions antérieures non chiffrées. Le titulaire fournit les fichiers de définition des objets gérés et assiste l'exploitant dans leur intégration.",
+    "Sont remontés au minimum : la disponibilité de chaque équipement et de chaque liaison, l'état des alimentations et des ventilateurs, la température interne, le taux d'utilisation des interfaces, le taux d'erreurs, l'état des batteries d'onduleur et les bascules de liaison WAN.",
+    "Le titulaire propose un jeu de seuils d'alerte argumenté et un tableau de bord d'exploitation présentant l'état du parc par région, par type d'agence et par criticité. Ce tableau de bord est livré paramétré et fonctionnel à la réception provisoire.",
+    "Les indicateurs contractuels de disponibilité sont calculés mensuellement à partir des données de supervision, sur la base de relevés contradictoires. Toute divergence entre les relevés du titulaire et ceux de l'exploitant est tranchée au profit des relevés de l'autorité contractante, sauf preuve contraire apportée par le titulaire."
+   ]
+  },
+  {
+   "titre": "Essais, recette et réception",
+   "paragraphes": [
+    "Les essais se déroulent en trois phases : essais en usine ou en plateau sur un échantillon représentatif avant expédition ; essais de mise en service site par site ; recette globale portant sur l'ensemble du parc déployé.",
+    "Le plan de recette est proposé par le titulaire et approuvé par l'autorité contractante avant tout démarrage. Il comporte, pour chaque exigence du présent CCTP, un scénario de test, un résultat attendu et un mode de preuve. Une exigence sans scénario de test associé est réputée non recettée.",
+    "Les essais comprennent au minimum : la certification de chaque lien de câblage, la vérification de la segmentation par tentative de flux interdits, l'essai de bascule automatique de liaison WAN avec chronométrage de la reprise, l'essai d'autonomie sur onduleur, la vérification des remontées de supervision et la restauration d'une configuration depuis sauvegarde.",
+    "La réception provisoire est prononcée après levée de toutes les réserves bloquantes et remise complète de la documentation. La réception définitive intervient au terme d'une période d'observation de trois (3) mois d'exploitation sans incident bloquant imputable au titulaire.",
+    "Tout incident survenu pendant la période d'observation et imputable au titulaire suspend le décompte de celle-ci jusqu'à correction définitive et validation par l'exploitant."
+   ]
+  },
+  {
+   "titre": "Documentation et transfert de compétences",
+   "paragraphes": [
+    "Le titulaire remet, en français et sous format numérique modifiable : le dossier des ouvrages exécutés par site, les schémas d'architecture et de câblage mis à jour, le plan d'adressage, la matrice des flux, les configurations commentées, les procédures d'exploitation courante et les procédures de reprise après incident.",
+    "Le dossier de chaque site comporte le relevé des liens certifiés, les photographies des installations avant et après intervention, la liste des matériels installés avec leurs numéros de série, et le procès-verbal de mise en service signé par le responsable d'agence.",
+    "Le transfert de compétences porte sur l'exploitation, le diagnostic et la maintenance de premier niveau. Il comprend des sessions théoriques et des travaux pratiques sur maquette, et fait l'objet d'une évaluation des acquis dont les résultats sont communiqués à l'autorité contractante.",
+    "La documentation est mise à jour par le titulaire à chaque modification intervenant pendant la période de garantie. Une documentation non à jour constitue une réserve bloquante à la réception définitive."
+   ]
+  },
+  {
+   "titre": "Niveaux de service, délais d'intervention et astreinte",
+   "paragraphes": [
+    "SPÉCIFICATION MINIMALE. Le délai d'intervention sur site est inférieur à huit (8) heures ouvrées pour les agences du district d'Abidjan et à vingt-quatre (24) heures ouvrées pour les autres agences du territoire, à compter de la déclaration de l'incident.",
+    "Le délai de remise en service est de quatre (4) heures pour un incident bloquant l'activité de guichet en agence urbaine et de vingt-quatre (24) heures pour les autres sites. Lorsque la remise en service exige une pièce non disponible en stock local, le titulaire met en place une solution de contournement dans ces mêmes délais.",
+    "Le titulaire met en place un point d'entrée unique joignable en français, disponible pendant les heures ouvrées et en astreinte pour les incidents bloquants, avec accusé de prise en compte sous trente (30) minutes et suivi traçable de chaque incident jusqu'à clôture contradictoire.",
+    "Le non-respect d'un délai contractuel donne lieu à l'application de pénalités spécifiques, cumulables avec les pénalités de retard prévues au CCAP, selon le barème annexé à l'acte d'engagement.",
+    "Un comité de suivi trimestriel réunit le titulaire et l'exploitant pour examiner les indicateurs, les incidents récurrents et les actions correctives engagées. Le compte rendu de ce comité est annexé au dossier de marché."
+   ]
+  },
+  {
+   "titre": "Logistique, transport, dédouanement et délais d'acheminement",
+   "paragraphes": [
+    "Le soumissionnaire détaille dans son offre la chaîne logistique retenue : lieu d'expédition, mode de transport, incoterm proposé, délai d'acheminement prévisionnel et marges prises en compte pour les opérations de dédouanement.",
+    "Les délais d'acheminement et de dédouanement sont inclus dans le délai global d'exécution. Aucune prolongation de délai ne sera accordée au titre de difficultés logistiques ou douanières ordinaires, celles-ci étant réputées connues et intégrées au planning.",
+    "Les matériels sont conditionnés pour un transport maritime ou aérien en zone tropicale, avec protection contre l'humidité et les chocs. Tout matériel livré avec un emballage détérioré fait l'objet de réserves à la livraison et peut être refusé.",
+    "Le titulaire supporte les frais de stockage et de magasinage en cas de retard qui lui est imputable. Il assure les matériels jusqu'à leur réception provisoire par l'autorité contractante."
+   ]
+  },
+  {
+   "titre": "Environnement, sécurité au travail et gestion des déchets",
+   "paragraphes": [
+    "Les interventions sont conduites dans le respect des règles de sécurité applicables aux établissements recevant du public. Le personnel intervenant dispose des équipements de protection individuelle adaptés et d'une habilitation électrique en cours de validité pour les travaux concernés.",
+    "Les équipements déposés sont évacués par le titulaire et traités dans une filière conforme à la réglementation applicable aux déchets d'équipements électriques et électroniques. Un bordereau de suivi des déchets est remis à l'autorité contractante pour chaque enlèvement.",
+    "Les batteries d'onduleur remplacées font l'objet d'une reprise systématique par le titulaire et d'un traitement en filière spécialisée. Leur abandon sur site constitue un manquement grave au sens du CCAP.",
+    "Le titulaire propose, à performances égales, les matériels présentant la consommation électrique la plus faible, et documente dans son mémoire technique la consommation prévisionnelle du parc installé."
+   ]
+  },
+  {
+   "titre": "Liaisons étendues, qualité de service et performance applicative",
+   "paragraphes": [
+    "Le titulaire configure la priorisation des flux de sorte que les applications de guichet et la monétique disposent d'une bande passante garantie, y compris en période de saturation. Les flux de sauvegarde, de mise à jour et de bureautique lourde sont relégués en classe non prioritaire et peuvent être écrêtés.",
+    "SPÉCIFICATION MINIMALE. La latence aller-retour entre une agence raccordée par liaison terrestre et le centre de traitement n'excède pas cent cinquante (150) millisecondes en heure de pointe, et la perte de paquets sur les flux prioritaires demeure inférieure à un pour mille (1 ‰) mesuré sur une heure glissante.",
+    "Les agences desservies par liaison satellitaire font l'objet d'un paramétrage spécifique tenant compte de la latence propre à ce mode de transport : adaptation des temporisations applicatives, compression des en-têtes lorsque cela est pertinent, et exclusion explicite des flux non critiques pendant les heures d'ouverture.",
+    "Le titulaire réalise, avant réception provisoire, une campagne de mesure de performance sur un échantillon représentatif d'au moins quinze pour cent (15 %) des sites, couvrant chaque type de raccordement. Les résultats sont consignés dans un rapport contradictoire.",
+    "Le dimensionnement proposé tient compte d'une croissance de trafic de vingt pour cent (20 %) par an sur trois ans. Le soumissionnaire justifie ses hypothèses de dimensionnement dans son mémoire technique."
+   ]
+  },
+  {
+   "titre": "Téléphonie sur IP et intégration des services de communication",
+   "paragraphes": [
+    "Les équipements de commutation assurent l'alimentation électrique des postes téléphoniques par le port et leur affectation automatique au réseau local virtuel dédié à la voix, sans configuration manuelle poste par poste.",
+    "Les flux de signalisation et de média sont marqués et priorisés de bout en bout. Le titulaire vérifie lors de la recette que la qualité vocale mesurée demeure satisfaisante en situation de charge, y compris lors d'une bascule de liaison WAN.",
+    "L'acheminement des appels d'urgence et des appels vers le centre de sécurité de l'autorité contractante reste opérationnel en cas de perte de la liaison principale. Le dispositif de secours proposé est décrit et testé lors de la recette.",
+    "Les postes existants conservés sont inventoriés et leur compatibilité avec l'infrastructure proposée est vérifiée avant déploiement. Tout poste incompatible est signalé à l'autorité contractante, qui décide de son remplacement ou de son maintien sur infrastructure dédiée."
+   ]
+  },
+  {
+   "titre": "Réseau sans fil en agence",
+   "paragraphes": [
+    "Le réseau sans fil comporte deux services distincts : un service interne réservé aux équipements professionnels, authentifié par certificat ou par annuaire, et un service invité strictement isolé du réseau interne, sans aucune route vers les segments métier ou monétique.",
+    "SPÉCIFICATION MINIMALE. Le service invité est cloisonné au niveau du port et au niveau du routage. Une architecture reposant uniquement sur un filtrage applicatif pour séparer le service invité du réseau interne est refusée.",
+    "La couverture radio est dimensionnée à partir d'une étude par type d'agence, tenant compte des cloisons, des espaces de caisse et des zones de coffre. Une étude de couverture après installation est réalisée sur un échantillon de sites et remise à l'autorité contractante.",
+    "Les bornes sont administrables de manière centralisée, avec application automatique des politiques de sécurité et des mises à jour. Le remplacement d'une borne défaillante s'effectue sans reconfiguration manuelle, la configuration étant restituée depuis le contrôleur central."
+   ]
+  },
+  {
+   "titre": "Courants faibles, vidéosurveillance et systèmes de sûreté",
+   "paragraphes": [
+    "Les flux de vidéosurveillance sont portés par un réseau local virtuel dédié et n'empruntent en aucun cas le segment bureautique. Le dimensionnement des liens tient compte du débit cumulé des caméras et de la durée de rétention exigée par la politique de sûreté de l'autorité contractante.",
+    "Les équipements de contrôle d'accès et de détection d'intrusion raccordés au réseau font l'objet d'un segment spécifique, dont les flux sortants sont limités aux seuls serveurs de gestion identifiés dans la matrice des flux.",
+    "La perte de la liaison étendue ne doit pas interrompre l'enregistrement local des images ni le fonctionnement autonome du contrôle d'accès. Le titulaire vérifie ce comportement lors de la recette, liaison débranchée.",
+    "Le titulaire coordonne ses interventions avec les prestataires de sûreté en place. Toute intervention susceptible d'interrompre un système de sûreté fait l'objet d'une autorisation écrite préalable du responsable sûreté de l'autorité contractante."
+   ]
+  },
+  {
+   "titre": "Reprise de l'existant et migration",
+   "paragraphes": [
+    "Le titulaire réalise un inventaire contradictoire de l'existant par site avant toute dépose : équipements, versions, configurations, raccordements opérateur et servitudes particulières. Cet inventaire est validé par l'exploitant et sert de référence en cas de litige.",
+    "Les configurations existantes sont sauvegardées et archivées avant toute modification. Aucune dépose n'intervient avant que la sauvegarde ne soit vérifiée comme exploitable.",
+    "La migration s'effectue site par site, avec une fenêtre de bascule définie et un point de non-retour explicite. Au-delà de ce point, si la bascule n'est pas achevée, le plan de repli est déclenché et le site est restitué dans son état initial avant la reprise de l'activité.",
+    "SPÉCIFICATION MINIMALE. Aucune agence ne peut rester indisponible au-delà de l'ouverture des guichets du fait d'une opération de migration. Le plan de repli est documenté, testé sur le site pilote et approuvé avant tout déploiement de masse.",
+    "Les équipements déposés sont conservés en quarantaine pendant trente (30) jours avant évacuation, afin de permettre une restitution rapide en cas de difficulté post-migration."
+   ]
+  },
+  {
+   "titre": "Continuité d'activité et résilience des agences",
+   "paragraphes": [
+    "L'architecture proposée permet le maintien de l'activité de guichet en mode dégradé en cas de perte de la liaison principale, par bascule automatique sur la liaison de secours. Le mode dégradé et ses limites fonctionnelles sont documentés et portés à la connaissance des exploitants d'agence.",
+    "Le titulaire fournit, pour chaque type d'agence, une fiche de conduite à tenir en cas d'incident majeur : diagnostic de premier niveau, actions autorisées à l'agent d'agence, seuil d'escalade et coordonnées du support.",
+    "Un exercice de simulation d'incident est organisé avant la réception définitive sur au moins trois sites de typologies différentes, en présence de l'exploitant. Le compte rendu de cet exercice, incluant les délais constatés, est annexé au dossier de réception.",
+    "Les temps de reprise constatés lors de ces exercices constituent la référence contractuelle. Un écart significatif entre les délais annoncés à l'offre et les délais constatés donne lieu à un plan d'action correctif à la charge du titulaire."
+   ]
+  },
+  {
+   "titre": "Gestion des versions, obsolescence et évolutions",
+   "paragraphes": [
+    "Le titulaire maintient un référentiel des versions de micrologiciels déployées par référence d'équipement et par site. Toute mise à jour est précédée d'une validation en maquette et d'une demande de changement approuvée.",
+    "Les mises à jour correctives de sécurité qualifiées de critiques par le constructeur sont déployées dans un délai de trente (30) jours à compter de leur publication, après validation en maquette. Les mises à jour fonctionnelles suivent le calendrier convenu en comité de suivi.",
+    "Le titulaire informe l'autorité contractante de toute annonce de fin de commercialisation ou de fin de support affectant un matériel déployé, dans le mois suivant l'annonce, et propose une trajectoire de remplacement.",
+    "Aucune modification de configuration n'est apportée en production sans demande de changement tracée, comportant la description de l'opération, l'analyse d'impact, la procédure de retour arrière et la fenêtre d'intervention."
+   ]
+  },
+  {
+   "titre": "Contrôle de capacité, métrologie et amélioration continue",
+   "paragraphes": [
+    "Le titulaire met en place une métrologie permettant de suivre l'évolution de la charge des liens, l'occupation des ports, la consommation électrique et la température des locaux techniques, avec conservation des historiques sur douze (12) mois glissants.",
+    "Un rapport trimestriel de capacité est remis à l'autorité contractante, identifiant les sites approchant leurs limites, les incidents récurrents et les recommandations d'évolution argumentées et chiffrées.",
+    "Les incidents récurrents font l'objet d'une analyse de cause racine formalisée, distincte du simple rétablissement du service. L'analyse est présentée en comité de suivi avec le plan d'action correspondant et son échéancier.",
+    "Les recommandations du titulaire n'engagent l'autorité contractante que lorsqu'elles sont acceptées par écrit. Une recommandation formulée et non suivie d'effet ne dégage pas le titulaire de ses obligations de résultat sur le périmètre contractuel."
+   ]
+  },
+  {
+   "titre": "Mise à la terre, protection foudre et surtensions",
+   "paragraphes": [
+    "SPÉCIFICATION MINIMALE. Chaque local technique dispose d'une prise de terre dont la résistance mesurée est inférieure à dix (10) ohms. La mesure est réalisée contradictoirement avant installation ; lorsque la valeur n'est pas atteinte, le titulaire chiffre et réalise la reprise de la prise de terre au titre du marché.",
+    "L'ensemble des masses métalliques des baies, chemins de câbles et coffrets est relié à une barrette de terre unique par site, selon un maillage documenté au dossier des ouvrages exécutés. Les liaisons équipotentielles sont réalisées en conducteur de section adaptée et repérées.",
+    "Des parafoudres de type adapté sont installés en tête d'alimentation électrique de chaque local technique ainsi que sur les arrivées de liaisons cuivre extérieures. Les parafoudres comportent un report d'état de fin de vie vers la supervision.",
+    "Les liaisons cuivre entre bâtiments distincts d'un même site sont proscrites : elles sont réalisées en fibre optique, y compris sur de courtes distances, afin d'éviter la propagation des surtensions d'origine atmosphérique.",
+    "Le titulaire remet, pour chaque site, un procès-verbal de mesure de terre et de continuité des liaisons équipotentielles, daté et signé. L'absence de ce procès-verbal constitue une réserve bloquante à la réception provisoire du site concerné."
+   ]
+  },
+  {
+   "titre": "Prérequis de site, génie civil et servitudes",
+   "paragraphes": [
+    "Le titulaire établit, pour chaque site, une fiche de prérequis précisant les besoins en alimentation électrique, en espace, en ventilation, en cheminement de câbles et en travaux de percement éventuels. Cette fiche est transmise à l'autorité contractante au moins quinze (15) jours avant l'intervention.",
+    "Les travaux de génie civil légers nécessaires au cheminement des câbles, à la pose des chemins de câbles et à la fixation des baies sont inclus dans le marché, ainsi que les rebouchages, les reprises de peinture et le nettoyage des zones d'intervention.",
+    "Les percements de parois coupe-feu sont rebouchés au moyen de dispositifs conservant le degré coupe-feu d'origine. Un relevé photographique des rebouchages est joint au dossier des ouvrages exécutés.",
+    "Le titulaire est réputé avoir pris connaissance de l'état des sites lors de la visite obligatoire. Aucune plus-value ne sera accordée au titre de sujétions de site qu'une visite attentive aurait permis d'identifier.",
+    "Les interventions en agence sont conduites de manière à préserver l'accueil du public : protection des sols, limitation du bruit pendant les heures d'ouverture, dégagement quotidien des zones de circulation et évacuation des gravats en fin de journée."
+   ]
+  },
+  {
+   "titre": "Interopérabilité avec le système d'information et la monétique",
+   "paragraphes": [
+    "L'infrastructure proposée s'intègre sans adaptation du système d'information existant. Le soumissionnaire identifie dans son mémoire technique les éventuels points d'adhérence et les modalités de vérification préalable qu'il propose.",
+    "Les automates bancaires et terminaux monétiques conservent leur adressage et leur cheminement réseau après migration, sauf décision contraire de l'autorité contractante. Toute modification affectant ces équipements fait l'objet d'une validation préalable de l'exploitant monétique.",
+    "SPÉCIFICATION MINIMALE. Les flux à destination des automates bancaires ne transitent par aucun équipement partagé avec le réseau invité, et sont filtrés de manière explicite à chaque franchissement de segment.",
+    "Le titulaire réalise, avant bascule de chaque site comportant un automate, un essai de transaction de bout en bout en condition réelle, tracé et validé par l'exploitant monétique. Aucune bascule n'est réputée achevée sans cet essai.",
+    "Les fenêtres d'intervention sur les segments monétiques sont arrêtées conjointement avec les exploitants concernés et tiennent compte des périodes de forte affluence, notamment les fins de mois et les veilles de jours fériés."
+   ]
+  },
+  {
+   "titre": "Gestion des identités, administration déléguée et traçabilité",
+   "paragraphes": [
+    "Les droits d'administration sont attribués selon le principe du moindre privilège, par profils distincts : administration complète, exploitation courante, consultation seule. Les profils et leurs périmètres sont définis avec l'autorité contractante avant mise en service.",
+    "Les intervenants du titulaire disposent de comptes nominatifs, individuellement identifiés, dont la création et la suppression suivent une procédure formalisée. La sortie d'un intervenant de l'équipe projet entraîne la révocation de ses accès sous vingt-quatre (24) heures.",
+    "Les accès distants du titulaire aux équipements sont soumis à autorisation préalable pour chaque intervention, transitent par un point d'accès contrôlé par l'autorité contractante, et sont intégralement journalisés.",
+    "Un relevé trimestriel des comptes actifs et des accès effectués est remis à l'autorité contractante. Tout écart entre les comptes déclarés et les comptes constatés donne lieu à explication écrite du titulaire."
+   ]
+  },
+  {
+   "titre": "Repérage, inventaire et gestion des actifs",
+   "paragraphes": [
+    "Chaque équipement installé est étiqueté de manière durable et lisible, résistante à la chaleur et à l'humidité, mentionnant l'identifiant du site, l'identifiant de l'équipement et sa fonction, selon la convention de nommage approuvée.",
+    "Le titulaire constitue et remet un inventaire complet du parc déployé, exploitable sous format tableur, comportant par équipement : le site, la localisation précise, la référence, le numéro de série, la version de micrologiciel, la date de mise en service et la date d'échéance de garantie.",
+    "Cet inventaire est tenu à jour pendant toute la durée du marché et remis actualisé à chaque comité de suivi trimestriel. Il est également remis lors de la réception définitive dans un format permettant sa reprise dans l'outil de gestion des actifs de l'autorité contractante.",
+    "Les numéros de série déclarés sont vérifiables auprès du constructeur. Toute discordance entre l'inventaire déclaré et le parc constaté lors d'un contrôle inopiné constitue un manquement au sens du CCAP."
+   ]
+  },
+  {
+   "titre": "Variantes, équivalences techniques et propriété des livrables",
+   "paragraphes": [
+    "Les soumissionnaires peuvent proposer des variantes techniques, à la condition expresse de présenter également une offre de base strictement conforme aux exigences du présent CCTP. Une offre composée exclusivement de variantes est écartée.",
+    "Toute proposition présentée comme équivalente à une exigence du CCTP est accompagnée d'une démonstration technique documentée de cette équivalence, pièce à pièce. La charge de la preuve incombe au soumissionnaire ; l'appréciation de l'équivalence relève de l'autorité contractante.",
+    "Les configurations, scripts, procédures, schémas et documentations produits au titre du marché deviennent la propriété de l'autorité contractante, qui peut les utiliser, les modifier et les communiquer à un tiers intervenant sur son infrastructure, sans que le titulaire puisse s'y opposer.",
+    "Les licences logicielles nécessaires au fonctionnement des équipements sont acquises au nom de l'autorité contractante et transférables. Les licences nominatives au titulaire ou non transférables sont refusées.",
+    "À l'expiration du marché, le titulaire assure la réversibilité : remise de l'ensemble des éléments d'exploitation à jour, transfert des accès, et accompagnement du prestataire entrant pendant une période de trente (30) jours, incluse dans le prix du marché."
+   ]
+  },
+  {
+   "titre": "Réception des matériels sur site, stockage et conservation",
+   "paragraphes": [
+    "Les matériels sont réceptionnés contradictoirement sur chaque site ou sur la plateforme logistique du titulaire, en présence d'un représentant de l'autorité contractante. La réception donne lieu à un procès-verbal mentionnant les références, les quantités, les numéros de série et l'état des emballages.",
+    "Le stockage intermédiaire est assuré dans des locaux fermés, secs et ventilés, à l'abri de l'ensoleillement direct et des infiltrations. Les matériels sont stockés sur palettes ou étagères, jamais à même le sol, afin de prévenir les dommages en cas d'inondation saisonnière.",
+    "Les matériels demeurent sous la garde et la responsabilité du titulaire jusqu'à leur installation et leur mise en service. Toute perte, vol ou détérioration survenant avant réception provisoire est à sa charge exclusive, y compris lorsque le stockage s'effectue dans les locaux de l'autorité contractante.",
+    "Les équipements sensibles à l'humidité sont conservés dans leur emballage d'origine avec dessiccant jusqu'à l'installation. Un matériel dont l'emballage a été ouvert plus de trente (30) jours avant installation fait l'objet d'un contrôle de bon fonctionnement documenté avant mise en service.",
+    "Le titulaire tient un registre de mouvement des matériels, du port ou de l'entrepôt jusqu'au site d'installation, consultable à tout moment par l'autorité contractante."
+   ]
+  },
+  {
+   "titre": "Sites isolés et contraintes d'accès",
+   "paragraphes": [
+    "Certaines agences sont situées hors des grands axes et peuvent être difficilement accessibles en saison des pluies. Le soumissionnaire intègre cette contrainte dans son planning et précise, pour chacun de ces sites, la fenêtre d'intervention qu'il retient et les moyens logistiques mobilisés.",
+    "SPÉCIFICATION MINIMALE. Pour les sites isolés, le titulaire constitue sur place un jeu de pièces de rechange de premier niveau permettant le remplacement des composants les plus exposés sans attendre un acheminement depuis Abidjan. La liste de ce jeu est soumise à l'approbation de l'autorité contractante.",
+    "Les interventions sur ces sites sont regroupées afin de limiter les déplacements. Le titulaire propose un calendrier de tournées préventives cohérent avec les contraintes saisonnières d'accès.",
+    "Lorsque l'accès physique est temporairement impossible, le titulaire met en œuvre les moyens de diagnostic et de correction à distance dont il dispose, et en informe l'exploitant. L'impossibilité d'accès dûment constatée suspend le décompte des délais d'intervention, à charge pour le titulaire d'en apporter la preuve.",
+    "Le titulaire prend à sa charge l'ensemble des frais de déplacement, d'hébergement et de mission de ses équipes, quels que soient l'éloignement du site et la durée de l'intervention. Aucune facturation complémentaire à ce titre ne sera admise."
+   ]
+  },
+  {
+   "titre": "Essais de montée en charge et vérification du dimensionnement",
+   "paragraphes": [
+    "Avant la réception provisoire, le titulaire réalise des essais de montée en charge sur un site représentatif de chaque typologie d'agence, visant à vérifier le comportement de l'infrastructure en conditions de trafic soutenu.",
+    "Les essais portent notamment sur : la saturation progressive des liens montants, le comportement de la qualité de service sous charge, la tenue des équipements en température après plusieurs heures de fonctionnement à charge élevée, et le comportement du dispositif lors d'une bascule de liaison en pleine charge.",
+    "Les résultats sont comparés aux hypothèses de dimensionnement présentées dans le mémoire technique. Un écart défavorable significatif entre les performances annoncées et les performances constatées engage le titulaire à renforcer le dimensionnement à ses frais.",
+    "Les essais sont conduits en dehors des heures d'ouverture au public et selon un protocole approuvé préalablement. Les mesures sont relevées contradictoirement et consignées dans un rapport d'essais annexé au dossier de réception.",
+    "Le titulaire fournit l'ensemble des moyens de test nécessaires à ces essais : générateurs de trafic, appareils de mesure étalonnés, sondes de température. Ces moyens demeurent sa propriété et sont retirés à l'issue des essais."
+   ]
+  }
+ ]
+}

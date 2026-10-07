@@ -85,3 +85,33 @@ test('refus du modèle : l’erreur est rendue proprement', async () => {
   assert.equal(fin.status, 422); assert.equal(fin.json.code, 'AI_REFUSAL');
   reponse = null;
 });
+
+test('CCTP : rédigé à partir du cahier des charges enregistré, borné, puis enregistré et validé', async () => {
+  const CCTP = { articles: [
+    { titre: 'Contexte, périmètre et objectifs', paragraphes: ['Le présent CCTP porte sur le réseau des agences.', ' '] },
+    { titre: 'Exigences techniques — Lot 1', paragraphes: ['SPÉCIFICATION MINIMALE. Les équipements sont administrables.'] },
+    { titre: 'Vide', paragraphes: [] },
+  ], aVerifier: ['Nombre de sites à confirmer.'] };
+  reponse = { stop_reason: 'end_turn', model: 'claude-opus-5-5', content: [{ type: 'text', text: JSON.stringify(CCTP) }], usage: {} };
+  const r = await call('POST', '/api/procedures/p1/ia/cctp', {}, achats);
+  ok(r, 202);
+  const fin = await attendre(achats, r.json.tache);
+  ok(fin);
+  assert.deepEqual(fin.json.cctp.articles.map((a) => a.titre), ['Contexte, périmètre et objectifs', 'Exigences techniques — Lot 1']); // article vide écarté
+  assert.deepEqual(fin.json.cctp.articles[0].paragraphes, ['Le présent CCTP porte sur le réseau des agences.']);
+  assert.deepEqual(fin.json.cctp.aVerifier, ['Nombre de sites à confirmer.']);
+  // l'appel porte le cahier des charges comme une donnée, avec ses lots
+  const p = appels.at(-1);
+  assert.equal(p.output_config.format.schema, IA.SCHEMA_CCTP);
+  assert.match(p.messages[0].content[0].text, /<cahier_des_charges>[\s\S]*Lot 1[\s\S]*<\/cahier_des_charges>/);
+  assert.match(p.system, /CCTP/);
+  reponse = null;
+  // enregistrement dans le cahier des charges ; une forme invalide est refusée
+  const s = (await call('GET', '/api/procedures/p1/state', null, achats)).json.state;
+  const cctp = { source: 'ia', articles: fin.json.cctp.articles };
+  ok(await call('PATCH', '/api/procedures/p1/state', { changes: { cdc: { ...s.cdc, cctp } } }, achats));
+  const mauvais = await call('PATCH', '/api/procedures/p1/state', { changes: { cdc: { ...s.cdc, cctp: { articles: [{ titre: 'x', paragraphes: [42] }] } } } }, achats);
+  assert.equal(mauvais.status, 422); assert.equal(mauvais.json.code, 'CCTP_INVALID');
+  // le fournisseur ne commande pas de rédaction
+  assert.equal((await call('POST', '/api/procedures/p1/ia/cctp', {}, soum)).status, 404);
+});

@@ -96,6 +96,11 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         return refus(422, 'REFERENCE_INVALID', 'La référence de la procédure est obligatoire (40 caractères au plus).');
       if (cur && cur.cdcPublie && value.ref !== cur.ref)
         return refus(409, 'REFERENCE_LOCKED', 'Le dossier est publié : sa référence ne peut plus être modifiée.');
+      // clauses techniques propres à l'achat : articles titrés, paragraphes de texte, tailles bornées
+      if (value.cctp != null && !(isObj(value.cctp) && Array.isArray(value.cctp.articles) && value.cctp.articles.length <= 40
+        && value.cctp.articles.every((a) => isObj(a) && typeof a.titre === 'string' && a.titre.length <= 200 && Array.isArray(a.paragraphes)
+          && a.paragraphes.length <= 15 && a.paragraphes.every((x) => typeof x === 'string' && x.length <= 4000))))
+        return refus(422, 'CCTP_INVALID', 'Clauses techniques invalides (40 articles, 15 paragraphes de 4 000 caractères au plus).');
       if (!!value.cdcPublie !== !!(cur && cur.cdcPublie) && !req.can('cdc.publish')) return 'Publier le cahier des charges exige l’habilitation « Publier ».';
       if (value.cdcPublie && !(cur && cur.cdcPublie)) {
         const manque = R.cdcManquants({ ...ctxOf(next), cdc: value, consultes: next('consultes') });

@@ -982,3 +982,14 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 /* Portail : total de l'offre, somme des prix par lot */
 .prix-total { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); background: var(--color-surface-2); border-radius: var(--radius-sm); }
 .prix-total strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+
+/* Cahier des charges : articles du CCTP, repliés par défaut */
+.cctp-article { border: var(--border-w) solid var(--color-border); border-radius: var(--radius-sm); }
+.cctp-article + .cctp-article { margin-top: var(--space-2); }
+.cctp-article summary { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-3) var(--space-4); cursor: pointer; font-weight: var(--fw-strong); }
+.cctp-article summary .muted { margin-left: auto; font-weight: normal; font-size: var(--fs-small); }
+.cctp-corps { padding: 0 var(--space-4) var(--space-4); }
+.cctp-corps label { display: block; margin-top: var(--space-3); }
+.cctp-corps input, .cctp-corps textarea { width: 100%; }
+.cctp-actions { display: flex; justify-content: flex-end; margin-top: var(--space-3); }
+.cctp-verifier summary { cursor: pointer; font-weight: var(--fw-strong); }
