@@ -993,3 +993,9 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .cctp-corps input, .cctp-corps textarea { width: 100%; }
 .cctp-actions { display: flex; justify-content: flex-end; margin-top: var(--space-3); }
 .cctp-verifier summary { cursor: pointer; font-weight: var(--fw-strong); }
+
+/* Évaluation : note proposée simulée ou provisoire (badge atténué) ; analyse du mémoire technique */
+.ai.ai-sim { color: var(--color-text-muted); font-style: italic; }
+.analyse-ia h3 { display: flex; align-items: center; gap: var(--space-2); }
+.analyse-crit { margin-top: var(--space-3); }
+.analyse-crit p { margin: 2px 0 0; }

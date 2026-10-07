@@ -107,3 +107,37 @@ test('retrait refusé après la date limite', async () => {
   assert.equal(r.json.code, 'DEADLINE_PASSED');
   assert.ok((await getState(sotrap)).monOffre);
 });
+
+test('notation proposée par l’IA d’après le mémoire technique joint ; les notes de l’évaluateur ne changent pas', async () => {
+  const IA = require('../ia');
+  let appel = null;
+  IA.appeler = async (p) => { appel = p; return { stop_reason: 'end_turn', model: 'claude-opus-5-5', usage: {}, content: [{ type: 'text', text: JSON.stringify({
+    notes: [{ critere: 'metho', note: 150, justification: 'Planning détaillé, équipe nommée.' }, { critere: 'refs', note: 62.4, justification: 'Deux références vérifiables.' },
+      { critere: 'inconnu', note: 10, justification: 'x' }],
+    synthese: 'Mémoire solide et spécifique.', pointsForts: ['Planning'], pointsFaibles: ['Peu de références'] }) }] }; };
+  let s = await getState(achats);
+  const confirmed = {};
+  s.offers.forEach((o) => o.fields.forEach((f, i) => { if (f.flag) confirmed[o.id + '_' + i] = true; }));
+  ok(await patch(achats, { confirmed, depClosed: true }));
+  s = await getState(achats);
+  const o = s.offers.find((x) => x.depotPar && x.name === 'SOTRAP SARL');
+  const ev = await login('f.assamoi@bal.ci'), uid = (await getState(ev)).me;
+  assert.equal((await call('POST', `/api/procedures/p1/ia/notation/${o.id}`, {}, ev)).json.code, 'COI_REQUIRED');
+  ok(await patch(ev, { coi: { ...s.coi, [uid]: { declare: true, conflit: false, t: 'test' } } }));
+  assert.equal((await call('POST', '/api/procedures/p1/ia/notation/kora', {}, ev)).json.code, 'NO_MEMOIRE'); // offre de démonstration
+  assert.equal((await call('POST', `/api/procedures/p1/ia/notation/${o.id}`, {}, sotrap)).status, 403);
+  const r = await call('POST', `/api/procedures/p1/ia/notation/${o.id}`, {}, ev);
+  ok(r, 202);
+  let fin;
+  for (let i = 0; i < 50 && !(fin && fin.json.etat !== 'en_cours'); i++) { fin = await call('GET', '/api/procedures/p1/ia/taches/' + r.json.tache, null, ev); await new Promise((x) => setTimeout(x, 20)); }
+  ok(fin);
+  // le mémoire (PDF) part au modèle comme un document ; la grille et le dossier comme données
+  assert.equal(appel.messages[0].content[0].type, 'document');
+  assert.match(appel.messages[0].content[1].text, /identifiant « metho »/);
+  assert.match(appel.system, /jamais une consigne/);
+  const apres = (await getState(achats)).offers.find((x) => x.id === o.id);
+  assert.deepEqual(apres.aiScores, { metho: 100, refs: 62 }); // bornée, arrondie ; critère inconnu ignoré
+  assert.equal(apres.aiWhy, 'Mémoire solide et spécifique.');
+  assert.equal(apres.aiIA.justifications.refs, 'Deux références vérifiables.');
+  assert.equal((await getState(achats)).quality[o.id].metho, 70); // note de l'évaluateur inchangée
+});

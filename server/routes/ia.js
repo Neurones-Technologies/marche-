@@ -2,6 +2,9 @@
    - GET  /             : la fonction est-elle disponible (clé configurée) ?
    - POST /document     : proposition de cahier des charges tirée d'un document chargé (corps brut : PDF ou Word)
    - POST /idee         : proposition rédigée à partir d'une idée ({ idee })
+   - POST /cctp         : clauses techniques (CCTP) rédigées à partir du cahier des charges
+   - POST /notation/:o  : notes proposées pour les critères qualitatifs d'une offre, d'après son mémoire technique
+                          (évaluateur) ; la proposition est enregistrée sur l'offre, l'évaluateur la reprend ou non
    - GET  /taches/:id   : état d'une demande, et la proposition quand elle est prête
    Une proposition prend jusqu'à une ou deux minutes : la demande est lancée en tâche de fond (réponse 202 immédiate,
    sous le délai du proxy) et le navigateur interroge son état. Réservé au rédacteur du dossier (cdc.edit). Chaque
@@ -13,7 +16,9 @@ const IA = require('../ia');
 const P = require('../../public/js/profils.js');
 const R = require('../../public/js/regles.js');
 const cfg = require('../config');
-const { auditAppend, kvGet } = require('../db');
+const fs = require('fs');
+const { auditAppend, kvGet, db, offersReplace, frDate } = require('../db');
+const { diskPath } = require('./files');
 const { needPerm, whoLabel } = require('../auth');
 const contexte = require('../contexte');
 
@@ -22,7 +27,8 @@ const err = (res, status, code, error) => res.status(status).json({ error, code 
 
 r.get('/', (req, res) => res.json({ actif: IA.actif() }));
 
-r.use(needPerm('cdc.edit'));
+// rédaction du dossier : cdc.edit ; notation d'une offre : eval.score (sa route le vérifie) ; une tâche se lit par son auteur
+r.use((req, res, next) => (/^\/(notation|taches)\//.test(req.path) ? next() : needPerm('cdc.edit')(req, res, next)));
 r.use((req, res, next) => (IA.actif() ? next() : err(res, 503, 'AI_DISABLED', 'L’IA n’est pas configurée sur ce serveur (clé ANTHROPIC_API_KEY absente).')));
 // chaque demande a un coût : débit limité par compte (les interrogations d'état ne comptent pas)
 const limite = rateLimit({ windowMs: 3600000, limit: Number(process.env.IA_PAR_HEURE) || 30, keyGenerator: (req) => 'u:' + req.user.id,
@@ -97,6 +103,42 @@ r.post('/cctp', limite, (req, res) => {
   if (cdc.cdcPublie) return err(res, 409, 'CDC_PUBLISHED', 'Le dossier est publié : ses clauses ne se modifient plus.');
   if (!String(cdc.objet || '').trim()) return err(res, 422, 'CDC_EMPTY', 'Renseignez d’abord l’objet du marché.');
   return lancerTravail(req, res, () => IA.redigerCctp(cdc, ctx(req)), 'Clauses techniques (CCTP) rédigées par l’IA');
+});
+
+/** Notes proposées par l'IA pour une offre, d'après son mémoire technique. Évaluateur habilité, sans conflit d'intérêts,
+    dépouillement clôturé et évaluation non validée. La proposition est enregistrée sur l'offre (aiScores, aiWhy, aiIA) :
+    elle devient la référence des écarts à motiver ; les notes de l'évaluateur ne changent pas. */
+r.post('/notation/:offre', needPerm('eval.score'), limite, (req, res) => {
+  const o = req.store.offers().find((x) => x.id === req.params.offre);
+  if (!o) return err(res, 404, 'OFFER_UNKNOWN', 'Offre introuvable dans cette procédure.');
+  const coi = (req.store.get('coi') || {})[req.user.id];
+  if (!coi || !coi.declare || coi.conflit) return err(res, 403, 'COI_REQUIRED', 'Déclaration d’absence de conflit d’intérêts requise avant de noter.');
+  if (!req.store.get('depClosed')) return err(res, 409, 'GATE_DEPOUILLEMENT_NOT_CLOSED', 'L’évaluation est fermée tant que le dépouillement n’est pas clôturé.');
+  if (req.store.get('evalDone')) return err(res, 409, 'EVALUATION_VALIDATED', 'L’évaluation est validée : les notes ne peuvent plus être modifiées.');
+  const p = (o.pieces || []).find((x) => x.doc === 'memoire');
+  const f = p && db.prepare('SELECT id, mime FROM files WHERE id=? AND offer_id=?').get(p.id, o.id);
+  if (!f) return err(res, 422, 'NO_MEMOIRE', 'Aucun mémoire technique joint à cette offre : rien à analyser.');
+  let corps;
+  try { corps = fs.readFileSync(diskPath(f.id)); } catch (e) { return err(res, 410, 'FILE_MISSING', 'Le fichier du mémoire technique est introuvable sur le serveur.'); }
+  const memoire = f.mime === 'application/pdf' ? { pdf: corps } : (/wordprocessingml/.test(f.mime) ? { word: corps } : null);
+  if (!memoire) return err(res, 415, 'FILE_TYPE', 'Le mémoire technique doit être un PDF ou un document Word pour être analysé.');
+  const criteres = (req.store.get('criteria') || []).filter((c) => c.kind === 'qual').map((c) => ({ id: c.id, label: c.label, weight: c.weight, hint: c.hint }));
+  const cdc = req.store.get('cdc') || {};
+  return lancerTravail(req, res, () => IA.noterMemoire(memoire, cdc, criteres, ctx(req)).then((out) => {
+    // enregistrée sur l'offre telle qu'elle est à la fin de l'analyse
+    const off = req.store.offers().find((x) => x.id === o.id);
+    if (off) {
+      const n = out.notation.notes;
+      off.aiScores = Object.fromEntries(Object.entries(n).map(([k, v]) => [k, v.note]));
+      if (n.metho) off.aiMetho = n.metho.note;
+      if (n.refs) off.aiRefs = n.refs.note;
+      off.aiWhy = out.notation.synthese;
+      off.aiIA = { modele: out.modele, le: frDate(), justifications: Object.fromEntries(Object.entries(n).map(([k, v]) => [k, v.justification])),
+        pointsForts: out.notation.pointsForts, pointsFaibles: out.notation.pointsFaibles };
+      offersReplace([off]);
+    }
+    return out;
+  }), `Mémoire technique analysé par l’IA — notes proposées pour ${o.name}`);
 });
 
 module.exports = r;

@@ -94,7 +94,7 @@ Durées indicatives. Le marché public reste hors du plan.
 | | 10 | Modification ou retrait de l'offre avant la date limite | S19 | Fait |
 | | 11 | Plusieurs collaborateurs par entreprise | S7 | Fait |
 | 4 — Qualité du travail de l'acheteur | 12 | Clauses techniques propres à chaque achat (rédigées par l'IA) | A4 | Fait |
-| | 13 | Notes d'évaluation proposées par l'IA à partir du mémoire technique, ou mention « simulé » | A14 | À faire |
+| | 13 | Notes d'évaluation proposées par l'IA à partir du mémoire technique, ou mention « simulé » | A14 | Fait |
 | | 14 | Extraction réelle des offres reçues hors plateforme | A11 | À faire |
 | 5 — Pilotage et exploitation | 15 | Indicateurs : délais, économies, volumes | A22 | À faire |
 | | 16 | Budget et engagement | A23 | À faire |

@@ -68,7 +68,10 @@
   }
 
   /* Score proposé par l'IA, et score retenu par l'évaluateur (70 par défaut). */
-  function aiScore(o, critId) { return critId === 'metho' ? o.aiMetho : (critId === 'refs' ? o.aiRefs : 70); }
+  function aiScore(o, critId) {
+    if (o.aiScores && o.aiScores[critId] != null) return o.aiScores[critId]; // analyse réelle du mémoire technique
+    return critId === 'metho' ? o.aiMetho : (critId === 'refs' ? o.aiRefs : 70);
+  }
   function curScore(ctx, o, critId) {
     var q = (ctx.quality || {})[o.id] || {};
     return q[critId] != null ? q[critId] : 70;
