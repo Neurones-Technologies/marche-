@@ -425,8 +425,15 @@ function defaultOrgKv() {
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
     notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT), formulaireReferencement: formulaireDefaut(seed.DOC_DEFS), circuitCommande: clone(CIRCUIT_COMMANDE), evaluationPartenaires: clone(EVALUATION_PARTENAIRES),
     mailFrom: 'marches@bal.ci', mailSuffix: '@bal.ci',
+    budget: { lignes: [] },
   };
 }
+/* Lignes budgétaires de la démonstration (exercice en cours). */
+const budgetDemo = () => { const a = new Date().getFullYear(); return [
+  { id: 'b-dsi-inv', code: 'DSI-INV-01', libelle: 'Investissements réseau et télécoms', service: 'Direction des systèmes d’information', exercice: a, montant: 150000000 },
+  { id: 'b-dsi-mco', code: 'DSI-MCO-02', libelle: 'Maintenance et support informatique', service: 'Direction des systèmes d’information', exercice: a, montant: 40000000 },
+  { id: 'b-log-amg', code: 'LOG-AMG-01', libelle: 'Aménagement et équipement des agences', service: 'Direction de la logistique', exercice: a, montant: 90000000 },
+]; };
 
 /** Compte administrateur initial d'une instance sans démonstration : ADMIN_EMAIL, ADMIN_NOM, ADMIN_PASSWORD ;
     sans ADMIN_PASSWORD, un mot de passe aléatoire est tiré et affiché une seule fois dans le journal du serveur. */
@@ -457,10 +464,11 @@ function seedAll(withUsers = true, options = null) {
       if (org.roles && org.roles.admin) org.roles.admin.perms['portail.use'] = false;
       org.mailFrom = ''; org.mailSuffix = '';
     }
+    if (demo) org.budget = { lignes: budgetDemo() };
     for (const [k, v] of Object.entries(org)) kvSet(k, v, 'seed');
     if (demo) {
       // procédure de démonstration : AO-2026-014, telle que dans le prototype, avec ses offres
-      const demo = procDefaults({ ...clone(seed.CDC), cctp: clone(CCTP_EXEMPLE), ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
+      const demo = procDefaults({ ...clone(seed.CDC), cctp: clone(CCTP_EXEMPLE), ligneBudget: 'b-dsi-inv', ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
       seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
       procedureInsert('p1', demo, 'seed');
       seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));
@@ -574,6 +582,8 @@ db.transaction(function migrate() {
     const c = pkvGet(p.id, 'cdc');
     if (c && !c.value.cctp && c.value.ref === seed.CDC.ref && c.value.objet === seed.CDC.objet) pkvSet(p.id, 'cdc', { ...c.value, cctp: clone(CCTP_EXEMPLE) }, 'migration');
   }
+  // 07/10/2026 : budget et engagement. Sans ligne budgétaire, le contrôle des crédits reste inactif.
+  if (kvGet('org') && !kvGet('budget')) kvSet('budget', { lignes: [] }, 'migration');
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.
   if (kvGet('org') && !kvGet('circuitCommande')) kvSet('circuitCommande', clone(CIRCUIT_COMMANDE), 'migration');
   // 02/10/2026 : module 5 (évaluation des partenaires). Réglages par défaut.

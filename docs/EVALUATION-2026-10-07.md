@@ -97,7 +97,7 @@ Durées indicatives. Le marché public reste hors du plan.
 | | 13 | Notes d'évaluation proposées par l'IA à partir du mémoire technique, ou mention « simulé » | A14 | Fait |
 | | 14 | Extraction réelle des offres reçues hors plateforme | A11 | Fait |
 | 5 — Pilotage et exploitation | 15 | Indicateurs : délais, économies, volumes | A22 | Fait |
-| | 16 | Budget et engagement | A23 | À faire |
+| | 16 | Budget et engagement | A23 | Fait |
 | | 17 | Sauvegardes automatiques | A25 | À faire |
 | | 18 | Le fournisseur confirme les livraisons et dépose ses factures | S24 | À faire |
 

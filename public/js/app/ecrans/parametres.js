@@ -132,6 +132,7 @@ function vParams(m){
   champ(fc,'Préfixe des numéros',o.prefixeCommande||'BC',function(v){ o.prefixeCommande=String(v).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)||'BC'; logit('Préfixe des bons de commande : '+o.prefixeCommande); });
   add(add(kc,'div','panel-foot'),'span','muted','Numéros continus et sans trou, attribués par le serveur à l\u2019émission : '+(o.prefixeCommande||'BC')+'-'+new Date().getFullYear()+'-0001, puis 0002…');
   add(add(k6,'div','panel-foot'),'span','muted','Aucun message n\u2019est réellement expédié dans cette maquette : la boîte d\u2019envoi restitue ce qui partirait.');
+  vParamsBudget(m,15);
 }
 
 /* Cadre réglementaire : profil par défaut et réglages du client, dans les bornes du profil (profils.js). */

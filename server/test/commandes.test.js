@@ -52,6 +52,10 @@ test('établissement : pré-rempli depuis l’offre retenue, contrôles du broui
 
 test('validation : circuit selon le montant, séparation des fonctions, rejet motivé', async () => {
   const U = `/api/commandes/${cmd.id}`;
+  // des lignes budgétaires existent : la commande s'impute sur l'une d'elles avant d'être soumise
+  refusé(await call('POST', U + '/soumettre', {}, achats), 422, 'BUDGET_LINE_REQUIRED');
+  refusé(await call('PUT', U, { ligneBudget: 'inconnue' }, achats), 422, 'BUDGET_LINE_UNKNOWN');
+  ok(await call('PUT', U, { ligneBudget: 'b-dsi-inv' }, achats));
   let r = await call('POST', U + '/soumettre', {}, achats);
   ok(r);
   assert.equal(r.json.commande.statut, 'validation');
@@ -120,7 +124,7 @@ test('annulation motivée : le numéro reste attribué, pas de trou dans la num�
   assert.equal(el.restant, montant - 17000000);
   const emettre = async () => {
     const c = (await call('POST', '/api/commandes', { procedure: pid }, achats)).json.commande;
-    ok(await call('PUT', `/api/commandes/${c.id}`, { lignes: [{ designation: 'Complément', quantite: 1, unite: 'forfait', prixUnitaire: 1000000 }] }, achats));
+    ok(await call('PUT', `/api/commandes/${c.id}`, { ligneBudget: 'b-dsi-inv', lignes: [{ designation: 'Complément', quantite: 1, unite: 'forfait', prixUnitaire: 1000000 }] }, achats));
     ok(await call('POST', `/api/commandes/${c.id}/soumettre`, {}, achats));
     ok(await call('POST', `/api/commandes/${c.id}/approbations/0`, {}, approb));
     return (await call('POST', `/api/commandes/${c.id}/emettre`, {}, achats)).json.commande;

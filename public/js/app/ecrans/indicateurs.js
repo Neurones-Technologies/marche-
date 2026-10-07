@@ -72,6 +72,20 @@ function vIndicateurs(m){
       ['Offres par consultation (moyenne)', cc.parConsultation ? String(cc.parConsultation.moyenne).replace('.',',') : '—']
     ]);
 
+    /* Budget : situation des lignes (si l'utilisateur peut la lire) */
+    var sit=situationBudget();
+    if(sit && sit.length){
+      tableau(zone,{ cle:'indicateurs-budget', titre:'Budget et engagement', lignes:sit,
+        colonnes:[
+          {lab:'Ligne', rendu:function(l,td){ add(td,'strong',null,l.code); add(td,'div','dt-extrait',l.libelle+' ('+l.exercice+')'); }},
+          {lab:'Alloué', num:true, val:function(l){ return xof(l.montant); }},
+          {lab:'Engagé', num:true, val:function(l){ return xof(l.engage); }},
+          {lab:'Réservé', num:true, val:function(l){ return xof(l.reserve); }},
+          {lab:'Disponible', num:true, rendu:function(l,td){ add(td,'span',l.disponible<0?'budget-epuise':null,xof(l.disponible)); }},
+          {lab:'Consommé', num:true, val:function(l){ return l.montant ? Math.round((l.engage+l.reserve)/l.montant*100)+' %' : '—'; }}
+        ] });
+    }
+
     /* Par appel d'offres */
     tableau(zone,{ cle:'indicateurs', titre:'Par appel d’offres', lignes:r.procedures,
       vide:'Aucun appel d’offres sur la période.',

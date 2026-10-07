@@ -65,6 +65,8 @@ function vBesoins(m){
     champ('service','Service demandeur');
     var bu=champ('budget','Budget estimé (XOF)','number'); bu.min='0'; bu.step='100000';
     champ('dateSouhaitee','Date souhaitée','date');
+    var ligneBudget=b.ligneBudget||'';
+    choixLigneBudget(f,'bes-ligne-'+(b.id||'neuf'),ligneBudget,function(v){ ligneBudget=v||''; },!editable);
     champ('description','Description (quantités, spécifications)','textarea');
     champ('justification','Justification','textarea');
     var typ=add(parent,'p','muted'); typ.style.marginTop='10px';
@@ -74,7 +76,8 @@ function vBesoins(m){
     }
     if(editable){ bu.addEventListener('input',majType); majType(); } // une fois soumis, le type retenu est affiché à la place
     return function(){
-      var o={}; Object.keys(vals).forEach(function(k){ o[k]= k==='budget' ? Number(vals[k].value) : vals[k].value.trim(); }); return o;
+      var o={}; Object.keys(vals).forEach(function(k){ o[k]= k==='budget' ? Number(vals[k].value) : vals[k].value.trim(); });
+      o.ligneBudget=ligneBudget||null; return o;
     };
   }
 

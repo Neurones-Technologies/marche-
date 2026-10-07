@@ -1000,3 +1000,20 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .analyse-crit { margin-top: var(--space-3); }
 .analyse-crit p { margin: 2px 0 0; }
 .fen label .conf { margin-left: var(--space-2); }
+
+/* Budget : crédits épuisés ou dépassés */
+.budget-epuise { color: var(--red); font-weight: var(--fw-strong); }
+/* Paramètres : une ligne budgétaire = ses champs, puis sa consommation */
+.budget-ligne { display: grid; grid-template-columns: 110px minmax(0,1.4fr) minmax(0,1fr) 80px 130px 36px; gap: var(--space-3); align-items: center; }
+.budget-ligne input { width: 100%; min-width: 0; }
+.budget-tete { margin-top: var(--space-3); font-size: var(--fs-small); color: var(--color-text-muted); font-weight: var(--fw-strong); padding-bottom: var(--space-2); }
+.budget-bloc { padding: var(--space-3) 0; border-top: var(--border-w) solid var(--color-border); }
+.budget-conso { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2); flex-wrap: wrap; font-size: var(--fs-small); }
+.budget-barre { display: flex; flex: 0 0 200px; height: 8px; border-radius: 4px; background: var(--color-surface-2); overflow: hidden; gap: 2px; }
+.budget-eng { background: var(--color-accent); }
+.budget-res { background: var(--color-accent); opacity: .45; }
+@media (max-width: 760px) {
+  .budget-tete { display: none; }
+  .budget-ligne { grid-template-columns: 1fr 1fr; }
+  .budget-barre { flex-basis: 100%; }
+}

@@ -129,12 +129,14 @@ function vCommandes(m){
     var rs=add(w2,'select'); rs.id='cmd-recep'; fk(rs,'cmd-recep');
     (state.users||[]).filter(function(u){ return u.role!=='soum'; }).forEach(function(u){ var o=add(rs,'option',null,u.nom+' — '+roleLab(u.role)); o.value=u.id; });
     rs.value=c.receptionnaire.id;
+    var ligneBudget=c.ligneBudget||null;
+    choixLigneBudget(f,'cmd-ligne',ligneBudget,function(v){ ligneBudget=v; });
     var cd=c.conditions||{};
     add(b,'p','muted','Conditions reprises du cahier des charges : pénalité de retard de '+cd.penaliteParJour+' ‰ par jour, plafonnée à '+cd.plafondPenalite+' % ; garantie de '+cd.garantieMois+' mois ; avance de démarrage de '+cd.avance+' % ; TVA '+cd.tva+' %.').style.marginTop='10px';
 
     var foot=add(k,'div','panel-foot');
     var be=add(foot,'button','btn btn-ghost btn-sm','Enregistrer'); fk(be,'cmd-enr');
-    var corps=function(){ return { lignes:lignes, jalons:jalons, dateLivraison:dl.value, receptionnaire:rs.value }; };
+    var corps=function(){ return { lignes:lignes, jalons:jalons, dateLivraison:dl.value, receptionnaire:rs.value, ligneBudget:ligneBudget||'' }; };
     be.addEventListener('click',function(){ agir('PUT',enc(c.id),corps(),'Brouillon enregistré.'); });
     var bs=add(foot,'button','btn btn-primary btn-sm','Soumettre à validation'); fk(bs,'cmd-soum');
     bs.addEventListener('click',function(){
@@ -158,6 +160,8 @@ function vCommandes(m){
     c.lignes.forEach(function(lg){ var tr=add(tb,'tr'); add(tr,'td',null,lg.designation); add(tr,'td','num',String(lg.quantite)); add(tr,'td',null,lg.unite); add(tr,'td','num',sep(lg.prixUnitaire)); add(tr,'td','num',sep(lg.quantite*lg.prixUnitaire)); });
     var tf=add(add(tl,'tfoot'),'tr'); add(tf,'td',null,'Total hors taxes ('+c.devise+')').colSpan=4; add(tf,'td','num',sep(c.total)).style.fontWeight='700';
     add(k,'p',null,'Livraison prévue le '+c.dateLivraison+' · réceptionnaire : '+c.receptionnaire.nom+'.');
+    var lb=c.ligneBudget && (situationBudget()||[]).filter(function(x){ return x.id===c.ligneBudget; })[0];
+    if(lb) add(k,'p',null,'Imputation budgétaire : '+libelleLigneBudget(lb)+'.');
     add(k,'p',null,'Jalons de paiement : '+c.jalons.map(function(j){ return j.libelle+' '+j.pourcentage+' %'; }).join(' · ')+'.');
     var cd=c.conditions||{};
     add(k,'p','muted','Pénalité de retard : '+cd.penaliteParJour+' ‰ du montant par jour calendaire, plafonnée à '+cd.plafondPenalite+' %. Garantie : '+cd.garantieMois+' mois. TVA applicable : '+cd.tva+' %. Conditions générales : cahier des charges de la procédure '+c.procedure.ref+'.');

@@ -30,7 +30,9 @@ function champs(d) {
     objet: String(d.objet || '').trim(), service: String(d.service || '').trim(),
     description: String(d.description || '').trim(), justification: String(d.justification || '').trim(),
     budget: Number(d.budget), dateSouhaitee: String(d.dateSouhaitee || '').trim(),
+    ligneBudget: d.ligneBudget ? String(d.ligneBudget) : null,
   };
+  if (out.ligneBudget && !require('../budget').lignes().some((l) => l.id === out.ligneBudget)) return { erreur: 'Ligne budgétaire inconnue.' };
   if (!out.objet || out.objet.length > 300) return { erreur: 'L’objet est obligatoire (300 caractères au plus).' };
   if (out.service.length > 120 || out.description.length > 4000 || out.justification.length > 2000) return { erreur: 'Texte trop long.' };
   if (!(out.budget > 0)) return { erreur: 'Le budget estimé doit être un montant positif.' };
@@ -141,7 +143,7 @@ r.post('/:id/procedure', (req, res) => {
   let pid;
   db.transaction(() => {
     pid = procedureCreate({ ref, objet: b.objet, profil: d.profil, extra: {
-      procedure: b.typeLab, budgetEstime: b.budget, besoin: b.id, demandeur: b.par, serviceDemandeur: b.service,
+      procedure: b.typeLab, budgetEstime: b.budget, besoin: b.id, demandeur: b.par, serviceDemandeur: b.service, ligneBudget: b.ligneBudget || null,
     } }, req.user.id);
     Object.assign(b, { statut: 'transforme', procedure: pid, procedureRef: ref });
     journal(req, b, `transformée en procédure ${ref}`);

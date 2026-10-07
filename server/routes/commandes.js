@@ -13,6 +13,7 @@ const C = require('../../public/js/circuits.js');
 const R = require('../../public/js/regles.js');
 const P = require('../../public/js/profils.js');
 
+const B = require('../budget');
 const r = express.Router();
 r.use(requireAuth);
 
@@ -115,6 +116,7 @@ r.post('/', (req, res) => {
     receptionnaire: demandeur ? { id: demandeur.id, nom: demandeur.nom } : { id: req.user.id, nom: req.user.nom },
     conditions: { penaliteParJour: Number(cdc.penalite) || 0, plafondPenalite: 10, garantieMois: Number(cdc.garantieMin) || 0, avance: Number(cdc.avance) || 0, tva: Number(cdc.tva) || 0 },
     circuit: [], receptions: [], historique: [], creePar: req.user.id, cree: frDate(),
+    ligneBudget: cdc.ligneBudget || null, // ligne de la demande d'achat d'origine, modifiable sur le brouillon
   };
   db.transaction(() => { journal(req, c, 'brouillon établi pour ' + win.name); commandeInsert(c); })();
   res.status(201).json({ commande: vue(c) });
@@ -142,6 +144,11 @@ r.put('/:id', (req, res) => {
   if (jalons.some((j) => !String(j.libelle || '').trim()) || Math.round(somme) !== 100) return err(res, 422, 'MILESTONES_INVALID', `Les jalons de paiement doivent totaliser 100 % (ici ${somme} %).`);
   const dateLivraison = String(d.dateLivraison || c.dateLivraison);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateLivraison)) return err(res, 422, 'ORDER_INVALID', 'Date de livraison invalide (AAAA-MM-JJ).');
+  let ligneBudget = c.ligneBudget || null;
+  if (d.ligneBudget !== undefined) {
+    ligneBudget = d.ligneBudget ? String(d.ligneBudget) : null;
+    if (ligneBudget && !B.lignes().some((l) => l.id === ligneBudget)) return err(res, 422, 'BUDGET_LINE_UNKNOWN', 'Ligne budgétaire inconnue.');
+  }
   let receptionnaire = c.receptionnaire;
   if (d.receptionnaire) {
     const u = db.prepare('SELECT id, nom FROM users WHERE id=? AND active=1').get(String(d.receptionnaire));
@@ -149,7 +156,7 @@ r.put('/:id', (req, res) => {
     receptionnaire = { id: u.id, nom: u.nom };
   }
   const nouv = { ...c, lignes: lignes.map((l) => ({ designation: String(l.designation).trim(), quantite: Number(l.quantite), unite: String(l.unite || 'unité').trim().slice(0, 30), prixUnitaire: Number(l.prixUnitaire) })),
-    jalons: jalons.map((j) => ({ libelle: String(j.libelle).trim().slice(0, 120), pourcentage: Number(j.pourcentage) })), dateLivraison, receptionnaire };
+    jalons: jalons.map((j) => ({ libelle: String(j.libelle).trim().slice(0, 120), pourcentage: Number(j.pourcentage) })), dateLivraison, receptionnaire, ligneBudget };
   const plafond = c.montantOffre - engage(c.procedure.id, c.id);
   if (total(nouv) > plafond + 0.005) return err(res, 422, 'AMOUNT_EXCEEDED', `Le total dépasse le montant restant de l’offre retenue (${Math.round(plafond).toLocaleString('fr-FR')} ${c.devise}).`);
   db.transaction(() => { Object.assign(c, nouv); journal(req, c, 'brouillon modifié'); commandeSave(c); })();
@@ -162,6 +169,8 @@ r.post('/:id/soumettre', (req, res) => {
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Établir les bons de commande » requise.');
   if (!MODIFIABLE.includes(c.statut)) return err(res, 409, 'ORDER_LOCKED', 'Cette commande est déjà soumise.');
   if (!(total(c) > 0)) return err(res, 422, 'ORDER_INVALID', 'Le montant de la commande doit être positif.');
+  const credits = B.controler(c, total(c) * (c.taux || 1));
+  if (credits) return err(res, credits.status, credits.code, credits.error);
   const circuit = C.appliquerMontant(C.reinitialiser((kvGet('circuitCommande') || { value: [] }).value), total(c) * (c.taux || 1));
   db.transaction(() => {
     c.circuit = circuit; delete c.rejet;
@@ -210,6 +219,9 @@ r.post('/:id/emettre', (req, res) => {
   const c = req.commande;
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Établir les bons de commande » requise.');
   if (c.statut !== 'validee') return err(res, 409, 'ORDER_NOT_VALIDATED', 'Seule une commande validée peut être émise.');
+  // les crédits ont pu être consommés depuis la validation : contrôlés de nouveau à l'émission
+  const credits = B.controler(c, total(c) * (c.taux || 1));
+  if (credits) return err(res, credits.status, credits.code, credits.error);
   const org = (kvGet('org') || { value: {} }).value;
   db.transaction(() => {
     c.numero = commandeNumero(org.prefixeCommande);
@@ -273,6 +285,7 @@ r.post('/:id/avenants', (req, res) => {
   const plafond = c.montantOffre - engage(c.procedure.id, c.id);
   if (nouveauTotal > plafond + 0.005) return err(res, 422, 'AMOUNT_EXCEEDED', `Le nouveau total dépasse le montant restant de l’offre retenue (${Math.round(plafond).toLocaleString('fr-FR')} ${c.devise}).`);
   if (!(nouveauTotal > 0)) return err(res, 422, 'AMENDMENT_INVALID', 'Le montant de la commande modifiée doit rester positif.');
+  if (nouveauTotal > total(c)) { const credits = B.controler(c, nouveauTotal * (c.taux || 1)); if (credits) return err(res, credits.status, credits.code, credits.error); }
   const circuit = C.appliquerMontant(C.reinitialiser((kvGet('circuitCommande') || { value: [] }).value), nouveauTotal * (c.taux || 1));
   const a = { n: (c.avenants || []).length + 1, motif, lignes: nouvelles, dateLivraison, ancienTotal: total(c), nouveauTotal, circuit,
     statut: C.nbRequises(circuit) ? 'validation' : 'validee', creePar: req.user.id, cree: frDate() };

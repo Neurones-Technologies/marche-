@@ -21,7 +21,7 @@ const WRITE_PERMS = {
   depClosed: ['depouille.close'],
   evalDone: ['eval.validate', 'recours.handle'],
   approvals: ['decision.approve', 'params.edit', 'recours.handle'],
-  org: ['params.edit'], seuils: ['params.edit'], docDefs: ['cdc.edit', 'params.edit'],
+  org: ['params.edit'], seuils: ['params.edit'], budget: ['params.edit'], docDefs: ['cdc.edit', 'params.edit'],
   mailFrom: ['params.edit'], mailSuffix: ['params.edit'], circuitModele: ['params.edit'], circuitBesoin: ['params.edit'], circuitReferencement: ['params.edit'], formulaireReferencement: ['params.edit'], circuitCommande: ['params.edit'], evaluationPartenaires: ['params.edit'],
   offers: ['params.edit'],
   consultes: ['cdc.edit', 'cdc.publish'],
@@ -433,6 +433,24 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         return 'Chaque pièce a un libellé (200 caractères au plus) et des soumissionnaires concernés.';
       // pièces d'un dossier publié : figées (les changer modifierait les conditions de participation en cours de route)
       if ((stored('cdc') || {}).cdcPublie && !same(value, cur)) return refus(409, 'PIECES_LOCKED', 'Le dossier est publié : les pièces exigées ne peuvent plus être modifiées.');
+      break;
+    }
+    case 'budget': {
+      if (!isObj(value) || !Array.isArray(value.lignes) || value.lignes.length > 300) return refus(422, 'BUDGET_INVALID', 'Budget invalide (300 lignes au plus).');
+      const vus = new Set();
+      for (const l of value.lignes) {
+        if (!isObj(l) || typeof l.id !== 'string' || !/^[\w-]{1,40}$/.test(l.id) || vus.has(l.id)) return refus(422, 'BUDGET_INVALID', 'Identifiant de ligne invalide ou en double.');
+        vus.add(l.id);
+        if (typeof l.code !== 'string' || !l.code.trim() || l.code.length > 40) return refus(422, 'BUDGET_INVALID', 'Chaque ligne a un code (40 caractères au plus).');
+        if (typeof l.libelle !== 'string' || !l.libelle.trim() || l.libelle.length > 200) return refus(422, 'BUDGET_INVALID', 'Chaque ligne a un libellé (200 caractères au plus).');
+        if (l.service != null && (typeof l.service !== 'string' || l.service.length > 120)) return refus(422, 'BUDGET_INVALID', 'Service invalide.');
+        if (!Number.isInteger(l.exercice) || l.exercice < 2000 || l.exercice > 2100) return refus(422, 'BUDGET_INVALID', 'Exercice invalide (année).');
+        if (!(typeof l.montant === 'number' && l.montant >= 0 && Number.isFinite(l.montant))) return refus(422, 'BUDGET_INVALID', 'Montant alloué invalide.');
+      }
+      const codes = value.lignes.map((l) => l.exercice + '|' + l.code.trim().toLowerCase());
+      if (new Set(codes).size !== codes.length) return refus(422, 'BUDGET_INVALID', 'Deux lignes portent le même code sur le même exercice.');
+      const e = require('./budget').controlerListe(value.lignes);
+      if (e) return refus(409, 'BUDGET_LINE_IN_USE', e);
       break;
     }
     default:

@@ -159,6 +159,13 @@ r.get('/accueil', requireAuth, (req, res) => {
   res.json({ chiffres, taches, activite });
 });
 
+/** Budget : lignes et situation (alloué, engagé, réservé, disponible). Paramètres, achats, demandes et commandes. */
+r.get('/budget', requireAuth, (req, res) => {
+  if (!['params.edit', 'offres.read', 'commande.manage', 'besoin.create', 'besoin.approve', 'besoin.manage', 'audit.read'].some((p) => req.can(p)))
+    return res.status(403).json({ error: 'Habilitation insuffisante.' });
+  res.json({ lignes: require('../budget').situation(null) });
+});
+
 /* ---- Indicateurs ---- */
 const isoSql = (t) => (t ? String(t).replace(' ', 'T') + (/Z$/.test(t) ? '' : 'Z') : null);
 const jours = (a, b) => (a && b ? Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 864e5 * 10) / 10) : null);
