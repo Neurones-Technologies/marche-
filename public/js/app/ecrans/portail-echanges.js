@@ -38,19 +38,23 @@ function paysLettre(iso){ return ({ CI:'Côte d’Ivoire', BF:'Burkina Faso', SN
 /* Parcours du fournisseur sur un appel d'offres, en trois étapes : 1. cahier des charges et échanges avec l'acheteur ;
    2. montage de l'offre ; 3. soumission (contrôle, dépôt, puis offre déposée et résultat). */
 function clarifsEnAttente(){ return (state.clarifs||[]).filter(function(x){ return x.statut==='envoyee'; }).length; }
-/* Pied d'écran : étape précédente et suivante, en liens de navigation (comme chez l'acheteur, cadreProcedureBas) ;
-   les boutons pleins restent réservés aux actions. note : une indication entre les deux (ce qui reste à faire). */
-function piedEtapesFournisseur(m, actif, note){
-  var i=ETAPES_FOURNISSEUR.map(function(x){ return x[0]; }).indexOf(actif), pied=add(m,'div','proc-foot');
+/* Navigation entre les étapes, en haut, centrée sous la frise : étape précédente, position (« Étape 2 sur 3 ») et ce qui
+   reste à faire, étape suivante. Des liens, pas des boutons d'action. Retourne la zone de la note (remplie plus tard). */
+function navEtapesFournisseur(m, actif){
+  var i=ETAPES_FOURNISSEUR.map(function(x){ return x[0]; }).indexOf(actif), nav=add(m,'nav','ao-nav-etapes');
+  nav.setAttribute('aria-label','Navigation entre les étapes');
   function lien(e, suivante){
-    var bt=add(pied,'button','etape-lien'+(suivante?' suivante':'')); bt.type='button'; fk(bt,'vers-'+e[0]);
-    add(bt,'span','etape-lien-lab', suivante?'Étape suivante':'Étape précédente');
-    add(bt,'span','etape-lien-nom', suivante ? e[1]+' →' : '← '+e[1]);
+    var bt=add(nav,'button','ao-nav-lien'+(suivante?' suivante':'')); bt.type='button'; fk(bt,'vers-'+e[0]);
+    add(bt,'span','ao-nav-lab', suivante?'Étape suivante':'Étape précédente');
+    add(bt,'span','ao-nav-nom', suivante ? e[1]+' →' : '← '+e[1]);
     bt.addEventListener('click',function(){ go(e[0]); });
   }
-  if(i>0) lien(ETAPES_FOURNISSEUR[i-1], false);
-  if(note) add(pied,'span','muted ao-etape-note',note);
-  if(i<ETAPES_FOURNISSEUR.length-1) lien(ETAPES_FOURNISSEUR[i+1], true);
+  if(i>0) lien(ETAPES_FOURNISSEUR[i-1], false); else add(nav,'span','ao-nav-vide');
+  var mil=add(nav,'div','ao-nav-milieu');
+  add(mil,'strong',null,'Étape '+(i+1)+' sur '+ETAPES_FOURNISSEUR.length);
+  var note=add(mil,'span','ao-nav-note');
+  if(i<ETAPES_FOURNISSEUR.length-1) lien(ETAPES_FOURNISSEUR[i+1], true); else add(nav,'span','ao-nav-vide');
+  return note;
 }
 var ETAPES_FOURNISSEUR = [['echanges','Cahier des charges & échanges'],['portail','Monter mon offre'],['soumission','Soumission']];
 function etapesFournisseur(m, actif){
@@ -68,6 +72,7 @@ function etapesFournisseur(m, actif){
     if(x[0]===actif) b.setAttribute('aria-current','step');
     b.addEventListener('click',function(){ if(x[0]!==actif) go(x[0]); });
   });
+  return navEtapesFournisseur(m, actif);
 }
 
 /* Date d'un échange (« 07/10/2026 13:14:34 » ou « 07/10/2026 »), pour ordonner la conversation. */
@@ -138,7 +143,6 @@ function vEchanges(m){
   var sa=add(k,'div','chat-saisie');
   if(!questionOuverte && !reclamation) add(sa,'p','muted','Il n’est plus possible de poser de question : elles s’arrêtent '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.');
   else saisieEchange(sa, limite, questionOuverte, reclamation);
-  piedEtapesFournisseur(m,'echanges');
 }
 /* Saisie d'une question (jusqu'à 3 jours avant l'échéance) ou d'une réclamation (après un dépôt), sous la conversation. */
 function saisieEchange(sa, limite, questionOuverte, reclamation){

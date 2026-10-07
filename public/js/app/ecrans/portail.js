@@ -114,7 +114,7 @@ function vPortail(m, etape){
   var h=add(m,'div','head'); add(add(h,'div'),'h1',null, etape==='soumission' ? 'Soumission de l’offre' : 'Monter mon offre');
   var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
   if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
-  etapesFournisseur(m, etape==='soumission' ? 'soumission' : 'portail');
+  var noteEtape=etapesFournisseur(m, etape==='soumission' ? 'soumission' : 'portail');
   var nc=clarifsEnAttente();
   if(nc){ var wc=add(m,'div','warn'); wc.style.marginBottom='18px'; add(wc,'strong',null,'L’acheteur attend votre réponse. ');
     wc.appendChild(document.createTextNode(nc+' demande(s) de clarification sur votre offre : répondez à l’étape 1, « Cahier des charges & échanges ».')); }
@@ -122,10 +122,9 @@ function vPortail(m, etape){
 
   // offre déposée : récapitulatif, modification ou retrait à l'étape 3 ; le formulaire ne revient qu'après retrait
   if(state.monOffre){
-    if(etape==='soumission'){ vPortailResultat(m); vPortailMonOffre(m,clos); vPortailAccuses(m); piedEtapesFournisseur(m,'soumission'); return; }
+    if(etape==='soumission'){ vPortailResultat(m); vPortailMonOffre(m,clos); vPortailAccuses(m); return; }
     var nd=add(m,'div','note'); add(nd,'strong',null,'Votre offre est déposée. ');
     nd.appendChild(document.createTextNode('Pour la relire, la modifier ou la retirer, passez à l’étape « Soumission ».'));
-    piedEtapesFournisseur(m,'portail');
     return;
   }
   if(etape==='soumission') vPortailResultat(m);
@@ -272,11 +271,11 @@ function vPortail(m, etape){
 
   if(etape==='soumission'){
     vPortailAccuses(m);
-    piedEtapesFournisseur(m,'soumission');
     return;
   }
   // préparation : retour au dossier, ou passage à la soumission (avec ce qui reste à compléter)
-  piedEtapesFournisseur(m,'portail', errs.length ? errs.length+' point(s) à compléter avant le dépôt' : '');
+  // en haut, au centre de la navigation : ce qui reste à compléter avant le dépôt
+  noteEtape.textContent = errs.length ? errs.length+' point(s) à compléter avant le dépôt' : 'Tout est prêt pour le dépôt';
 }
 
 /* Accusés de dépôt du fournisseur ; un dépôt retiré reste tracé. */
