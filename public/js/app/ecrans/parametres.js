@@ -133,6 +133,7 @@ function vParams(m){
   add(add(kc,'div','panel-foot'),'span','muted','Numéros continus et sans trou, attribués par le serveur à l\u2019émission : '+(o.prefixeCommande||'BC')+'-'+new Date().getFullYear()+'-0001, puis 0002…');
   add(add(k6,'div','panel-foot'),'span','muted','Aucun message n\u2019est réellement expédié dans cette maquette : la boîte d\u2019envoi restitue ce qui partirait.');
   vParamsBudget(m,15);
+  vParamsSauvegardes(m,16);
 }
 
 /* Cadre réglementaire : profil par défaut et réglages du client, dans les bornes du profil (profils.js). */
@@ -382,4 +383,24 @@ function vParamsInscription(m,o){
   var a=add(l,'a','',lien.replace(/^https?:\/\//,'')); a.href=lien; a.target='_blank'; a.rel='noopener';
   var c=add(l,'button','btn btn-ghost btn-sm','Copier le lien'); c.type='button';
   c.addEventListener('click',function(){ (navigator.clipboard?navigator.clipboard.writeText(lien):Promise.reject()).then(function(){ toast('Lien du portail copié.'); },function(){ toast(lien); }); });
+}
+
+/* Sauvegardes : la dernière, et la vérification de la base de cet espace (lecture seule ; voir docs/SAUVEGARDES.md). */
+var SAUVEGARDES_ETAT = { t:0, e:null };
+function vParamsSauvegardes(m, num){
+  var S=SAUVEGARDES_ETAT;
+  if(Date.now()-S.t>60000){ S.t=Date.now(); MP.api('GET','/api/sauvegardes').then(function(r){ S.e=r; render(); }).catch(function(){}); }
+  var k=add(m,'div','card'); k.style.marginTop='18px';
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,num+' · Sauvegardes');
+  var b=add(k,'div','pad'), e=S.e;
+  if(!e){ add(b,'p','muted','Chargement…'); return; }
+  var d=e.derniere;
+  if(d) chipCellule(ph, d.statut==='ok' ? 'Vérifiée' : (d.statut==='absente' ? 'Base absente' : 'Anomalie'), d.statut==='ok' ? 'c-green' : 'c-red');
+  grilleLecture(b,[
+    ['Sauvegarde automatique', e.actif ? 'Toutes les '+e.intervalleHeures+' h' : 'Désactivée'],
+    ['Dernière sauvegarde', d ? new Date(d.date).toLocaleString('fr-FR') : 'Aucune pour l’instant'],
+    ['Taille de la base sauvegardée', d && d.taille ? taille(d.taille) : null],
+    ['Sauvegardes conservées', e.nombre+' sur '+e.conserver]
+  ]);
+  add(add(k,'div','panel-foot'),'span','muted','Chaque sauvegarde copie la base et les pièces déposées, puis vérifie la copie. La restauration est faite par l’exploitant de la plateforme.');
 }

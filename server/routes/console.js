@@ -270,6 +270,15 @@ r.post('/mot-de-passe', (req, res) => {
 });
 
 /* ── Journal ── */
+/* ── Sauvegardes : état, et sauvegarde immédiate (journalisée) ── */
+r.get('/sauvegardes', (req, res) => res.json(require('../sauvegardes').etat()));
+r.post('/sauvegardes', (req, res) => {
+  E.journaliser(qui(req), 'Sauvegarde lancée depuis la console');
+  require('../sauvegardes').sauvegarder('console — ' + req.op.nom)
+    .then((m) => res.json({ sauvegarde: { nom: m.nom, statut: m.statut, bases: m.bases.length, duree: m.duree } }))
+    .catch((e) => res.status(500).json({ error: 'Sauvegarde impossible : ' + e.message }));
+});
+
 r.get('/journal', (req, res) => {
   res.json({ journal: reg().prepare('SELECT t,auteur,action,ip FROM journal ORDER BY id DESC LIMIT 500').all() });
 });

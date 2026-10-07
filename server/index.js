@@ -26,7 +26,7 @@ app.use(helmet({
   },
 }));
 // Téléversement d'une pièce : corps binaire, ni analysé en JSON ni soumis à l'exigence JSON ci-dessous.
-const FILES = /^\/api\/((procedures\/[^/]+\/)?files|procedures\/[^/]+\/ia\/(document|offre-externe)|partenaires\/[^/]+\/fichiers|inscription\/brouillon\/pieces)(\/|$)/;
+const FILES = /^\/api\/((procedures\/[^/]+\/)?files|procedures\/[^/]+\/ia\/(document|offre-externe)|partenaires\/[^/]+\/fichiers|commandes\/[^/]+\/fichiers|inscription\/brouillon\/pieces)(\/|$)/;
 app.use((req, res, next) => (FILES.test(req.path) ? next() : express.json({ limit: '1mb' })(req, res, next)));
 
 // Les requêtes d'écriture doivent être du JSON (protection CSRF complémentaire au cookie SameSite=Strict)
@@ -98,5 +98,6 @@ app.use((err, req, res, next) => { // eslint-disable-line
 
 if (require.main === module) {
   app.listen(cfg.port, () => console.log(`Marché+ — http://localhost:${cfg.port}`));
+  require('./sauvegardes').demarrer(); // sauvegardes automatiques (SAUVEGARDE_HEURES)
 }
 module.exports = app;

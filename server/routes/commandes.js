@@ -1,5 +1,7 @@
 /* Bon de commande et suivi d'exécution jusqu'à la réception (module 4, docs/CADRAGE.md §4 et §6).
-   Marché+ émet le bon de commande ; il s'arrête à la réception (la facture et le paiement restent dans l'ERP).
+   Marché+ émet le bon de commande ; le titulaire en accuse réception, déclare ses livraisons (bon de livraison joint)
+   et dépose ses factures, que les achats rapprochent (montant du jalon, service fait) puis acceptent pour paiement ou
+   rejettent avec un motif. Le paiement reste dans l'ERP (export des factures acceptées).
 
    Statuts : brouillon → validation (circuit circuitCommande sur le montant) → validee → emise (numéro et empreinte
    posés par le serveur) → en_reception → receptionnee (réception provisoire) → cloturee (réception définitive).
@@ -24,6 +26,7 @@ const jour = (d) => (d || new Date()).toISOString().slice(0, 10);
 const plusJours = (n) => { const d = new Date(); d.setDate(d.getDate() + Number(n || 0)); return jour(d); };
 const ecartJours = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
 const MODIFIABLE = ['brouillon', 'rejete'];
+const EN_EXECUTION = ['emise', 'en_reception', 'receptionnee', 'cloturee'];
 
 function journal(req, c, action) {
   c.historique.push({ t: frDate(), who: whoLabel(req.user), action });
@@ -72,11 +75,32 @@ function visible(req, c) {
   return !!(p && c.titulaire.partenaire === p.id && ['emise', 'en_reception', 'receptionnee', 'cloturee', 'annulee'].includes(c.statut) && c.numero);
 }
 
-r.get('/', (req, res) => res.json({ commandes: commandesAll().filter((c) => visible(req, c)).map(vue) }));
+/** Le titulaire de la commande (un compte de son entreprise). */
+const titulaire = (req, c) => { const p = req.can('portail.use') ? partenaireDe(req.user.id) : null; return !!(p && c.titulaire.partenaire === p.id); };
+/** Ce que voit le titulaire : la commande émise et son exécution, sans le circuit interne ni l'historique des achats. */
+function vueTitulaire(c) {
+  const v = vue(c);
+  delete v.circuit; delete v.historique; delete v.rejet; delete v.creePar; delete v.emisePar; delete v.evaluation; delete v.ligneBudget;
+  v.avenants = (v.avenants || []).filter((a) => a.numero).map((a) => ({ n: a.n, numero: a.numero, motif: a.motif, nouveauTotal: a.nouveauTotal, emisLe: a.emisLe }));
+  return v;
+}
+r.get('/', (req, res) => res.json({ commandes: commandesAll().filter((c) => visible(req, c)).map((c) => (gere(req) || valide(req) || !titulaire(req, c) ? vue(c) : vueTitulaire(c))) }));
 
 r.get('/eligibles', (req, res) => {
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Établir les bons de commande » requise.');
   res.json({ procedures: eligibles() });
+});
+
+/** Factures acceptées pour paiement, pour la comptabilité (CSV ; le paiement reste dans l'ERP). */
+r.get('/factures.csv', (req, res) => {
+  if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Établir les bons de commande » requise.');
+  const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const lignes = [['Facture', 'Date', 'Commande', 'Titulaire', 'Jalon', 'Montant HT', 'TVA %', 'Montant TTC', 'Devise', 'Acceptée le', 'Empreinte du fichier']];
+  commandesAll().forEach((c) => (c.factures || []).filter((f) => f.statut === 'acceptee').forEach((f) =>
+    lignes.push([f.numero, f.date, c.numero, c.titulaire.nom, f.jalonLib, f.montantHT, f.tva, f.montantTTC, c.devise, f.decision.t, f.fichier.sha256])));
+  auditAppend(req.user.id, whoLabel(req.user), 'Export des factures acceptées pour la comptabilité');
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="factures.csv"', 'Cache-Control': 'no-store' });
+  res.send('\ufeff' + lignes.map((l) => l.map(q).join(';')).join('\r\n') + '\r\n');
 });
 
 /** Export pour la comptabilité : commandes émises (CSV, séparateur « ; », UTF-8 avec BOM pour les tableurs). */
@@ -365,6 +389,116 @@ r.post('/:id/avenants/:n/emettre', (req, res) => {
 const estReceptionnaire = (req, c) => c.receptionnaire && c.receptionnaire.id === req.user.id;
 
 /** Constat d'une livraison : quantités reçues par ligne, conformité, réserves. */
+/* ---- Exécution par le titulaire : pièces, accusé de réception, livraisons, factures ---- */
+const comptesTitulaire = (c) => ((c.titulaire.partenaire && partenaireGet(c.titulaire.partenaire)) || {}).comptes || [];
+const prevenirAchats = (c, titre, corps) => SU.notifier([c.creePar, c.receptionnaire && c.receptionnaire.id].filter(Boolean), titre, corps, { ev: 'execution', lab: 'Exécution' });
+const prevenirTitulaire = (c, titre, corps) => SU.notifier(comptesTitulaire(c), titre, corps, { ev: 'execution', lab: 'Exécution' });
+const sansTitulaire = (res) => err(res, 403, 'NOT_HOLDER', 'Réservé au titulaire de la commande.');
+
+/** Pièce d'exécution déposée par le titulaire : bon de livraison ou facture (PDF ou image), rattachée à la commande. */
+r.post('/:id/fichiers', require('./files').corpsBrut, (req, res) => {
+  const c = req.commande;
+  if (!titulaire(req, c)) return sansTitulaire(res);
+  if (!EN_EXECUTION.includes(c.statut)) return err(res, 409, 'ORDER_NOT_RUNNING', 'Cette commande n’est pas en exécution.');
+  const fx = require('./files').lireFichier(req);
+  if (fx.erreur) return err(res, fx.status, 'FILE_INVALID', fx.erreur);
+  if (!['bon-livraison', 'facture'].includes(fx.doc)) return err(res, 422, 'FILE_INVALID', 'Pièce attendue : bon de livraison ou facture.');
+  if (!/^(application\/pdf|image\/(png|jpeg))$/.test(fx.mime)) return err(res, 415, 'FILE_TYPE', 'Format attendu : PDF ou image (PNG, JPEG).');
+  const id = crypto.randomUUID();
+  require('fs').writeFileSync(require('./files').diskPath(id), fx.body, { mode: 0o600 });
+  db.prepare('INSERT INTO files(id,owner,doc_id,name,mime,size,sha256,procedure_id,commande_id) VALUES(?,?,?,?,?,?,?,?,?)')
+    .run(id, req.user.id, fx.doc, fx.name, fx.mime, fx.body.length, fx.sha, c.procedure.id, c.id);
+  res.status(201).json({ id, doc: fx.doc, name: fx.name, size: fx.body.length, sha256: fx.sha });
+});
+/** Pièce d'exécution de cette commande, d'un type donné, déposée par l'entreprise titulaire. */
+function pieceExecution(c, id, doc) {
+  const f = id ? db.prepare('SELECT id, name, size, sha256 FROM files WHERE id=? AND commande_id=? AND doc_id=?').get(String(id), c.id, doc) : null;
+  return f ? { id: f.id, name: f.name, size: f.size, sha256: f.sha256 } : null;
+}
+
+/** Accusé de réception du bon de commande par le titulaire. */
+r.post('/:id/accuse', (req, res) => {
+  const c = req.commande;
+  if (!titulaire(req, c)) return sansTitulaire(res);
+  if (!EN_EXECUTION.includes(c.statut)) return err(res, 409, 'ORDER_NOT_RUNNING', 'Cette commande n’est pas en exécution.');
+  if (c.accuse) return err(res, 409, 'ALREADY_ACKNOWLEDGED', 'Le bon de commande a déjà été accusé.');
+  db.transaction(() => {
+    c.accuse = { t: frDate(), par: { id: req.user.id, nom: req.user.nom } };
+    journal(req, c, 'bon de commande reçu et accepté par le titulaire');
+    commandeSave(c);
+  })();
+  prevenirAchats(c, `Commande ${c.numero} acceptée par ${c.titulaire.nom}`, `${req.user.nom} a accusé réception du bon de commande ${c.numero}.`);
+  res.json({ commande: vueTitulaire(c) });
+});
+
+/** Livraison déclarée par le titulaire : quantités par ligne, date, bon de livraison ; le réceptionnaire la constate. */
+r.post('/:id/livraisons', (req, res) => {
+  const c = req.commande, d = req.body || {};
+  if (!titulaire(req, c)) return sansTitulaire(res);
+  if (!['emise', 'en_reception'].includes(c.statut)) return err(res, 409, 'ORDER_NOT_RECEIVABLE', 'Cette commande n’attend plus de livraison.');
+  const q = Array.isArray(d.quantites) ? d.quantites.map(Number) : [];
+  if (q.length !== c.lignes.length || q.some((x) => !(x >= 0)) || !q.some((x) => x > 0)) return err(res, 422, 'DELIVERY_INVALID', 'Quantités livrées attendues pour chaque ligne (au moins une positive).');
+  const rp = vue(c).rapprochement, trop = c.lignes.map((l, i) => (q[i] > rp[i].ecart + 1e-9 ? l.designation : null)).filter(Boolean);
+  if (trop.length) return err(res, 422, 'DELIVERY_EXCEEDS_ORDER', 'Quantité supérieure au reste à livrer : ' + trop.join(' ; ') + '.');
+  const date = String(d.date || jour());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > jour()) return err(res, 422, 'DELIVERY_INVALID', 'Date de livraison invalide (pas dans le futur).');
+  const bon = pieceExecution(c, d.bon, 'bon-livraison');
+  if (d.bon && !bon) return err(res, 422, 'FILE_UNKNOWN', 'Bon de livraison introuvable : joignez-le de nouveau.');
+  const commentaire = String(d.commentaire || '').trim().slice(0, 1000);
+  c.livraisons = c.livraisons || [];
+  const l = { n: c.livraisons.length + 1, date, t: frDate(), par: { id: req.user.id, nom: req.user.nom }, quantites: q, bon, commentaire: commentaire || null, statut: 'declaree' };
+  db.transaction(() => { c.livraisons.push(l); journal(req, c, `livraison n° ${l.n} déclarée par le titulaire (${date})`); commandeSave(c); })();
+  SU.notifier([c.receptionnaire && c.receptionnaire.id].filter(Boolean), `Livraison annoncée — commande ${c.numero}`,
+    `${c.titulaire.nom} déclare une livraison le ${date.split('-').reverse().join('/')}. Constatez-la dans « Exécution ».`, { ev: 'execution', lab: 'Exécution' });
+  res.status(201).json({ commande: vueTitulaire(c) });
+});
+
+/** Facture déposée par le titulaire, rapportée à un jalon de paiement. */
+r.post('/:id/factures', (req, res) => {
+  const c = req.commande, d = req.body || {};
+  if (!titulaire(req, c)) return sansTitulaire(res);
+  if (!EN_EXECUTION.includes(c.statut)) return err(res, 409, 'ORDER_NOT_RUNNING', 'Cette commande n’est pas en exécution.');
+  const numero = String(d.numero || '').trim(), date = String(d.date || ''), ht = Math.round(Number(d.montantHT) * 100) / 100, j = Number(d.jalon);
+  if (!numero || numero.length > 40) return err(res, 422, 'INVOICE_INVALID', 'Numéro de facture obligatoire (40 caractères au plus).');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > jour()) return err(res, 422, 'INVOICE_INVALID', 'Date de facture invalide.');
+  if (!(ht > 0)) return err(res, 422, 'INVOICE_INVALID', 'Montant hors taxes invalide.');
+  if (!Number.isInteger(j) || !c.jalons[j]) return err(res, 422, 'INVOICE_INVALID', 'Jalon de paiement inconnu.');
+  const fichier = pieceExecution(c, d.fichier, 'facture');
+  if (!fichier) return err(res, 422, 'INVOICE_FILE_REQUIRED', 'Joignez la facture (PDF ou image).');
+  const actives = (c.factures || []).filter((f) => f.statut !== 'rejetee');
+  if (actives.some((f) => f.numero.toLowerCase() === numero.toLowerCase())) return err(res, 409, 'INVOICE_DUPLICATE', 'Une facture porte déjà ce numéro sur cette commande.');
+  if (actives.some((f) => f.jalon === j)) return err(res, 409, 'MILESTONE_INVOICED', 'Ce jalon est déjà facturé.');
+  const deja = actives.reduce((t, f) => t + f.montantHT, 0), tot = total(c);
+  if (deja + ht > tot + 0.5) return err(res, 422, 'INVOICE_EXCEEDS_ORDER', `Le cumul facturé dépasserait le montant de la commande (reste ${Math.round(tot - deja).toLocaleString('fr-FR')} ${c.devise}).`);
+  const tva = Number((c.conditions || {}).tva) || 0, attendu = Math.round(tot * c.jalons[j].pourcentage) / 100;
+  c.factures = c.factures || [];
+  const f = { n: c.factures.length + 1, numero, date, montantHT: ht, tva, montantTTC: Math.round(ht * (1 + tva / 100) * 100) / 100,
+    jalon: j, jalonLib: c.jalons[j].libelle, attendu, fichier, deposee: frDate(), par: { id: req.user.id, nom: req.user.nom }, statut: 'deposee' };
+  db.transaction(() => { c.factures.push(f); journal(req, c, `facture ${numero} déposée (${ht.toLocaleString('fr-FR')} ${c.devise} HT, jalon « ${f.jalonLib} »)`); commandeSave(c); })();
+  prevenirAchats(c, `Facture reçue — commande ${c.numero}`, `${c.titulaire.nom} a déposé la facture ${numero} (${ht.toLocaleString('fr-FR')} ${c.devise} HT, jalon « ${f.jalonLib} »).`);
+  res.status(201).json({ commande: vueTitulaire(c) });
+});
+
+/** Décision des achats sur une facture : acceptée pour paiement (service fait constaté) ou rejetée avec un motif. */
+r.post('/:id/factures/:n/decision', (req, res) => {
+  const c = req.commande, f = (c.factures || [])[Number(req.params.n) - 1], d = req.body || {};
+  if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Établir les bons de commande » requise.');
+  if (!f) return err(res, 404, 'INVOICE_UNKNOWN', 'Facture introuvable.');
+  if (f.statut !== 'deposee') return err(res, 409, 'INVOICE_DECIDED', 'Cette facture a déjà fait l’objet d’une décision.');
+  const motif = String(d.motif || '').trim().slice(0, 1000);
+  if (d.decision === 'rejetee' && !motif) return err(res, 422, 'REASON_REQUIRED', 'Le rejet d’une facture doit être motivé.');
+  if (d.decision === 'acceptee' && !c.receptions.length) return err(res, 409, 'SERVICE_NOT_DONE', 'Aucune réception n’est constatée : pas de paiement sans service fait.');
+  if (!['acceptee', 'rejetee'].includes(d.decision)) return err(res, 422, 'DECISION_INVALID', 'Décision attendue : acceptée ou rejetée.');
+  db.transaction(() => {
+    Object.assign(f, { statut: d.decision, decision: { t: frDate(), par: { id: req.user.id, nom: req.user.nom }, motif: motif || null } });
+    journal(req, c, `facture ${f.numero} ${d.decision === 'acceptee' ? 'acceptée pour paiement' : 'rejetée — motif : ' + motif}`);
+    commandeSave(c);
+  })();
+  prevenirTitulaire(c, `Facture ${f.numero} ${d.decision === 'acceptee' ? 'acceptée pour paiement' : 'rejetée'}`,
+    d.decision === 'acceptee' ? `Votre facture ${f.numero} (commande ${c.numero}) est transmise pour paiement.` : `Votre facture ${f.numero} (commande ${c.numero}) est rejetée : ${motif}`);
+  res.json({ commande: vue(c) });
+});
+
 r.post('/:id/receptions', (req, res) => {
   const c = req.commande, d = req.body || {};
   if (!estReceptionnaire(req, c)) return err(res, 403, 'NOT_RECEIVER', 'Seul le réceptionnaire désigné constate une réception.');
@@ -378,6 +512,9 @@ r.post('/:id/receptions', (req, res) => {
   if (reserves.length > 2000) return err(res, 422, 'RECEPTION_INVALID', 'Réserves trop longues (2 000 caractères au plus).');
   db.transaction(() => {
     c.receptions.push({ n: c.receptions.length + 1, date: jour(), t: frDate(), par: { id: req.user.id, nom: req.user.nom }, quantites: q, reserves: reserves || null, levee: null });
+    // livraison déclarée par le titulaire que cette réception constate
+    const liv = (c.livraisons || []).find((x) => x.n === Number(d.livraison) && x.statut === 'declaree');
+    if (liv) { liv.statut = 'constatee'; liv.reception = c.receptions.length; }
     const complete = vue(c).rapprochement.every((x) => x.ecart <= 1e-9);
     c.statut = complete ? 'receptionnee' : 'en_reception';
     journal(req, c, `réception n° ${c.receptions.length}${reserves ? ' avec réserves' : ''}${complete ? ' — tout est livré : réception provisoire' : ' — livraison partielle'}`);
@@ -462,4 +599,6 @@ r.post('/:id/definitive', (req, res) => {
   res.json({ commande: vue(c), evaluationPartenaire: alerte });
 });
 
+/** La commande est-elle visible de ce compte (téléchargement d'une pièce d'exécution) ? */
+r.voitCommande = (req, id) => { const c = commandeGet(id); return !!(c && visible(req, c)); };
 module.exports = r;

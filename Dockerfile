@@ -13,9 +13,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY package.json ./
 COPY server ./server
 COPY public ./public
-RUN mkdir /data && chown node:node /data
+RUN mkdir /data /sauvegardes && chown node:node /data /sauvegardes
 USER node
-VOLUME /data
+VOLUME /data /sauvegardes
 EXPOSE 3000
 HEALTHCHECK CMD node -e "fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node","server/index.js"]

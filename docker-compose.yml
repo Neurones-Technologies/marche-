@@ -40,7 +40,12 @@ services:
       M365_CLIENT_ID: ${M365_CLIENT_ID:-}
       M365_CLIENT_SECRET: ${M365_CLIENT_SECRET:-}
       M365_SENDER: ${M365_SENDER:-}
-    volumes: ["marcheplus-data:/data"]
+      # Sauvegardes automatiques (voir docs/SAUVEGARDES.md) : volume distinct des données ; 0 heure = désactivées
+      SAUVEGARDE_DOSSIER: /sauvegardes
+      SAUVEGARDE_HEURES: ${SAUVEGARDE_HEURES:-24}
+      SAUVEGARDE_CONSERVER: ${SAUVEGARDE_CONSERVER:-14}
+    volumes: ["marcheplus-data:/data", "marcheplus-sauvegardes:/sauvegardes"]
     restart: unless-stopped
 volumes:
   marcheplus-data:
+  marcheplus-sauvegardes:

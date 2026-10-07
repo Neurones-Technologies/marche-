@@ -90,7 +90,7 @@
       $('cs-moi').textContent = initiales(j.operateur.nom);
       $('cs-menu-tete').innerHTML = '<strong>' + esc(j.operateur.nom) + '</strong><small>' + esc(j.operateur.email) + '</small>';
       var o = (location.hash || '').replace('#', '');
-      if (['demandes', 'espaces', 'operateurs', 'journal'].indexOf(o) >= 0) ONGLET = o;
+      if (['demandes', 'espaces', 'operateurs', 'sauvegardes', 'journal'].indexOf(o) >= 0) ONGLET = o;
       charger();
     }).catch(function () {});
   }
@@ -120,6 +120,7 @@
     if (ONGLET === 'demandes') vueDemandes();
     else if (ONGLET === 'espaces') vueEspaces();
     else if (ONGLET === 'operateurs') vueOperateurs();
+    else if (ONGLET === 'sauvegardes') vueSauvegardes();
     else vueJournal();
   }
 
@@ -215,6 +216,22 @@
     }).catch(function (x) { $('cs-ops').textContent = x.message; });
   }
 
+  /* Sauvegardes automatiques : état, liste, sauvegarde immédiate (voir docs/SAUVEGARDES.md). */
+  function taille(o) { return o >= 1048576 ? (o / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(o / 1024)) + ' Ko'; }
+  function vueSauvegardes() {
+    $('cs-vue').innerHTML = '<div class="cs-entete"><div><h1>Sauvegardes</h1><p>Copies vérifiées des bases de chaque espace et du registre, et des pièces déposées.</p></div><button class="btn btn-primary" data-action="sauvegarder">' + ic('plus') + 'Sauvegarder maintenant</button></div><div id="cs-sv" class="cs-charge">Chargement…</div>';
+    api('GET', '/sauvegardes').then(function (e) {
+      var tete = '<p class="cs-muet">' + (e.actif ? 'Automatique toutes les ' + e.intervalleHeures + ' h' : 'Sauvegarde automatique désactivée (SAUVEGARDE_HEURES=0)') +
+        ' · ' + e.conserver + ' conservées · dossier <span class="cs-mono">' + esc(e.dossier) + '</span>' + (e.enCours ? ' · <strong>sauvegarde en cours</strong>' : '') + '</p>' +
+        (e.derniereErreur ? '<p class="pf-message" role="alert">Dernier échec le ' + date(e.derniereErreur.date, true) + ' : ' + esc(e.derniereErreur.message) + '</p>' : '');
+      $('cs-sv').outerHTML = '<div id="cs-sv">' + tete + (e.sauvegardes.length ? '<div class="cs-table-cadre"><table class="cs-table"><thead><tr><th>Date</th><th>Statut</th><th>Bases</th><th>Taille</th><th>Déclencheur</th></tr></thead><tbody>' +
+        e.sauvegardes.map(function (s) {
+          return '<tr><td class="cs-nowrap">' + date(s.date, true) + '</td><td>' + (s.statut === 'ok' ? '<span class="cs-statut actif">Vérifiée</span>' : '<span class="cs-statut suspendu">' + esc(s.statut || 'incomplète') + '</span>') +
+            '</td><td>' + s.bases + '</td><td>' + taille(s.taille) + '</td><td>' + esc(s.declencheur || '—') + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : vide('Aucune sauvegarde', 'La première est faite deux minutes après le démarrage, puis à l’intervalle réglé.')) + '</div>';
+    }).catch(function (x) { $('cs-sv').textContent = x.message; });
+  }
+
   function vueJournal() {
     $('cs-vue').innerHTML = '<div class="cs-entete"><div><h1>Journal</h1><p>Toutes les actions menées sur la plateforme, les plus récentes d’abord.</p></div></div><div id="cs-jn" class="cs-charge">Chargement…</div>';
     api('GET', '/journal').then(function (j) {
@@ -270,6 +287,11 @@
   }
 
   var ACTIONS = {
+    sauvegarder: function (b) {
+      b.disabled = true; toast('Sauvegarde en cours…');
+      api('POST', '/sauvegardes', {}).then(function (r) { toast('Sauvegarde ' + (r.sauvegarde.statut === 'ok' ? 'vérifiée' : 'avec anomalie') + ' : ' + r.sauvegarde.bases + ' base(s).'); vueSauvegardes(); })
+        .catch(function (x) { b.disabled = false; toast(x.message); });
+    },
     accepter: function (b) {
       var i = demandeDe(b.dataset.id); if (!i) return;
       ouvrir('Ouvrir l’espace de ' + i.nom, MSG + '<p class="cs-intro">L’espace <strong class="cs-adresse">' + esc(i.adresse.replace(/^https?:\/\//, '')) + '</strong> sera créé, et <strong>' + esc(i.admin.nom) + '</strong> pourra s’y connecter avec le mot de passe choisi à l’inscription.' + (MOI.courriels ? ' Un courriel le lui annoncera.' : ' Les courriels n’étant pas configurés, prévenez-le vous-même.') + '</p>' +

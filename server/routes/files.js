@@ -88,6 +88,13 @@ g.get('/:id', (req, res) => {
   const eq = equipeDe(req.user.id), lui = f && eq.includes(f.owner); // un fichier de son entreprise
   // pièce de référencement : son déposant, les acheteurs qui référencent, et les lecteurs des offres (elle tient lieu
   // de pièce du dossier de candidature lors d'un dépôt)
+  // pièce d'exécution d'une commande : qui voit la commande (achats, valideurs, réceptionnaire, titulaire)
+  if (f && f.commande_id) {
+    if (!require('./commandes').voitCommande(req, f.commande_id)) return res.status(404).json({ error: 'Pièce introuvable.' });
+    auditAppend(req.user.id, whoLabel(req.user), `Pièce d'exécution consultée — ${f.name} (commande ${f.commande_id})`, f.procedure_id);
+    res.set({ 'Content-Type': f.mime, 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'Cache-Control': 'private, no-store' });
+    return res.sendFile(path.resolve(diskPath(f.id)));
+  }
   const ok = f && (f.partenaire_id != null
     ? (lui || req.can('partenaires.manage') || req.can('offres.read'))
     : (lui || (f.offer_id != null && req.can('offres.read'))));

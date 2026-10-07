@@ -1,4 +1,6 @@
-/* Marché+ — Écran Exécution : commandes et réceptions (module 4 : bon de commande et suivi d'exécution).
+/* Marché+ — Écran Exécution : commandes et réceptions (module 4 : bon de commande et suivi d'exécution). Le titulaire
+   y accuse réception du bon de commande, déclare ses livraisons et dépose ses factures ; les achats rapprochent et
+   décident des factures (bon à payer ou rejet motivé).
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
    Les commandes se chargent par /api/commandes ; le serveur filtre ce que chacun voit (achats, valideurs,
    réceptionnaire désigné, titulaire par le portail). */
@@ -10,6 +12,15 @@ var STATUTS_COMMANDE = {
   receptionnee: ['Réception provisoire','c-teal'], cloturee: ['Réception définitive','c-green'], annulee: ['Annulée','c-grey']
 };
 UI.commande = null;
+var STATUTS_FACTURE = { deposee:['À traiter','c-amber'], acceptee:['Acceptée pour paiement','c-green'], rejetee:['Rejetée','c-red'] };
+/* Le compte connecté est-il le titulaire (portail) plutôt qu'un acheteur ? */
+function vueTitulaireCommande(){ return can('portail.use') && !can('commande.manage') && !can('commande.approve'); }
+/* Lien de téléchargement d'une pièce d'exécution (bon de livraison, facture). */
+function lienPieceExecution(parent, f){
+  if(!f) return null;
+  var a=add(parent,'a','pill',f.name+' · '+taille(f.size)); a.href='/api/files/'+f.id; a.setAttribute('download',f.name); a.title='SHA-256 '+f.sha256;
+  return a;
+}
 
 function montantDevise(n, devise){ return sep(Math.round(Number(n)||0))+' '+(devise||'XOF'); }
 
@@ -74,10 +85,11 @@ function vCommandes(m){
     if(c.rejet && c.statut==='rejete'){ var w=add(zone,'div','warn'); w.style.marginTop='18px'; add(w,'strong',null,'Rejetée ('+c.rejet.role+', '+c.rejet.at+') : '); w.appendChild(document.createTextNode(c.rejet.motif)); }
     if(c.annulation){ var wa=add(zone,'div','warn'); wa.style.marginTop='18px'; add(wa,'strong',null,'Annulée le '+c.annulation.at+' : '); wa.appendChild(document.createTextNode(c.annulation.motif)); }
     if(modifiable) brouillon(c); else documentCommande(c);
+    if(vueTitulaireCommande()){ executionTitulaire(c); return; } // le titulaire : son exécution, sans le circuit interne
     circuitCommande(c);
     actions(c);
     avenants(c);
-    if(c.numero && c.statut!=='annulee') receptions(c);
+    if(c.numero && c.statut!=='annulee'){ suiviTitulaire(c); receptions(c); }
     var kh=add(zone,'div','card'); kh.style.marginTop='18px';
     add(kh,'div','panel-head','Historique');
     var bh=add(kh,'div','pad');
@@ -294,17 +306,18 @@ function vCommandes(m){
       }
     });
     if(moi && (c.statut==='emise' || c.statut==='en_reception')){
-      add(b,'h3',null,'Constater une livraison').style.marginTop='14px';
+      var annoncee=(c.livraisons||[]).filter(function(l){ return l.statut==='declaree'; })[0];
+      add(b,'h3',null, annoncee ? 'Constater la livraison n° '+annoncee.n+' annoncée par le titulaire' : 'Constater une livraison').style.marginTop='14px';
       var champs=[];
       c.rapprochement.forEach(function(x,i){
-        var w=add(b,'div','docline'); add(w,'div',null,x.designation+' — reste '+x.ecart);
-        var q=add(w,'input'); q.type='number'; q.min='0'; q.max=String(x.ecart); q.value=String(x.ecart); q.style.width='110px'; q.setAttribute('aria-label','Quantité reçue — '+x.designation); fk(q,'cmd-q'+i);
+        var w=add(b,'div','docline'); add(w,'div',null,x.designation+' — reste '+x.ecart+(annoncee?' · annoncé : '+annoncee.quantites[i]:''));
+        var q=add(w,'input'); q.type='number'; q.min='0'; q.max=String(x.ecart); q.value=String(annoncee ? Math.min(annoncee.quantites[i],x.ecart) : x.ecart); q.style.width='110px'; q.setAttribute('aria-label','Quantité reçue — '+x.designation); fk(q,'cmd-q'+i);
         champs.push(q);
       });
       var lr=add(b,'label',null,'Réserves (facultatif)'); lr.setAttribute('for','cmd-reserves');
       var rv=add(b,'textarea'); rv.id='cmd-reserves'; rv.rows=2; rv.style.width='100%'; fk(rv,'cmd-reserves');
       var bc=add(b,'button','btn btn-primary btn-sm','Enregistrer la réception'); bc.style.marginTop='10px'; fk(bc,'cmd-recevoir');
-      bc.addEventListener('click',function(){ agir('POST',enc(c.id)+'/receptions',{quantites:champs.map(function(q){ return Number(q.value); }), reserves:rv.value},'Réception enregistrée.'); });
+      bc.addEventListener('click',function(){ agir('POST',enc(c.id)+'/receptions',{quantites:champs.map(function(q){ return Number(q.value); }), reserves:rv.value, livraison:annoncee?annoncee.n:null},'Réception enregistrée.'); });
     }
     if(c.receptionProvisoire) add(b,'p',null,'Réception provisoire le '+c.receptionProvisoire.date+'.'+(c.receptionDefinitive?' Réception définitive le '+c.receptionDefinitive.date+'.':'')).style.marginTop='10px';
     if(moi && c.statut==='receptionnee'){
@@ -335,6 +348,136 @@ function vCommandes(m){
         ' (poids '+ev.poids.delais+'/'+ev.poids.conformite+'/'+ev.poids.completude+'/'+ev.poids.qualite+')'+(ev.commentaire?' — « '+ev.commentaire+' »':'')+'.'));
     }
     if(!moi) add(b,'p','muted','Réceptionnaire désigné : '+c.receptionnaire.nom+'. Seul le réceptionnaire constate les livraisons.').style.marginTop='10px';
+  }
+
+  /* Côté achats : accusé du titulaire, livraisons qu'il a déclarées, factures à rapprocher et à décider. */
+  function suiviTitulaire(c){
+    var liv=c.livraisons||[], fac=c.factures||[];
+    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var ph=add(k,'div','panel-head'); add(ph,'span',null,'Titulaire : livraisons et factures');
+    chipCellule(ph, c.accuse ? 'Bon de commande accepté le '+c.accuse.t : 'Pas encore accusé par le titulaire', c.accuse ? 'c-green' : 'c-amber');
+    var b=add(k,'div','pad');
+    if(!liv.length && !fac.length){ add(b,'p','muted','Le titulaire n’a encore déclaré aucune livraison ni déposé de facture.'); return; }
+    liv.forEach(function(l){
+      var row=add(b,'div','docline'), lf=add(row,'div'); lf.style.flex='1 1 260px';
+      add(lf,'strong',null,'Livraison n° '+l.n+' du '+l.date.split('-').reverse().join('/')+' — déclarée par '+l.par.nom);
+      add(lf,'div','muted','Quantités : '+l.quantites.join(' · ')+(l.commentaire?' · '+l.commentaire:''));
+      lienPieceExecution(lf,l.bon);
+      chipCellule(row, l.statut==='constatee' ? 'Constatée (réception n° '+l.reception+')' : 'À constater', l.statut==='constatee'?'c-green':'c-amber');
+    });
+    var dejaAccepte=0;
+    fac.forEach(function(f){
+      var row=add(b,'div','docline'), lf=add(row,'div'); lf.style.flex='1 1 300px';
+      add(lf,'strong',null,'Facture '+f.numero+' du '+f.date.split('-').reverse().join('/')+' — '+montantDevise(f.montantHT,c.devise)+' HT ('+montantDevise(f.montantTTC,c.devise)+' TTC)');
+      var ecart=Math.round(f.montantHT-f.attendu);
+      add(lf,'div','muted','Jalon « '+f.jalonLib+' » : attendu '+montantDevise(f.attendu,c.devise)+' HT'+(ecart ? ' · écart '+(ecart>0?'+':'')+montantDevise(ecart,c.devise) : ' · conforme'));
+      if(f.decision && f.decision.motif) add(lf,'div','muted','Motif : '+f.decision.motif);
+      lienPieceExecution(lf,f.fichier);
+      var st=STATUTS_FACTURE[f.statut]||[f.statut,'c-grey']; chipCellule(row,st[0],st[1]);
+      if(ecart && f.statut==='deposee') chipCellule(row,'Écart avec le jalon','c-red');
+      if(f.statut==='acceptee') dejaAccepte+=f.montantHT;
+      if(f.statut==='deposee' && can('commande.manage')){
+        var ba=add(row,'button','btn btn-primary btn-sm','Accepter pour paiement'); fk(ba,'fac-ok-'+f.n);
+        if(!c.receptions.length){ ba.disabled=true; ba.title='Aucune réception constatée : pas de paiement sans service fait.'; }
+        ba.addEventListener('click',function(){ ask('La facture '+f.numero+' est transmise pour paiement ('+montantDevise(f.montantTTC,c.devise)+' TTC).',function(){ agir('POST',enc(c.id)+'/factures/'+f.n+'/decision',{decision:'acceptee'},'Facture acceptée pour paiement.'); },'Accepter la facture ?','Accepter'); });
+        var br=add(row,'button','btn btn-ghost btn-sm','Rejeter'); fk(br,'fac-rej-'+f.n);
+        br.addEventListener('click',function(){ demander('Le titulaire est prévenu du motif et peut déposer une facture corrigée.',function(motif){ agir('POST',enc(c.id)+'/factures/'+f.n+'/decision',{decision:'rejetee',motif:motif},'Facture rejetée.'); },'Rejeter la facture '+f.numero+' ?','Rejeter'); });
+      }
+    });
+    if(fac.length) add(b,'p','muted','Accepté pour paiement : '+montantDevise(dejaAccepte,c.devise)+' HT sur '+montantDevise(c.total,c.devise)+'. Le paiement est fait dans l’ERP (export « Factures acceptées »).').style.marginTop='10px';
+    if(can('commande.manage')){ var ex=add(b,'a','btn btn-ghost btn-sm','Exporter les factures acceptées (CSV)'); ex.href='/api/commandes/factures.csv'; ex.setAttribute('download','factures.csv'); }
+  }
+
+  /* Côté titulaire : accusé de réception, livraisons déclarées, factures déposées. */
+  function executionTitulaire(c){
+    var enCours=['emise','en_reception','receptionnee','cloturee'].indexOf(c.statut)>=0;
+    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var ph=add(k,'div','panel-head'); add(ph,'span',null,'Votre exécution');
+    var b=add(k,'div','pad');
+    if(!c.accuse && enCours){
+      var na=add(b,'div','note'); add(na,'strong',null,'Bon de commande à accepter. ');
+      na.appendChild(document.createTextNode('Accusez-en réception pour confirmer à l’acheteur que vous l’exécutez aux conditions indiquées.'));
+      var acc=add(b,'button','btn btn-primary btn-sm','Accuser réception du bon de commande'); acc.style.marginTop='10px'; fk(acc,'cmd-accuse');
+      acc.addEventListener('click',function(){ agir('POST',enc(c.id)+'/accuse',{},'Bon de commande accepté.'); });
+    } else if(c.accuse) chipCellule(ph,'Accepté le '+c.accuse.t,'c-green');
+    (c.avenants||[]).forEach(function(a){ add(b,'p','muted','Avenant '+a.numero+' émis le '+a.emisLe+' : nouveau total '+montantDevise(a.nouveauTotal,c.devise)+' — '+a.motif); });
+
+    /* Livraisons */
+    add(b,'h3',null,'Livraisons').style.marginTop='14px';
+    var liv=c.livraisons||[];
+    if(!liv.length) add(b,'p','muted','Aucune livraison déclarée.');
+    liv.forEach(function(l){
+      var row=add(b,'div','docline'), lf=add(row,'div'); lf.style.flex='1 1 260px';
+      add(lf,'strong',null,'Livraison n° '+l.n+' du '+l.date.split('-').reverse().join('/'));
+      add(lf,'div','muted','Quantités : '+l.quantites.join(' · ')+(l.commentaire?' · '+l.commentaire:''));
+      lienPieceExecution(lf,l.bon);
+      chipCellule(row, l.statut==='constatee' ? 'Constatée par l’acheteur' : 'En attente de constat', l.statut==='constatee'?'c-green':'c-amber');
+    });
+    if(c.statut==='emise' || c.statut==='en_reception'){
+      var fl=add(b,'details','echange-nouvelle'); add(fl,'summary',null,'Déclarer une livraison');
+      var qs=[];
+      c.rapprochement.forEach(function(x,i){
+        var w=add(fl,'div','docline'); add(w,'div',null,x.designation+' — reste à livrer '+x.ecart);
+        var q=add(w,'input'); q.type='number'; q.min='0'; q.max=String(x.ecart); q.value=String(x.ecart); q.style.width='110px';
+        q.setAttribute('aria-label','Quantité livrée — '+x.designation); fk(q,'liv-q'+i); qs.push(q);
+      });
+      var fd=add(fl,'div','frm'); fd.style.marginTop='10px';
+      var wd=add(fd,'div'); add(wd,'label',null,'Date de livraison').setAttribute('for','liv-date');
+      var dd=add(wd,'input'); dd.type='date'; dd.id='liv-date'; dd.value=new Date().toISOString().slice(0,10); fk(dd,'liv-date');
+      var wb=add(fd,'div'); add(wb,'label',null,'Bon de livraison (PDF ou image)').setAttribute('for','liv-bon');
+      var fb=add(wb,'input'); fb.type='file'; fb.id='liv-bon'; fb.accept='.pdf,.png,.jpg,.jpeg';
+      var wc=add(fl,'div'); add(wc,'label',null,'Commentaire (facultatif)').setAttribute('for','liv-com');
+      var tc=add(wc,'textarea'); tc.id='liv-com'; tc.rows=2; tc.style.width='100%'; fk(tc,'liv-com');
+      var gl=add(add(fl,'div','echange-actions'),'button','btn btn-primary btn-sm','Déclarer la livraison'); fk(gl,'liv-go');
+      gl.addEventListener('click',function(){
+        gl.disabled=true;
+        var f=fb.files && fb.files[0];
+        (f ? MP.upload('/api/commandes/'+enc(c.id)+'/fichiers?doc=bon-livraison',f) : Promise.resolve(null)).then(function(p){
+          return agir('POST',enc(c.id)+'/livraisons',{ quantites:qs.map(function(q){ return Number(q.value); }), date:dd.value, bon:p?p.id:null, commentaire:tc.value },'Livraison déclarée : l’acheteur la constatera.');
+        }).catch(function(e){ gl.disabled=false; toast(e.message||'Envoi impossible.'); });
+      });
+    }
+
+    /* Factures */
+    add(b,'h3',null,'Factures').style.marginTop='18px';
+    var fac=c.factures||[];
+    if(!fac.length) add(b,'p','muted','Aucune facture déposée.');
+    fac.forEach(function(f){
+      var row=add(b,'div','docline'), lf=add(row,'div'); lf.style.flex='1 1 280px';
+      add(lf,'strong',null,'Facture '+f.numero+' — '+montantDevise(f.montantHT,c.devise)+' HT');
+      add(lf,'div','muted','Jalon « '+f.jalonLib+' » · déposée le '+f.deposee+(f.decision && f.decision.motif ? ' · motif du rejet : '+f.decision.motif : ''));
+      lienPieceExecution(lf,f.fichier);
+      var st=STATUTS_FACTURE[f.statut]||[f.statut,'c-grey']; chipCellule(row, f.statut==='deposee'?'En cours d’examen':st[0], st[1]);
+    });
+    var actives=fac.filter(function(f){ return f.statut!=='rejetee'; }), libres=c.jalons.map(function(j,i){ return i; }).filter(function(i){ return !actives.some(function(f){ return f.jalon===i; }); });
+    if(enCours && libres.length){
+      var ff=add(b,'details','echange-nouvelle'); add(ff,'summary',null,'Déposer une facture');
+      var fr=add(ff,'div','frm');
+      var w1=add(fr,'div'); add(w1,'label',null,'Numéro de facture').setAttribute('for','fac-num');
+      var nu=add(w1,'input'); nu.type='text'; nu.id='fac-num'; nu.maxLength=40; fk(nu,'fac-num');
+      var w2=add(fr,'div'); add(w2,'label',null,'Date').setAttribute('for','fac-date');
+      var da=add(w2,'input'); da.type='date'; da.id='fac-date'; da.value=new Date().toISOString().slice(0,10); fk(da,'fac-date');
+      var w3=add(fr,'div'); add(w3,'label',null,'Jalon de paiement').setAttribute('for','fac-jalon');
+      var sj=add(w3,'select'); sj.id='fac-jalon'; fk(sj,'fac-jalon');
+      libres.forEach(function(i){ var j=c.jalons[i]; add(sj,'option',null,j.libelle+' — '+j.pourcentage+' % soit '+montantDevise(c.total*j.pourcentage/100,c.devise)+' HT').value=String(i); });
+      var w4=add(fr,'div'); add(w4,'label',null,'Montant hors taxes ('+c.devise+')').setAttribute('for','fac-ht');
+      var ht=add(w4,'input'); ht.type='number'; ht.id='fac-ht'; ht.min='0'; fk(ht,'fac-ht');
+      var majHt=function(){ ht.value=String(Math.round(c.total*c.jalons[Number(sj.value)].pourcentage)/100); };
+      majHt(); sj.addEventListener('change',majHt);
+      var w5=add(fr,'div'); add(w5,'label',null,'Facture (PDF ou image)').setAttribute('for','fac-fichier');
+      var fi=add(w5,'input'); fi.type='file'; fi.id='fac-fichier'; fi.accept='.pdf,.png,.jpg,.jpeg';
+      var gf=add(add(ff,'div','echange-actions'),'button','btn btn-primary btn-sm','Déposer la facture'); fk(gf,'fac-go');
+      add(gf.parentNode,'span','muted','TVA appliquée : '+((c.conditions||{}).tva||0)+' %.');
+      gf.addEventListener('click',function(){
+        var f=fi.files && fi.files[0];
+        if(!nu.value.trim()){ toast('Indiquez le numéro de la facture.'); nu.focus(); return; }
+        if(!f){ toast('Joignez la facture.'); return; }
+        gf.disabled=true;
+        MP.upload('/api/commandes/'+enc(c.id)+'/fichiers?doc=facture',f).then(function(p){
+          return agir('POST',enc(c.id)+'/factures',{ numero:nu.value.trim(), date:da.value, montantHT:Number(ht.value), jalon:Number(sj.value), fichier:p.id },'Facture déposée.');
+        }).catch(function(e){ gf.disabled=false; toast(e.message||'Envoi impossible.'); });
+      });
+    }
   }
 
   charger();

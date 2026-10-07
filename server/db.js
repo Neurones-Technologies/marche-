@@ -98,6 +98,7 @@ function addColumn(table, col, def) {
 ['offers', 'receipts', 'files', 'audit'].forEach((t) => addColumn(t, 'procedure_id', 'TEXT'));
 // 05/10/2026 : l'adresse IP de l'auteur est consignée avec chaque entrée du journal.
 addColumn('audit', 'ip', 'TEXT');
+addColumn('files', 'commande_id', 'TEXT'); // pièce d'exécution d'une commande (bon de livraison, facture)
 // 06/10/2026 : l'accusé de dépôt porte son déposant ; un soumissionnaire ne reçoit que les siens (jamais ceux des
 // concurrents : raison sociale et montant). Un accusé antérieur, sans déposant, ne va plus qu'aux lecteurs des offres.
 addColumn('receipts', 'owner', 'TEXT');

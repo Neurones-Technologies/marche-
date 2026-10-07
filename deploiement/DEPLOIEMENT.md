@@ -159,6 +159,12 @@ Paramètres du `.env` utiles :
 | `SHOW_DEMO_ACCOUNTS` | `0` | **Ne jamais mettre `1` sur Internet** : l'écran de connexion afficherait le mot de passe. |
 | `ALLOW_RESET` | `1` | Bouton « Réinitialiser la démo » (réservé aux droits paramètres/rôles). `0` pour le désactiver. |
 | `MAX_FILE_MB` | `10` | Taille maximale d'une pièce jointe. Garder `client_max_body_size` du vhost au-dessus. |
+| `SAUVEGARDE_HEURES` | `24` | Sauvegarde automatique des bases et des pièces dans le volume `marcheplus-sauvegardes`. `0` la désactive. |
+| `SAUVEGARDE_CONSERVER` | `14` | Nombre de sauvegardes gardées. |
+
+**Sauvegardes** : l'application sauvegarde elle-même ses bases (copie vérifiée) et ses pièces. La copie hors du
+serveur et la restauration sont décrites dans `docs/SAUVEGARDES.md`. Mettre en place la copie hors du serveur dès
+la mise en production.
 
 Après modification du `.env` : `docker compose -f docker-compose.yml up -d`.
 

@@ -98,7 +98,7 @@ Durées indicatives. Le marché public reste hors du plan.
 | | 14 | Extraction réelle des offres reçues hors plateforme | A11 | Fait |
 | 5 — Pilotage et exploitation | 15 | Indicateurs : délais, économies, volumes | A22 | Fait |
 | | 16 | Budget et engagement | A23 | Fait |
-| | 17 | Sauvegardes automatiques | A25 | À faire |
-| | 18 | Le fournisseur confirme les livraisons et dépose ses factures | S24 | À faire |
+| | 17 | Sauvegardes automatiques | A25 | Fait |
+| | 18 | Le fournisseur confirme les livraisons et dépose ses factures | S24 | Fait |
 
 S = axe soumissionnaire, A = axe acheteur.

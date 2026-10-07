@@ -166,6 +166,15 @@ r.get('/budget', requireAuth, (req, res) => {
   res.json({ lignes: require('../budget').situation(null) });
 });
 
+/** Sauvegardes vues d'un espace (administrateur) : la dernière, et le résultat pour sa propre base. */
+r.get('/sauvegardes', requireAuth, (req, res) => {
+  if (!req.can('params.edit')) return res.status(403).json({ error: 'Habilitation insuffisante.' });
+  const S = require('../sauvegardes'), e = S.etat(), moi = require('../contexte').espace() || require('../espaces').INITIAL();
+  const d = e.derniere, base = d && (d.bases || []).find((b) => b.espace === moi);
+  res.json({ actif: e.actif, intervalleHeures: e.intervalleHeures, conserver: e.conserver, nombre: e.sauvegardes.length,
+    derniere: d ? { date: d.date, statut: base ? (base.integrite === 'ok' ? 'ok' : 'anomalie') : 'absente', taille: base ? base.taille : null, sha256: base ? base.sha256 : null } : null });
+});
+
 /* ---- Indicateurs ---- */
 const isoSql = (t) => (t ? String(t).replace(' ', 'T') + (/Z$/.test(t) ? '' : 'Z') : null);
 const jours = (a, b) => (a && b ? Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 864e5 * 10) / 10) : null);

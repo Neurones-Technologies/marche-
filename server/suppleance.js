@@ -65,9 +65,9 @@ function mention(p) {
 }
 
 /** Notification ciblée sur des comptes précis (et non sur des rôles), dans le fil de l'organisation. */
-function notifier(ids, titre, corps) {
+function notifier(ids, titre, corps, o = {}) {
   const cur = (kvGet('notifs') || { value: [] }).value;
-  cur.unshift({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), ev: 'suppleance', lab: 'Suppléance',
+  cur.unshift({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), ev: o.ev || 'suppleance', lab: o.lab || 'Suppléance',
     titre, corps, t: frDate(), roles: [], ids: ids.filter(Boolean), lu: [] });
   kvSet('notifs', cur.slice(0, 120), 'suppleance');
 }
