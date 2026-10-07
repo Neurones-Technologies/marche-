@@ -37,3 +37,41 @@ test('prix par lot : un montant par lot soumissionné, le total en est la somme'
   const dl = await call('GET', '/api/files/' + mem.id, null, achats);
   assert.equal(dl.status, 200);
 });
+
+test('une seule offre en cours ; retrait avant l’échéance, fichiers rendus, accusé marqué retiré', async () => {
+  const s = await getState(sotrap);
+  assert.equal(s.monOffre.montant, 50000000);
+  assert.deepEqual(s.monOffre.prixLots, { l1: 30000000, l2: 20000000 });
+  assert.equal(s.offers.length, 0); // le fournisseur ne voit pas les offres, seulement la sienne
+  const base = { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', delai: 90, lots: ['l1'], prixLots: { l1: 1000 } };
+  const double = await call('POST', '/api/procedures/p1/offers', base, sotrap);
+  assert.equal(double.status, 409);
+  assert.equal(double.json.code, 'OFFER_EXISTS');
+
+  ok(await call('DELETE', '/api/procedures/p1/offers/mienne', {}, sotrap));
+  const apres = await getState(sotrap);
+  assert.equal(apres.monOffre, null);
+  assert.ok(apres.receipts.length && apres.receipts.every((x) => x.retire));
+  assert.ok(!(await getState(achats)).offers.some((o) => o.depotPar && o.name === 'SOTRAP SARL'));
+  // fichiers rendus : la nouvelle offre se dépose sans rien rejoindre, mémoire technique compris
+  const mine = await call('GET', '/api/procedures/p1/files/mine', null, sotrap);
+  assert.ok(['memoire', 'registre'].every((d) => mine.json.some((f) => f.doc === d)));
+  const r = await call('POST', '/api/procedures/p1/offers', base, sotrap);
+  ok(r, 201);
+  assert.equal(r.json.offer.montant, 1000);
+  assert.ok(r.json.offer.pieces.some((p) => p.doc === 'memoire' && p.offre));
+  assert.equal(r.json.receipt.offre, r.json.offer.id);
+  const fin = await getState(sotrap);
+  assert.equal(fin.receipts.filter((x) => !x.retire).length, 1);
+  assert.equal((await call('DELETE', '/api/procedures/p1/offers/mienne', {}, achats)).status, 403); // l'acheteur n'est pas soumissionnaire
+});
+
+test('retrait refusé après la date limite', async () => {
+  const s = await getState(achats);
+  const hier = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  ok(await patch(achats, { cdc: { ...s.cdc, ouverture: hier } }));
+  const r = await call('DELETE', '/api/procedures/p1/offers/mienne', {}, sotrap);
+  assert.equal(r.status, 409);
+  assert.equal(r.json.code, 'DEADLINE_PASSED');
+  assert.ok((await getState(sotrap)).monOffre);
+});

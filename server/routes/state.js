@@ -1,7 +1,7 @@
 /* Routes d'une procédure, montées sous /api/procedures/:pid (voir routes/procedures.js, qui pose req.pid et
    req.store). L'état renvoyé réunit les clés de l'organisation et celles de la procédure. */
 const express = require('express');
-const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, offersReplace, frDate, isProcKey, partenaireDe, partenairesAll } = require('../db');
+const { db, getRev, kvGet, kvAll, pkvAll, auditAppend, auditList, offerInsert, offerDelete, offersReplace, frDate, isProcKey, partenaireDe, partenairesAll } = require('../db');
 const { whoLabel } = require('../auth');
 const { validateChange, effectsOf } = require('../rules');
 const R = require('../../public/js/regles.js');
@@ -71,6 +71,11 @@ function buildState(req) {
     // questions : publiées sans leur auteur ; réclamations : les siennes seulement
     st.qa = (st.qa || []).map((q) => ({ id: q.id, question: q.question, t: q.t, reponse: q.reponse, tRep: q.tRep, mienne: q.par === req.user.id }));
     st.reclamations = (st.reclamations || []).filter((x) => x.par === req.user.id);
+    // son offre en cours : ce qu'il a déposé, pour la relire, la modifier ou la retirer avant l'échéance
+    const o = req.pid ? req.store.offers().find((x) => x.depotPar === req.user.id) : null;
+    st.monOffre = o ? { id: o.id, name: o.name, iso: o.iso, devise: o.devise, montant: o.montant, prixLots: o.prixLots, lots: o.lots || [],
+      delai: o.delai, garantie: o.garantie, refsCount: o.refsCount, depot: o.depot,
+      pieces: (o.pieces || []).map((p) => ({ doc: p.doc, name: p.name, size: p.size, offre: !!p.offre, referencement: !!p.referencement })) } : null;
     // résultat de ses offres, une fois l'attribution prononcée
     const ctxR = { offers: req.pid ? req.store.offers() : [], org: values.org, fxFrozen: values.fxFrozen, cadre: values.cadre, cdc: values.cdc, criteria: values.criteria,
       quality: values.quality, justif: values.justif, excluded: values.excluded, confirmed: values.confirmed, docDefs: values.docDefs, evalDone: values.evalDone, approvals: values.approvals };
@@ -450,6 +455,9 @@ r.post('/offers', (req, res) => {
   const partenaire = partenaireDe(req.user.id);
   const refus = require('../consultation').refusDepot(require('../consultation').consultation((k) => req.store.get(k)), partenaire);
   if (refus) return res.status(403).json(refus);
+  // une seule offre en cours par entreprise : pour la changer, il la retire d'abord (ses fichiers lui sont rendus)
+  if (req.store.offers().some((o) => o.depotPar === req.user.id))
+    return res.status(409).json({ error: 'Vous avez déjà une offre en cours sur cette consultation : retirez-la pour en déposer une nouvelle.', code: 'OFFER_EXISTS' });
 
   const docDefs = req.store.get('docDefs');
   const pending = db.prepare('SELECT * FROM files WHERE owner=? AND procedure_id=? AND offer_id IS NULL').all(req.user.id, req.pid);
@@ -497,13 +505,39 @@ r.post('/offers', (req, res) => {
     const q = req.store.get('quality'); q[id] = { metho: offer.aiMetho, refs: offer.aiRefs }; req.store.set('quality', q, req.user.id);
     // numérotation des accusés continue sur toute l'instance : un numéro ne désigne qu'un seul dépôt
     const n = db.prepare('SELECT COUNT(*) c FROM receipts').get().c + 1;
-    receipt = { num: 'DEP-' + String(n).padStart(4, '0'), ref: cdc.ref, name, pays: offer.pays, t: frDate(), montant: sep(montant) + ' ' + d.devise, lots: lots.length };
+    receipt = { num: 'DEP-' + String(n).padStart(4, '0'), offre: id, ref: cdc.ref, name, pays: offer.pays, t: frDate(), montant: sep(montant) + ' ' + d.devise, lots: lots.length };
     db.prepare('INSERT INTO receipts(num,data,procedure_id,owner) VALUES(?,?,?,?)').run(receipt.num, JSON.stringify(receipt), req.pid, req.user.id);
     auditAppend(req.user.id, whoLabel(req.user), `Dépôt enregistré — ${name} (${offer.pays}) — accusé ${receipt.num}`, req.pid);
     annoncer('depot.recu', 'Nouveau dépôt reçu', 'Nouveau dépôt — ' + name,
       `Accusé ${receipt.num}. Soumissionnaire : ${name} (${offer.pays}). Montant : ${receipt.montant}. Lots : ${lots.length}.`, cdc.ref);
   })();
   res.status(201).json({ offer, receipt, rev: getRev() });
+});
+
+/* Retrait de son offre par le fournisseur, jusqu'à la date limite de dépôt. L'offre quitte la consultation, son accusé
+   est marqué retiré, et ses fichiers lui sont rendus : il peut déposer une offre modifiée sans tout rejoindre. */
+r.delete('/offers/mienne', (req, res) => {
+  if (!req.can('portail.use')) return res.status(403).json({ error: 'Habilitation insuffisante.', needs: ['portail.use'] });
+  const o = req.store.offers().find((x) => x.depotPar === req.user.id);
+  if (!o) return res.status(404).json({ error: 'Aucune offre en cours à retirer.', code: 'OFFER_UNKNOWN' });
+  const echeance = R.echeanceDepot(req.store.get('cdc'));
+  if ((echeance && Date.now() > echeance) || req.store.get('depClosed'))
+    return res.status(409).json({ error: 'La date limite de dépôt est dépassée : l’offre ne peut plus être retirée.', code: 'DEADLINE_PASSED' });
+  const t = frDate();
+  db.transaction(() => {
+    offerDelete(o.id);
+    db.prepare('UPDATE files SET offer_id=NULL WHERE offer_id=? AND owner=?').run(o.id, req.user.id);
+    const q = req.store.get('quality'); delete q[o.id]; req.store.set('quality', q, req.user.id);
+    for (const x of db.prepare('SELECT num,data FROM receipts WHERE procedure_id=? AND owner=?').all(req.pid, req.user.id)) {
+      const rc = JSON.parse(x.data);
+      if (rc.retire || (rc.offre && rc.offre !== o.id)) continue;
+      db.prepare('UPDATE receipts SET data=? WHERE num=?').run(JSON.stringify({ ...rc, retire: t }), x.num);
+    }
+    auditAppend(req.user.id, whoLabel(req.user), `Offre retirée par le soumissionnaire — ${o.name}`, req.pid);
+    annoncer('depot.recu', 'Offre retirée', 'Offre retirée — ' + o.name,
+      `${o.name} a retiré son offre avant la date limite de dépôt. Il peut en déposer une nouvelle jusqu'à l'échéance.`, req.store.get('cdc').ref);
+  })();
+  res.json({ ok: true, rev: getRev() });
 });
 
 module.exports = r;

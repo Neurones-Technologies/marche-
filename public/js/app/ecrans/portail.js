@@ -90,6 +90,8 @@ function vPortail(m){
   var vd=add(b0,'button','btn btn-primary btn-sm','Consulter le dossier'); vd.style.marginTop='10px'; fk(vd,'portail-dossier');
   vd.addEventListener('click',function(){ go('cdc'); });
   vPortailQuestions(m);
+  // offre en cours : on la relit, la modifie ou la retire ; le formulaire de dépôt ne revient qu'après retrait
+  if(state.monOffre){ vPortailMonOffre(m,clos); vPortailAccuses(m); vPortailSuivi(m); return; }
 
   /* Identification */
   var k1=add(m,'div','card'); k1.style.marginTop='18px';
@@ -232,23 +234,77 @@ function vPortail(m){
       state.audit.unshift({t:receipt.t, who:me().nom, a:'Dépôt enregistré — '+offer.name+' ('+offer.pays+') — accusé '+receipt.num});
       toast('Offre déposée — accusé '+receipt.num);
       state.draft={ name:'', iso:d.iso, devise:d.devise, montant:'', delai:'', garantie:'', refsCount:'', lots:[], docs:{}, files:{} };
-      save(); render();
+      save(); render(); relireEtat(); // l'offre en cours (récapitulatif, modification, retrait) vient du serveur
     }).catch(function(err){ sub.disabled=false; toast(err.message||'Dépôt impossible.'); });
   });
 
-  /* Accusés */
-  if(state.receipts.length){
-    var k5=add(m,'div','card'); k5.style.marginTop='18px';
-    add(k5,'div','panel-head','Accusés de dépôt');
-    var b5=add(k5,'div','pad');
-    state.receipts.slice().reverse().forEach(function(r){
-      var row=add(b5,'div','docline');
-      var lf=add(row,'div');
-      var t=add(lf,'div'); t.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-      add(t,'strong',null,r.num); add(t,'span','chip c-green','Dépôt enregistré');
-      add(lf,'div','muted', r.name+' ('+r.pays+') — '+r.montant+' — '+r.lots+' lot(s) — horodaté le '+r.t);
-    });
-  }
-
+  vPortailAccuses(m);
   vPortailSuivi(m); // demandes de clarification et réclamations
+}
+
+/* Accusés de dépôt du fournisseur ; un dépôt retiré reste tracé. */
+function vPortailAccuses(m){
+  if(!(state.receipts||[]).length) return;
+  var k5=add(m,'div','card'); k5.style.marginTop='18px';
+  add(k5,'div','panel-head','Accusés de dépôt');
+  var b5=add(k5,'div','pad');
+  state.receipts.slice().reverse().forEach(function(r){
+    var row=add(b5,'div','docline');
+    var lf=add(row,'div');
+    var t=add(lf,'div'); t.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    add(t,'strong',null,r.num);
+    if(r.retire) add(t,'span','chip c-grey','Offre retirée le '+r.retire); else add(t,'span','chip c-green','Dépôt enregistré');
+    add(lf,'div','muted', r.name+' ('+r.pays+') — '+r.montant+' — '+r.lots+' lot(s) — horodaté le '+r.t);
+  });
+}
+
+/* Offre en cours du fournisseur : récapitulatif ; modification ou retrait jusqu'à la date limite de dépôt. */
+function vPortailMonOffre(m, clos){
+  var o=state.monOffre, c=state.cdc;
+  var k=add(m,'div','card'); k.style.marginTop='18px';
+  var ph=add(k,'div','panel-head'); add(ph,'span',null,'Votre offre');
+  chipCellule(ph, clos?'Offre ferme':'Offre déposée', clos?'c-grey':'c-green');
+  var b=add(k,'div','pad');
+  var nomLot=function(id){ var l=(c.lots||[]).filter(function(x){ return x.id===id; })[0]; return l ? l.nom : id; };
+  grilleLecture(b,[
+    ['Soumissionnaire',o.name], ['Montant total HT',sep(o.montant)+' '+o.devise],
+    ['Délai d’exécution', o.delai ? o.delai+' jours' : null], ['Garantie', o.garantie ? o.garantie+' mois' : null],
+    ['Références similaires', o.refsCount ? String(o.refsCount) : null]
+  ]);
+  var lots=add(b,'div','fen-section'); add(lots,'h3',null,'Lots soumissionnés');
+  o.lots.forEach(function(id){
+    var r=add(lots,'div','docline'); add(r,'span',null,nomLot(id));
+    if(o.prixLots && o.prixLots[id]!=null) add(r,'strong',null,sep(o.prixLots[id])+' '+o.devise);
+  });
+  var docs=add(b,'div','fen-section'); add(docs,'h3',null,'Documents transmis');
+  if(!o.pieces.length) add(docs,'p','muted','Aucun document.');
+  var pc=add(docs,'div'); pc.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+  o.pieces.forEach(function(f){ add(pc,'span','pill',(f.referencement?'Référencement — ':'')+f.name); });
+
+  var pied=add(k,'div','panel-foot');
+  if(clos){ add(pied,'span','muted','La date limite est passée : votre offre est ferme et ne peut plus être modifiée ni retirée.'); return; }
+  add(pied,'span','muted','Vous pouvez la modifier ou la retirer jusqu’au '+dateLongue(c.ouverture)+' à 10 h 00.');
+  var act=add(pied,'div'); act.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+  var mod=add(act,'button','btn btn-ghost','Modifier mon offre'); fk(mod,'offre-modifier');
+  var ret=add(act,'button','btn btn-ghost','Retirer mon offre'); fk(ret,'offre-retirer');
+  function retirer(bouton, ensuite, message){
+    bouton.disabled=true;
+    MP.api('DELETE',MP.url('/offers/mienne'),{}).then(function(){
+      ensuite(); PIECES_OK=false; save(); toast(message); return relireEtat();
+    }).catch(function(e){ bouton.disabled=false; toast(e.message||'Retrait impossible.'); });
+  }
+  mod.addEventListener('click',function(){
+    ask('Votre offre est retirée et ses éléments (montants, lots, fichiers) sont repris dans le formulaire. Tant que vous n’avez pas déposé la version modifiée, vous n’avez plus d’offre en cours.',
+      function(){
+        retirer(mod,function(){
+          var pl={}; Object.keys(o.prixLots||{}).forEach(function(id){ pl[id]=String(o.prixLots[id]); });
+          state.draft={ name:o.name, iso:o.iso, devise:o.devise, montant:'', prixLots:pl, delai:o.delai?String(o.delai):'', garantie:o.garantie?String(o.garantie):'',
+            refsCount:o.refsCount?String(o.refsCount):'', lots:o.lots.slice(), docs:{}, files:{} };
+        },'Offre retirée : modifiez-la puis déposez-la à nouveau.');
+      },'Modifier mon offre','Retirer et modifier');
+  });
+  ret.addEventListener('click',function(){
+    ask('Votre offre est retirée de la consultation. Vous pourrez en déposer une nouvelle jusqu’à la date limite.',
+      function(){ retirer(ret,function(){},'Offre retirée.'); },'Retirer mon offre','Retirer l’offre');
+  });
 }

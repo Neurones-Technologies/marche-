@@ -217,6 +217,10 @@ function offerInsert(o, submitted, pid) {
   db.prepare('INSERT INTO offers(id,ord,data,submitted,procedure_id) VALUES(?,?,?,?,?)').run(o.id, ord, JSON.stringify(o), submitted ? 1 : 0, pid);
   bumpRev();
 }
+function offerDelete(id) {
+  db.prepare('DELETE FROM offers WHERE id=?').run(id);
+  bumpRev();
+}
 function offersReplace(list) {
   const tx = db.transaction(() => {
     const upd = db.prepare('UPDATE offers SET data=? WHERE id=?');
@@ -566,7 +570,7 @@ function fermerBase(fichier) { const c = BASES.get(fichier); if (c && c !== prin
 
 module.exports = {
   ouvrirBase, fermerBase, db, getRev, bumpRev, kvGet, kvSet, kvAll, pkvGet, pkvSet, pkvAll, store, PROC_KEYS, isProcKey,
-  auditAppend, auditList, auditJournal, auditVerify, offersAll, offerInsert, offersReplace,
+  auditAppend, auditList, auditJournal, auditVerify, offersAll, offerInsert, offerDelete, offersReplace,
   commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero,
   partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, jetonCreer, jetonUtiliser,
   proceduresAll, procedureGet, procedureCreate, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero,
