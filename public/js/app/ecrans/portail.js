@@ -12,8 +12,8 @@ function delaiRestant(ms){
 }
 /* Documents de l'offre elle-même (le serveur les rattache au pli au dépôt). */
 var DOCS_OFFRE = [
-  { id:'memoire', label:'Offre technique', aide:'Mémoire technique : compréhension du besoin, méthodologie, organisation, moyens et planning (PDF ou Word)', accept:'.pdf,.docx' },
-  { id:'bordereau', label:'Offre financière', aide:'Lettre de soumission et bordereau des prix chiffré par lot et par poste (Excel ou PDF)', accept:'.xlsx,.pdf' }
+  { id:'memoire', label:'Offre technique', accept:'.pdf,.docx' },
+  { id:'bordereau', label:'Offre financière', accept:'.xlsx,.pdf' }
 ];
 /* Une ligne de fichier du dépôt : libellé, aide, fichier joint (nom, taille, empreinte), joindre, remplacer, retirer. */
 function ligneFichier(parent, doc, aide, sinon){
@@ -21,7 +21,7 @@ function ligneFichier(parent, doc, aide, sinon){
   var row=add(parent,'div','docline');
   var lf=add(row,'div');
   add(lf,'div',null,doc.label).style.fontWeight='600';
-  add(lf,'div','muted',aide);
+  if(aide) add(lf,'div','muted',aide);
   if(on) add(lf,'div','muted','Fichier : '+meta.name+' ('+taille(meta.size)+') · empreinte '+meta.sha256.slice(0,12)+'…').title=meta.sha256;
   else if(sinon) add(lf,'div','muted',sinon);
   var act=add(row,'div'); act.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
