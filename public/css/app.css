@@ -1144,3 +1144,9 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
   .ao-nav-milieu { grid-column: 1 / -1; grid-row: 1; }
   .ao-nav-vide { display: none; }
 }
+
+/* Paramètres : règles regroupées par effet */
+.regle-bloc + .regle-bloc { margin-top: var(--space-5); padding-top: var(--space-4); border-top: var(--border-w) solid var(--color-border); }
+.regle-bloc h3 { margin: 0 0 4px; font-size: 15px; }
+.regle-bloc > p { margin: 0 0 var(--space-2); }
+.regle-ligne > div > div:first-child { font-weight: var(--fw-strong); }

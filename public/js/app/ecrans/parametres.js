@@ -120,7 +120,7 @@ function vParams(m){
   champ(f6,'Adresse expéditrice',state.mailFrom,function(v){ state.mailFrom=v; });
   champ(f6,'Domaine des destinataires',state.mailSuffix,function(v){ state.mailSuffix=v; });
   vParamsCadre(m,o);
-  vParamsCircuitOrg(m,'circuitBesoin','8 · Circuit de validation des demandes d’achat','Une demande d’achat suit ce circuit à sa soumission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce budget. Le demandeur ne valide jamais sa propre demande.');
+  vParamsCircuitOrg(m,'circuitBesoin','8 · Demandes d’achat : circuit de validation et type de procédure','Une demande d’achat suit ce circuit à sa soumission ; un niveau avec seuil n\u2019intervient qu\u2019à partir de ce budget. Le demandeur ne valide jamais sa propre demande.',seuilsDemandes);
   vParamsCircuitOrg(m,'circuitReferencement','9 · Parcours de référencement des partenaires','Un dossier de référencement suit ces étapes ; les pièces déposées sont validées au dernier niveau.');
   vParamsFormulaire(m);
   vParamsInscription(m,o);
@@ -136,61 +136,90 @@ function vParams(m){
   vParamsSauvegardes(m,16);
 }
 
-/* Cadre réglementaire : profil par défaut et réglages du client, dans les bornes du profil (profils.js). */
-function vParamsCadre(m,o){
+/* Règles des appels d'offres : réglages de l'organisation, dans les bornes de son profil réglementaire (profils.js),
+   regroupés par effet. Le choix du profil ne s'affiche que si les marchés publics sont ouverts (MARCHES_PUBLICS) ; les
+   seuils de montant figurent avec les demandes d'achat (section 8). */
+var LIB_REGLES = {
+  niveauxApprobationMin:'Nombre minimum de validations', separationFonctions:'La personne qui note les offres ne peut pas approuver l’attribution',
+  recoursActif:'Permettre la contestation', delaiRecoursJours:'Délai pour contester (jours)',
+  preferenceAutorisee:'Autoriser une marge de préférence', preferenceTauxMax:'Taux maximal de la marge (%)', zonePreference:'Pays favorisés',
+  paysLocal:'Pays de l’organisation', piecesImposees:'Pièces exigées dans tous les appels d’offres',
+  seuilConsultation:'Appel d’offres restreint à partir de (XOF)', seuilAppelOffresOuvert:'Appel d’offres ouvert à partir de (XOF)'
+};
+function contexteRegles(o){
   var P=MPProfils, pid=R.profilId({ cdc:state.cdc||{}, org:o }), prof=P.profil(pid);
-  var eff=P.effectif(pid,o.reglages);
-  var k7=add(m,'div','card'); k7.style.marginTop='18px';
-  var ph=add(k7,'div','panel-head'); add(ph,'span',null,'7 · Cadre réglementaire');
-  add(ph,'span','chip '+(prof.public?'c-violet':'c-teal'), prof.lab);
-  var b=add(k7,'div','pad');
-  var w=add(add(b,'div','frm'),'div');
-  add(w,'label',null,'Profil par défaut des nouvelles procédures').setAttribute('for','par-profil');
-  var s=add(w,'select'); s.id='par-profil'; fk(s,'par-profil');
-  optionsProfils(s);
-  s.value=o.profilDefaut||P.DEFAUT;
-  s.addEventListener('change',function(){ o.profilDefaut=s.value; logit('Profil réglementaire par défaut : '+P.profil(s.value).lab); save(); render(); });
-  add(b,'p','muted','Règles du profil « '+prof.lab+' », celui de la procédure en cours. '+prof.note).style.marginTop='12px';
-  if(state.cadre) add(b,'div','note','Le cadre de la procédure '+REF()+' a été figé à sa publication, le '+state.cadre.at+' : un réglage modifié ici ne s’appliquera qu’aux procédures publiées ensuite.');
-  var lab=function(id){ var d=DOCS().filter(function(x){ return x.id===id; })[0]; return d?d.label:id; };
-  P.REGLES.forEach(function(def){
-    var r=prof.regles[def.id], v=eff[def.id];
-    var row=add(b,'div','docline');
-    var lf=add(row,'div'); lf.style.flex='1 1 260px';
-    add(lf,'div',null,def.lab).style.fontWeight='600';
-    if(def.type==='pieces' && !v.length){ add(lf,'div','muted','Aucune : toutes les pièces du référentiel peuvent être retirées.'); return; }
-    if(r.impose){
-      add(lf,'div','muted', def.type==='bool' ? (v?'Oui':'Non') : def.type==='liste-pays' ? v.join(', ')
-        : def.type==='pieces' ? (v.length ? v.map(lab).join(' ; ') : 'Aucune') : String(v));
-      add(row,'span','chip c-grey','Imposé par le profil');
-      return;
-    }
-    var set=function(val,aff){ o.reglages=o.reglages||{}; o.reglages[def.id]=val; logit('Réglage « '+def.lab+' » : '+aff); save(); render(); };
-    if(def.type==='bool'){
-      var p=add(row,'button','pill'+(v?' on':''), v?'Oui':'Non'); fk(p,'rg-'+def.id);
-      p.setAttribute('aria-pressed',v?'true':'false'); p.setAttribute('aria-label',def.lab);
-      p.addEventListener('click',function(){ set(!v, v?'non':'oui'); });
-      return;
-    }
-    var i=add(row,'input'); i.setAttribute('aria-label',def.lab); fk(i,'rg-'+def.id);
-    if(def.type==='nombre'){
-      i.type='number'; i.min=r.min; i.max=r.max; i.value=v; i.style.width='110px';
-      add(lf,'div','muted','Entre '+r.min+' et '+r.max+'.');
-    } else {
-      i.type='text'; i.value = def.type==='liste-pays' ? v.join(', ') : v; i.style.flex='1 1 200px';
-      add(lf,'div','muted', def.type==='liste-pays' ? 'Codes pays à deux lettres, séparés par des virgules.' : 'Code pays à deux lettres.');
-    }
-    i.addEventListener('change',function(){
-      var val = def.type==='nombre' ? Number(i.value)
-        : def.type==='liste-pays' ? i.value.toUpperCase().split(/[\s,;]+/).filter(Boolean) : i.value.trim().toUpperCase();
-      set(val, Array.isArray(val) ? val.join(', ') : String(val));
-    });
+  return { prof:prof, eff:P.effectif(pid,o.reglages) };
+}
+/* Une règle : libellé clair, valeur modifiable (ou imposée par le profil). */
+function ligneRegle(parent, o, id){
+  var ctx=contexteRegles(o), def=MPProfils.REGLES.filter(function(x){ return x.id===id; })[0], r=ctx.prof.regles[id], v=ctx.eff[id];
+  var row=add(parent,'div','docline regle-ligne');
+  var lf=add(row,'div'); lf.style.flex='1 1 260px';
+  add(lf,'div',null,LIB_REGLES[id]||def.lab);
+  if(r.impose){
+    var lab=function(x){ var d=DOCS().filter(function(y){ return y.id===x; })[0]; return d?d.label:x; };
+    add(row,'span','muted', def.type==='bool' ? (v?'Oui':'Non') : def.type==='liste-pays' ? v.join(', ') : def.type==='pieces' ? v.map(lab).join(' ; ') : String(v));
+    return;
+  }
+  var set=function(val,aff){ o.reglages=o.reglages||{}; o.reglages[id]=val; logit('Réglage « '+(LIB_REGLES[id]||def.lab)+' » : '+aff); save(); render(); };
+  if(def.type==='bool'){
+    var p=add(row,'button','pill'+(v?' on':''), v?'Oui':'Non'); fk(p,'rg-'+id);
+    p.setAttribute('aria-pressed',v?'true':'false'); p.setAttribute('aria-label',LIB_REGLES[id]||def.lab);
+    p.addEventListener('click',function(){ set(!v, v?'non':'oui'); });
+    return;
+  }
+  var i=add(row,'input'); i.setAttribute('aria-label',LIB_REGLES[id]||def.lab); fk(i,'rg-'+id);
+  if(def.type==='nombre'){ i.type='number'; i.min=r.min; i.max=r.max; i.value=v; i.style.width='150px'; }
+  else { i.type='text'; i.value = def.type==='liste-pays' ? v.join(', ') : v; i.style.flex='1 1 200px';
+    add(lf,'div','muted', def.type==='liste-pays' ? 'Codes pays à deux lettres, séparés par des virgules.' : 'Code pays à deux lettres.'); }
+  i.addEventListener('change',function(){
+    var val = def.type==='nombre' ? Number(i.value)
+      : def.type==='liste-pays' ? i.value.toUpperCase().split(/[\s,;]+/).filter(Boolean) : i.value.trim().toUpperCase();
+    set(val, Array.isArray(val) ? val.join(', ') : String(val));
   });
-  add(add(k7,'div','panel-foot'),'span','muted','Les valeurs du profil public sont à faire valider par un juriste marchés publics avant tout usage réel.');
+}
+function vParamsCadre(m,o){
+  var P=MPProfils, ctx=contexteRegles(o), eff=ctx.eff;
+  var k7=add(m,'div','card'); k7.style.marginTop='18px';
+  var ph=add(k7,'div','panel-head'); add(ph,'span',null,'7 · Règles des appels d’offres');
+  var b=add(k7,'div','pad');
+  if(state.marchesPublics){
+    // marchés publics ouverts : le profil (public ou privé) fixe les bornes des réglages
+    chipCellule(ph, ctx.prof.lab, ctx.prof.public?'c-violet':'c-teal');
+    var w=add(add(b,'div','frm'),'div');
+    add(w,'label',null,'Profil par défaut des nouveaux appels d’offres').setAttribute('for','par-profil');
+    var s=add(w,'select'); s.id='par-profil'; fk(s,'par-profil'); optionsProfils(s);
+    s.value=o.profilDefaut||P.DEFAUT;
+    s.addEventListener('change',function(){ o.profilDefaut=s.value; logit('Profil réglementaire par défaut : '+P.profil(s.value).lab); save(); render(); });
+  }
+  if(state.cadre) add(b,'div','note','Les règles de l’appel d’offres '+REF()+' ont été figées à sa publication, le '+state.cadre.at+' : un changement fait ici ne s’applique qu’aux appels d’offres publiés ensuite.');
+  function bloc(titre, explication, ids){
+    var z=add(b,'div','regle-bloc');
+    add(z,'h3',null,titre); add(z,'p','muted',explication);
+    ids.forEach(function(id){ ligneRegle(z,o,id); });
+  }
+  bloc('Validation de l’attribution','Combien de personnes doivent valider avant qu’un marché soit attribué.',
+    ['niveauxApprobationMin','separationFonctions']);
+  bloc('Contestation','Après l’attribution, les entreprises non retenues peuvent contester la décision pendant un délai, avant la signature du marché.',
+    eff.recoursActif ? ['recoursActif','delaiRecoursJours'] : ['recoursActif']);
+  bloc('Préférence géographique','Favoriser les entreprises de certains pays : pour la seule comparaison des prix, les offres des autres entreprises sont majorées du taux choisi dans chaque appel d’offres.',
+    eff.preferenceAutorisee ? ['preferenceAutorisee','preferenceTauxMax','zonePreference'] : ['preferenceAutorisee']);
+  bloc('Entreprises locales','Les entreprises établies dans ce pays fournissent, en plus, les pièces propres au pays (attestation de sécurité sociale…).',
+    ['paysLocal']);
+  if((eff.piecesImposees||[]).length) bloc('Pièces imposées','Ces pièces sont exigées dans tous les appels d’offres et ne peuvent pas en être retirées.',['piecesImposees']);
+}
+
+/* Seuils de montant : le type de procédure proposé quand une demande d'achat devient un appel d'offres. */
+function seuilsDemandes(b){
+  var z=add(b,'div','regle-bloc');
+  add(z,'h3',null,'Type de procédure selon le montant');
+  add(z,'p','muted','Quand une demande d’achat est transformée, le type de procédure est proposé d’après son budget : consultation simple (demande de cotations) en dessous du premier seuil, appel d’offres restreint entre les deux, appel d’offres ouvert au-delà.');
+  ligneRegle(z,state.org,'seuilConsultation');
+  ligneRegle(z,state.org,'seuilAppelOffresOuvert');
 }
 
 /* Circuit d'organisation (besoins, référencement) : même moteur que le circuit d'approbation de l'attribution. */
-function vParamsCircuitOrg(m, cle, titre, note){
+function vParamsCircuitOrg(m, cle, titre, note, plus){
   var c=state[cle]=state[cle]||[];
   var k=add(m,'div','card'); k.style.marginTop='18px';
   add(k,'div','panel-head',titre);
@@ -220,6 +249,7 @@ function vParamsCircuitOrg(m, cle, titre, note){
     del.disabled=c.length<=1;
     del.addEventListener('click',function(){ c.splice(i,1); logit(titre.replace(/^\d+ · /,'')+' — niveau supprimé : '+a.role); save(); render(); });
   });
+  if(plus) plus(b); // contenu propre à la section (seuils des demandes d'achat)
   var f=add(k,'div','panel-foot');
   add(f,'span','muted',note);
   add(f,'button','btn btn-ghost btn-sm','+ Ajouter un niveau').addEventListener('click',function(){
