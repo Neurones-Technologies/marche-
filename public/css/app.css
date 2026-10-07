@@ -1157,3 +1157,14 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 
 /* Partenaire (fenêtre) : actions sur le statut, en tête */
 .prt-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; margin: 0 0 var(--space-4); }
+
+/* Fenêtres « Données fictives » et « Vider les données » : zones à cocher */
+.zone-liste { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
+.zone-ligne { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm, 6px); cursor: pointer; }
+.zone-ligne input { margin-top: 3px; flex: none; }
+.zone-ligne .muted { margin-top: 2px; }
+.zone-tous { border: none; padding: var(--space-2) var(--space-3) 0; font-weight: var(--fw-strong); }
+.zone-force { opacity: .75; cursor: default; }
+.zone-confirmer { margin-top: var(--space-4); }
+.zone-confirmer label { display: block; font-weight: var(--fw-strong); margin-bottom: var(--space-1); }
+.zone-confirmer input { width: 100%; max-width: 280px; }

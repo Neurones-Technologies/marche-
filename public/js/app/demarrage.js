@@ -139,24 +139,93 @@ document.getElementById('backdrop').addEventListener('click',closeMenu);
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape') closeMenu();
 });
+/* Données fictives et vidage : une fenêtre où l'on coche les zones concernées. */
+var ZONES_VIDER=[
+  ['appels','Appels d’offres','Cahiers des charges, offres, accusés de réception, questions, pièces déposées. Les commandes partent avec eux.'],
+  ['commandes','Commandes','Bons de commande, réceptions et leurs pièces.'],
+  ['besoins','Demandes d’achat','Toutes les demandes d’achat et leur circuit.'],
+  ['partenaires','Partenaires','Fiches, pièces de référencement, inscriptions en cours ; les comptes fournisseurs sont gardés.'],
+  ['budget','Budget','Lignes budgétaires.'],
+  ['notifications','Notifications et courriels','Notifications et boîte d’envoi.'],
+  ['suppleances','Suppléances','Délégations et affectations des valideurs.'],
+  ['journal','Piste d’audit','Le journal repart d’une chaîne neuve.']
+];
+var ZONES_FICTIVES=[
+  ['budget','Budget','Trois lignes budgétaires (informatique, maintenance, agences).'],
+  ['partenaires','Partenaires','Quatre entreprises, dont deux référencées (SOTRAP, Delta Bâtiment).'],
+  ['appels','Appel d’offres','Un appel d’offres réseau et télécoms avec huit offres reçues.'],
+  ['besoins','Demandes d’achat','Deux demandes : un brouillon et une demande soumise à validation.']
+];
+function fenetreZones(o){
+  var coche={}; o.zones.forEach(function(z){ coche[z[0]]=!!o.tout; });
+  var conf='';
+  ouvrirFenetre(o.titre,function(c,pied){
+    add(c,'p','muted',o.intro);
+    var tous=add(c,'label','zone-ligne zone-tous'), ct=add(tous,'input'); ct.type='checkbox'; fk(ct,o.cle+'-tous');
+    ct.checked=o.zones.every(function(z){ return coche[z[0]]; });
+    add(tous,'span',null,'Tout sélectionner');
+    ct.addEventListener('change',function(){ o.zones.forEach(function(z){ coche[z[0]]=ct.checked; }); dessinerFenetre(); });
+    var l=add(c,'div','zone-liste');
+    o.zones.forEach(function(z){
+      var force=o.force && o.force(coche, z[0]);
+      var w=add(l,'label','zone-ligne'+(force?' zone-force':'')), cb=add(w,'input'); cb.type='checkbox'; fk(cb,o.cle+'-'+z[0]);
+      cb.checked=coche[z[0]]||!!force; cb.disabled=!!force;
+      var t=add(w,'div'); add(t,'strong',null,z[1]); add(t,'div','muted',force?force:z[2]);
+      cb.addEventListener('change',function(){ coche[z[0]]=cb.checked; dessinerFenetre(); });
+    });
+    var choisies=o.zones.map(function(z){ return z[0]; }).filter(function(k){ return coche[k] || (o.force && o.force(coche,k)); });
+    var saisie=null;
+    if(o.confirmation){
+      var wc=add(c,'div','zone-confirmer'); add(wc,'label',null,'Irréversible : saisissez VIDER pour confirmer').setAttribute('for','zones-conf');
+      saisie=add(wc,'input'); saisie.type='text'; saisie.id='zones-conf'; saisie.autocomplete='off'; saisie.value=conf;
+      saisie.addEventListener('input',function(){ conf=saisie.value; bt.disabled=!choisies.length || conf.trim().toUpperCase()!=='VIDER'; });
+    }
+    if(o.piedGauche) o.piedGauche(pied); else add(pied,'span');
+    var bt=add(pied,'button','btn '+(o.danger?'btn-danger':'btn-primary'),o.bouton+(choisies.length?' ('+choisies.length+')':'')); fk(bt,o.cle+'-go');
+    bt.disabled=!choisies.length || (o.confirmation && conf.trim().toUpperCase()!=='VIDER');
+    bt.addEventListener('click',function(){ bt.disabled=true; o.lancer(choisies, function(){ bt.disabled=false; }); });
+  });
+}
+function rechargerApres(message){
+  // les registres ont changé en profondeur : on repart du tableau de bord, état rechargé
+  fermerFenetre(); toast(message); setTimeout(function(){ location.href='/tableau-de-bord'; },900);
+}
 var resetBtn=document.getElementById('btn-reset-all');
 resetBtn.addEventListener('click',function(){
-  ask("Toutes les saisies, les offres déposées, les décisions et la piste d'audit seront effacées. Cette action est irréversible.", function(){
-    // la démonstration ne compte plus que la procédure p1 : on la rouvre
-    MP.api('POST','/api/admin/reset',{}).then(function(){ return MP.refreshProcs(); }).then(function(){ return MP.switchTo('p1',{fromLogin:true}); }).then(function(){
-      toast('Démonstration réinitialisée.');
-    }).catch(function(e){ toast(e.message||'Réinitialisation impossible.'); });
-  }, 'Réinitialiser la démonstration ?', 'Tout effacer');
+  fenetreZones({ cle:'fictives', titre:'Ajouter des données fictives', bouton:'Ajouter', tout:true, zones:ZONES_FICTIVES,
+    intro:'Les données fictives s’ajoutent à celles qui existent déjà ; rien n’est effacé. Choisissez les zones à remplir.',
+    piedGauche:function(pied){
+      // repartir de zéro : l'ancien bouton « Réinitialiser » (paramètres compris)
+      var rz=add(pied,'button','btn btn-ghost','Réinitialiser toute la démonstration'); fk(rz,'fictives-reset');
+      rz.addEventListener('click',function(){
+        ask("Toutes les saisies, les offres déposées, les décisions, les paramètres et la piste d'audit seront remplacés par le jeu de démonstration. Cette action est irréversible.", function(){
+          MP.api('POST','/api/admin/reset',{}).then(function(){ return MP.refreshProcs(); }).then(function(){ return MP.switchTo('p1',{fromLogin:true}); }).then(function(){
+            fermerFenetre(); toast('Démonstration réinitialisée.');
+          }).catch(function(e){ toast(e.message||'Réinitialisation impossible.'); });
+        }, 'Réinitialiser la démonstration ?', 'Tout réinitialiser');
+      });
+    },
+    lancer:function(zones, rendre){
+      MP.api('POST','/api/admin/fictives',{ zones:zones }).then(function(r){
+        var a=r.ajout||{}, m=[];
+        if(a.appels) m.push('appel d’offres '+a.appels);
+        if(a.partenaires!=null) m.push(a.partenaires+' partenaire'+(a.partenaires>1?'s':''));
+        if(a.besoins!=null) m.push(a.besoins+' demande'+(a.besoins>1?'s':'')+' d’achat');
+        if(a.budget!=null) m.push(a.budget+' ligne'+(a.budget>1?'s':'')+' budgétaire'+(a.budget>1?'s':''));
+        rechargerApres('Ajouté : '+m.join(', ')+'.');
+      }).catch(function(e){ rendre(); toast(e.message||'Ajout impossible.'); });
+    } });
 });
-/* Vider les données : registres, échanges, pièces et budget effacés ; paramètres et comptes conservés. */
+/* Vider les données : zones choisies ; paramètres et comptes conservés. */
 var viderBtn=document.getElementById('btn-vider');
 viderBtn.addEventListener('click',function(){
-  demander("Tous les appels d'offres, offres, demandes d'achat, commandes, partenaires, pièces déposées, lignes budgétaires et la piste d'audit seront effacés. Les paramètres de l'organisation et les comptes sont conservés. Cette action est irréversible : saisissez VIDER pour confirmer.",
-    function(texte){
-      if(texte.trim().toUpperCase()!=='VIDER'){ toast('Confirmation incorrecte : rien n’a été effacé.'); return; }
-      MP.api('POST','/api/admin/vider',{ confirmation:'VIDER' }).then(function(){ toast('Données effacées.'); setTimeout(function(){ location.href='/tableau-de-bord'; },600); })
-        .catch(function(e){ toast(e.message||'Effacement impossible.'); });
-    }, 'Vider toutes les données ?', 'Vider', 'Confirmation');
+  fenetreZones({ cle:'vider', titre:'Vider des données', bouton:'Vider', danger:true, confirmation:true, zones:ZONES_VIDER,
+    intro:'Choisissez les zones à effacer. Les paramètres de l’organisation et les comptes sont toujours conservés.',
+    force:function(coche, k){ return k==='commandes' && coche.appels ? 'Effacées avec les appels d’offres, auxquels elles sont rattachées.' : ''; },
+    lancer:function(zones, rendre){
+      MP.api('POST','/api/admin/vider',{ confirmation:'VIDER', zones:zones }).then(function(){ rechargerApres('Données effacées.'); })
+        .catch(function(e){ rendre(); toast(e.message||'Effacement impossible.'); });
+    } });
 });
 window.MarchePlus = {
   start:function(p, opts){

@@ -620,22 +620,145 @@ db.transaction(function migrate() {
 })();
 }
 
-/** Vide les données de l'espace (fictives ou non) : registres, échanges, pièces, budget et journal. Les paramètres de
-    l'organisation (profil, rôles, circuits, formulaires, seuils, règles de notification) et les comptes sont
-    conservés ; les comptes fournisseurs perdent leur fiche partenaire. Retourne les identifiants des fichiers à effacer
-    du disque. */
-function viderDonnees(uid, who) {
-  let fichiers = [];
+/** Zones de données que l'on peut vider, avec leur libellé (journal d'audit). Les paramètres de l'organisation (profil,
+    rôles, circuits, formulaires, seuils, règles de notification) et les comptes ne sont jamais touchés. */
+const ZONES_VIDER = { appels: 'appels d’offres et offres', commandes: 'commandes', besoins: 'demandes d’achat', partenaires: 'partenaires',
+  budget: 'budget', notifications: 'notifications et courriels', suppleances: 'suppléances', journal: 'piste d’audit' };
+/** Vide les zones choisies (toutes par défaut). Les commandes, rattachées à un appel d'offres, partent avec les appels
+    d'offres. Retourne les identifiants des fichiers à effacer du disque. */
+function viderDonnees(uid, who, zones) {
+  const z = new Set(zones && zones.length ? zones : Object.keys(ZONES_VIDER));
+  if (z.has('appels')) z.add('commandes');
+  const fichiers = [];
+  const del = (where) => {
+    fichiers.push(...db.prepare('SELECT id FROM files WHERE ' + where).all().map((f) => f.id));
+    db.prepare('DELETE FROM files WHERE ' + where).run();
+  };
   const tx = db.transaction(() => {
-    fichiers = db.prepare('SELECT id FROM files').all().map((f) => f.id);
-    db.exec('DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts; DELETE FROM audit; DELETE FROM besoins; '
-      + 'DELETE FROM commandes; DELETE FROM partenaires; DELETE FROM files; DELETE FROM brouillons; DELETE FROM jetons; UPDATE users SET partenaire_id=NULL;');
-    for (const [k, v] of Object.entries({ notifs: [], emails: [], delegations: [], affectations: [], budget: { lignes: [] } })) if (kvGet(k)) kvSet(k, v, 'vidage');
+    if (z.has('commandes')) { del('commande_id IS NOT NULL'); db.exec('DELETE FROM commandes;'); }
+    if (z.has('appels')) {
+      del('procedure_id IS NOT NULL');
+      db.exec('DELETE FROM pkv; DELETE FROM procedures; DELETE FROM offers; DELETE FROM receipts;');
+      // une demande d'achat transformée redevient validée : on pourra en refaire un appel d'offres
+      if (!z.has('besoins')) for (const b of besoinsAll().filter((x) => x.statut === 'transforme')) {
+        b.statut = 'valide'; delete b.procedure; delete b.procedureRef;
+        b.historique.push({ t: frDate(), who, action: 'appel d’offres effacé : demande de nouveau à transformer' });
+        besoinSave(b);
+      }
+    }
+    if (z.has('besoins')) db.exec('DELETE FROM besoins;');
+    if (z.has('partenaires')) {
+      del("partenaire_id IS NOT NULL OR owner='inscription'");
+      db.exec('DELETE FROM partenaires; DELETE FROM brouillons; UPDATE users SET partenaire_id=NULL;');
+    }
+    const vides = { budget: { budget: { lignes: [] } }, notifications: { notifs: [], emails: [] }, suppleances: { delegations: [], affectations: [] } };
+    for (const [zone, cles] of Object.entries(vides)) if (z.has(zone)) for (const [k, v] of Object.entries(cles)) if (kvGet(k)) kvSet(k, v, 'vidage');
+    if (z.has('journal')) db.exec('DELETE FROM audit;');
     bumpRev();
-    auditAppend(uid, who, 'Données effacées : appels d’offres, offres, demandes d’achat, commandes, partenaires, pièces et budget ; paramètres et comptes conservés');
+    auditAppend(uid, who, 'Données effacées : ' + Object.keys(ZONES_VIDER).filter((k) => z.has(k)).map((k) => ZONES_VIDER[k]).join(', ') + ' ; paramètres et comptes conservés');
   });
   tx();
   return fichiers;
+}
+
+/* ---- données fictives, ajoutées à la demande, par zone, sans rien effacer ---- */
+const ZONES_FICTIVES = { budget: 'lignes budgétaires', partenaires: 'partenaires', appels: 'appel d’offres avec ses offres', besoins: 'demandes d’achat' };
+const PARTENAIRES_FICTIFS = [
+  { raisonSociale: 'SOTRAP Ingénierie SA', pays: 'CI', immatriculation: 'CI-ABJ-2009-B-14522', adresse: 'Abidjan, Plateau',
+    contact: { nom: 'K. Amani', email: 'contact.sotrap@bal.ci', tel: '' }, domaines: ['Réseaux et télécoms'], statut: 'reference', compte: 'contact.sotrap@bal.ci' },
+  { raisonSociale: 'Delta Bâtiment SA', pays: 'CI', immatriculation: 'CI-ABJ-2014-B-30871', adresse: 'Abidjan, Marcory',
+    contact: { nom: 'A. Kouassi', email: 'contact@delta-batiment.example', tel: '' }, domaines: ['Bâtiment et travaux'], statut: 'reference' },
+  { raisonSociale: 'Téranga Réseaux SA', pays: 'SN', immatriculation: 'SN-DKR-2016-B-11204', adresse: 'Dakar, Plateau',
+    contact: { nom: 'M. Ndiaye', email: 'contact@teranga-reseaux.example', tel: '' }, domaines: ['Réseaux et télécoms'], statut: 'candidat' },
+  { raisonSociale: 'Ivoire Netcom SARL', pays: 'CI', immatriculation: 'CI-ABJ-2018-B-05219', adresse: 'Abidjan, Treichville',
+    contact: { nom: 'S. Koné', email: 'contact@ivoire-netcom.example', tel: '' }, domaines: ['Réseaux et télécoms', 'Maintenance informatique'], statut: 'candidat' },
+];
+const BESOINS_FICTIFS = [
+  { objet: 'Renouvellement de 60 postes de travail', service: 'Direction des systèmes d’information', budget: 35000000, ligneBudget: 'b-dsi-mco',
+    description: 'Remplacement des postes de plus de cinq ans des agences d’Abidjan.', justification: 'Postes hors garantie, pannes fréquentes.', soumettre: false },
+  { objet: 'Aménagement de l’agence de Yamoussoukro', service: 'Direction de la logistique', budget: 60000000, ligneBudget: 'b-log-amg',
+    description: 'Cloisonnement, câblage et mobilier de la nouvelle agence.', justification: 'Ouverture de l’agence prévue au prochain trimestre.', soumettre: true },
+];
+/** Identifiant libre pour une nouvelle procédure (jamais celui d'une procédure supprimée encore citée au journal). */
+function nouveauPid() {
+  const ids = db.prepare("SELECT id FROM procedures UNION SELECT DISTINCT procedure_id FROM audit WHERE procedure_id IS NOT NULL").all()
+    .map((x) => Number(String(x.id).replace(/^p/, ''))).filter((x) => Number.isInteger(x));
+  let pid = 'p' + (ids.length ? Math.max(...ids) + 1 : 1);
+  while (procedureGet(pid)) pid = 'p' + (Number(pid.slice(1)) + 1);
+  return pid;
+}
+/** Ajoute les données fictives des zones choisies, à côté des données existantes. Retourne ce qui a été ajouté. */
+function ajouterFictives(uid, who, zones) {
+  const z = new Set(zones || []), ajout = {};
+  const tx = db.transaction(() => {
+    if (z.has('budget')) {
+      const b = (kvGet('budget') || { value: { lignes: [] } }).value, lignes = b.lignes || [];
+      const neuves = budgetDemo().filter((l) => !lignes.some((x) => x.id === l.id || x.code === l.code));
+      kvSet('budget', { ...b, lignes: lignes.concat(neuves) }, uid);
+      ajout.budget = neuves.length;
+    }
+    if (z.has('partenaires')) {
+      const noms = new Set(partenairesAll().map((p) => String(p.raisonSociale).toLowerCase()));
+      ajout.partenaires = 0;
+      for (const f of PARTENAIRES_FICTIFS) {
+        if (noms.has(f.raisonSociale.toLowerCase())) continue;
+        const { statut, compte, ...champs } = f;
+        const u = compte ? db.prepare('SELECT id FROM users WHERE lower(email)=? AND partenaire_id IS NULL').get(compte) : null;
+        const p = partenaireCreer(clone(champs), u ? u.id : null, statut);
+        if (statut === 'reference') p.referenceLe = frDate();
+        p.historique.push({ t: frDate(), who, action: 'fiche fictive ajoutée' + (statut === 'reference' ? ' (référencée)' : '') });
+        partenaireSave(p);
+        ajout.partenaires++;
+      }
+    }
+    if (z.has('appels')) {
+      // AO-2026-014, puis la première référence libre (AO-2026-015…) s'il existe déjà
+      const refs = new Set(proceduresAll().map((p) => String(p.ref).toLowerCase()));
+      let ref = seed.CDC.ref;
+      while (refs.has(ref.toLowerCase())) ref = ref.replace(/(\d+)$/, (n) => String(Number(n) + 1).padStart(n.length, '0'));
+      const lignes = ((kvGet('budget') || { value: {} }).value.lignes) || [];
+      const pid = nouveauPid();
+      const v = procDefaults({ ...clone(seed.CDC), ref, ...(cfg.marchesPublics ? {} : { prefActive: false, prefTaux: 0 }), cctp: clone(CCTP_EXEMPLE),
+        ligneBudget: lignes.some((l) => l.id === 'b-dsi-inv') ? 'b-dsi-inv' : null, ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
+      // les identifiants d'offre sont uniques sur l'espace : suffixés si l'appel d'offres fictif existe déjà
+      const pris = new Set(db.prepare('SELECT id FROM offers').all().map((o) => o.id));
+      const offres = seed.OFFERS.map((o) => ({ ...clone(o), id: pris.has(o.id) ? o.id + '-' + pid : o.id }));
+      offres.forEach((o) => { v.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
+      procedureInsert(pid, v, uid);
+      offres.forEach((o) => offerInsert(o, false, pid));
+      // achats privés : les partenaires fictifs qui ont une offre sont consultés
+      const noms = new Set(offres.map((o) => o.name.toLowerCase()));
+      const consultes = partenairesAll().filter((p) => p.statut === 'reference' && noms.has(String(p.raisonSociale).toLowerCase())).map((p) => p.id);
+      if (!cfg.marchesPublics && consultes.length) pkvSet(pid, 'consultes', { mode: 'restreint', partenaires: consultes }, uid);
+      auditAppend(uid, who, `Appel d’offres fictif ajouté — ${ref} : ${seed.CDC.objet}`, pid);
+      ajout.appels = ref;
+    }
+    if (z.has('besoins')) {
+      const dem = db.prepare("SELECT id, nom FROM users WHERE role='demandeur' AND active=1 ORDER BY id").get() || db.prepare('SELECT id, nom FROM users WHERE id=?').get(uid);
+      const lignes = ((kvGet('budget') || { value: {} }).value.lignes) || [];
+      const org = (kvGet('org') || { value: {} }).value;
+      ajout.besoins = 0;
+      for (const f of BESOINS_FICTIFS) {
+        let id = besoinNumero();
+        while (besoinGet(id)) id = id.replace(/(\d+)$/, (n) => String(Number(n) + 1).padStart(n.length, '0'));
+        const { soumettre, ...champs } = f;
+        const b = { id, ...champs, ligneBudget: lignes.some((l) => l.id === f.ligneBudget) ? f.ligneBudget : null, dateSouhaitee: '',
+          statut: 'brouillon', par: dem.id, parNom: dem.nom, cree: frDate(), circuit: [], historique: [{ t: frDate(), who, action: 'demande fictive ajoutée' }] };
+        const circuit = C.appliquerMontant(C.reinitialiser((kvGet('circuitBesoin') || { value: [] }).value), b.budget);
+        if (soumettre && C.nbRequises(circuit)) {
+          const type = P.typeProcedure(P.effectif(org.profilDefaut, org.reglages), b.budget);
+          Object.assign(b, { statut: 'soumis', circuit, type: type.id, typeLab: type.lab, soumis: frDate() });
+          b.historique.push({ t: frDate(), who, action: `soumise à validation (${type.lab})` });
+        }
+        besoinInsert(b, dem.id);
+        ajout.besoins++;
+      }
+    }
+    bumpRev();
+    auditAppend(uid, who, 'Données fictives ajoutées : ' + Object.keys(ZONES_FICTIVES).filter((k) => z.has(k)).map((k) => ZONES_FICTIVES[k]).join(', '));
+  });
+  tx();
+  return ajout;
 }
 function resetDemo(uid, who) {
   const tx = db.transaction(() => {
@@ -655,5 +778,5 @@ module.exports = {
   commandesAll, commandeGet, commandeInsert, commandeSave, commandeNumero,
   partenairesAll, partenaireGet, partenaireSave, partenaireDe, partenaireCreer, equipeDe, marques, jetonCreer, jetonUtiliser,
   proceduresAll, procedureGet, procedureCreate, besoinsAll, besoinGet, besoinInsert, besoinSave, besoinNumero,
-  resetDemo, viderDonnees, slug, frDate, seed,
+  resetDemo, viderDonnees, ZONES_VIDER, ajouterFictives, ZONES_FICTIVES, slug, frDate, seed,
 };

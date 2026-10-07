@@ -1,6 +1,6 @@
 /* Routes de l'instance, hors procédure : vérification de la chaîne d'audit, réinitialisation de la démonstration. */
 const express = require('express');
-const { auditVerify, auditJournal, proceduresAll, resetDemo, viderDonnees } = require('../db');
+const { auditVerify, auditJournal, proceduresAll, resetDemo, viderDonnees, ZONES_VIDER, ajouterFictives, ZONES_FICTIVES } = require('../db');
 const { requireAuth, needPerm, whoLabel } = require('../auth');
 const cfg = require('../config');
 
@@ -22,15 +22,32 @@ r.post('/admin/reset', needPerm('params.edit', 'roles.edit'), (req, res) => {
   res.json({ ok: true });
 });
 
-/** Vide les données de l'espace (par exemple les données fictives de la démonstration), en gardant ses paramètres
-    et ses comptes. Mêmes droits et même garde que la réinitialisation ; confirmation explicite exigée. */
+/** Zones choisies : absentes, toutes (vidage) ; sinon une liste non vide de zones connues. */
+const zonesDe = (d, connues, toutesParDefaut) => {
+  if (d.zones == null) return toutesParDefaut ? Object.keys(connues) : null;
+  if (!Array.isArray(d.zones) || !d.zones.length || d.zones.some((z) => !Object.prototype.hasOwnProperty.call(connues, z))) return null;
+  return [...new Set(d.zones)];
+};
+/** Vide les zones choisies de l'espace (par exemple les données fictives de la démonstration), en gardant ses
+    paramètres et ses comptes. Mêmes droits et même garde que la réinitialisation ; confirmation explicite exigée. */
 r.post('/admin/vider', needPerm('params.edit', 'roles.edit'), (req, res) => {
   if (!require('../espaces').reinitialisable()) return res.status(403).json({ error: 'Opération désactivée dans cet espace.' });
-  if ((req.body || {}).confirmation !== 'VIDER') return res.status(422).json({ error: 'Confirmation attendue : saisissez VIDER.', code: 'CONFIRMATION_REQUIRED' });
-  const fichiers = viderDonnees(req.user.id, whoLabel(req.user));
+  const d = req.body || {};
+  if (d.confirmation !== 'VIDER') return res.status(422).json({ error: 'Confirmation attendue : saisissez VIDER.', code: 'CONFIRMATION_REQUIRED' });
+  const zones = zonesDe(d, ZONES_VIDER, true);
+  if (!zones) return res.status(422).json({ error: 'Choisissez au moins une zone à vider.', code: 'ZONES_INVALID' });
+  const fichiers = viderDonnees(req.user.id, whoLabel(req.user), zones);
   const { diskPath } = require('./files'), fs = require('fs');
   for (const id of fichiers) { try { fs.unlinkSync(diskPath(id)); } catch (e) { /* déjà absent */ } }
   res.json({ ok: true, fichiers: fichiers.length });
+});
+
+/** Ajoute des données fictives dans les zones choisies, sans rien effacer. Mêmes droits et même garde. */
+r.post('/admin/fictives', needPerm('params.edit', 'roles.edit'), (req, res) => {
+  if (!require('../espaces').reinitialisable()) return res.status(403).json({ error: 'Opération désactivée dans cet espace.' });
+  const zones = zonesDe(req.body || {}, ZONES_FICTIVES, false);
+  if (!zones) return res.status(422).json({ error: 'Choisissez au moins une zone à remplir.', code: 'ZONES_INVALID' });
+  res.status(201).json({ ok: true, ajout: ajouterFictives(req.user.id, whoLabel(req.user), zones) });
 });
 
 /* Messagerie de l'organisation : serveur SMTP. Le mot de passe est chiffré dans la base et ne revient jamais au
