@@ -116,7 +116,7 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const frDate = () => new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abidjan' });
 
 /* Clés propres à une procédure ; toutes les autres appartiennent à l'organisation (une par instance). */
-const PROC_KEYS = ['jalons', 'reclamations', 'docDefs', 'cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
+const PROC_KEYS = ['rappels', 'jalons', 'reclamations', 'docDefs', 'cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
   'qa', 'additifs', 'clarifs', 'coi', 'recours', 'standstill', 'contractSigned', 'infructueux', 'fxFrozen', 'cadre', '_sod', 'rejets', 'consultes'];
 const isProcKey = (k) => PROC_KEYS.includes(k);
 

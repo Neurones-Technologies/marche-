@@ -161,6 +161,7 @@ Paramètres du `.env` utiles :
 | `MAX_FILE_MB` | `10` | Taille maximale d'une pièce jointe. Garder `client_max_body_size` du vhost au-dessus. |
 | `SAUVEGARDE_HEURES` | `24` | Sauvegarde automatique des bases et des pièces dans le volume `marcheplus-sauvegardes`. `0` la désactive. |
 | `SAUVEGARDE_CONSERVER` | `14` | Nombre de sauvegardes gardées. |
+| `RAPPELS` | `1` | Rappels automatiques à 3 jours et la veille de la date limite aux entreprises concernées qui n'ont pas déposé. `0` les désactive. |
 
 **Sauvegardes** : l'application sauvegarde elle-même ses bases (copie vérifiée) et ses pièces. La copie hors du
 serveur et la restauration sont décrites dans `docs/SAUVEGARDES.md`. Mettre en place la copie hors du serveur dès

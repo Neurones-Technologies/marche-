@@ -99,5 +99,6 @@ app.use((err, req, res, next) => { // eslint-disable-line
 if (require.main === module) {
   app.listen(cfg.port, () => console.log(`Marché+ — http://localhost:${cfg.port}`));
   require('./sauvegardes').demarrer(); // sauvegardes automatiques (SAUVEGARDE_HEURES)
+  require('./rappels').demarrer(); // rappels aux fournisseurs avant la date limite de dépôt
 }
 module.exports = app;

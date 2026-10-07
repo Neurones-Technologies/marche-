@@ -648,4 +648,7 @@ r.delete('/offers/mienne', (req, res) => {
   res.json({ ok: true, rev: getRev() });
 });
 
+// partagés avec les rappels avant échéance (server/rappels.js)
+r.comptesConcernes = comptesConcernes;
+r.expedier = expedier;
 module.exports = r;
