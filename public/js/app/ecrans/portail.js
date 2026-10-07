@@ -135,7 +135,7 @@ function vPortail(m, etape){
 
   /* Identification */
   var k1=add(zPrep,'div','card'); k1.style.marginTop='18px';
-  add(k1,'div','panel-head','1 · Identification du soumissionnaire');
+  add(k1,'div','panel-head','1 · Identification');
   var f1=add(add(k1,'div','pad'),'div','frm');
   function fld(parent,lab,tag,val,cb,opts){
     var w=add(parent,'div'); var id='p'+Math.random().toString(36).slice(2,8);
