@@ -73,16 +73,19 @@ function ficheAppelOffres(m, clos, reste, compact){
   var pied=add(k,'div','panel-foot ao-fiche-pied');
   var o=state.monOffre;
   chipCellule(pied, o ? 'Votre offre est déposée' : (clos ? 'Aucune offre déposée' : 'Votre offre n’est pas encore déposée'), o ? 'c-green' : (clos ? 'c-grey' : 'c-amber'));
-  if(adds){ var la=add(pied,'button','btn btn-ghost btn-sm',adds+' additif'+(adds>1?'s':'')+' au dossier'); fk(la,'ao-additifs');
-    la.addEventListener('click',function(){ go('echanges'); }); }
+  if(adds) chipCellule(pied, adds+' additif'+(adds>1?'s':'')+' au dossier — voir les échanges ci-dessous','c-amber');
   var act=add(pied,'div','ao-fiche-actions');
   var tl=add(act,'button','btn btn-ghost btn-sm','Télécharger le dossier (PDF)'); fk(tl,'ao-pdf'); tl.setAttribute('data-consult','');
   tl.addEventListener('click',telechargerDossierPdf);
   var vd=add(act,'button','btn btn-primary btn-sm','Consulter le dossier'); fk(vd,'portail-dossier'); vd.setAttribute('data-consult','');
-  vd.addEventListener('click',function(){ go('cdc'); });
+  vd.addEventListener('click',ouvrirDossierPdf);
 }
 
-function vPortail(m){
+/* Étape 2 (préparation) ou 3 (soumission) du parcours du fournisseur. Les deux se calculent ensemble (le contrôle avant
+   dépôt dépend de la saisie) ; chaque étape n'affiche que sa part. */
+function vSoumission(m){ vPortail(m,'soumission'); }
+function vPortail(m, etape){
+  etape = etape || 'preparation';
   var c=state.cdc, d=state.draft;
   if(!d.files) d.files={};
   if(!PIECES_OK){
@@ -108,22 +111,31 @@ function vPortail(m){
   var mp=state.monPartenaire;
   if(mp && !String(d.name||'').trim()){ d.name=mp.raisonSociale||''; if(mp.pays && /^[A-Z]{2}$/.test(mp.pays)) d.iso=mp.pays; uem=isUemoa(d); loc=isLocal(d); }
 
-  var h=add(m,'div','head'); add(add(h,'div'),'h1',null,'Répondre à l’appel d’offres');
+  var h=add(m,'div','head'); add(add(h,'div'),'h1',null, etape==='soumission' ? 'Soumission de l’offre' : 'Préparation de l’offre');
   var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
   if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
-  ficheAppelOffres(m, clos, reste);
-  ongletsFournisseur(m,'portail');
+  etapesFournisseur(m, etape==='soumission' ? 'soumission' : 'portail');
+  ficheAppelOffres(m, clos, reste, true);
   var nc=clarifsEnAttente();
   if(nc){ var wc=add(m,'div','warn'); wc.style.marginBottom='18px'; add(wc,'strong',null,'L’acheteur attend votre réponse. ');
-    wc.appendChild(document.createTextNode(nc+' demande(s) de clarification sur votre offre : répondez dans l’onglet « Échanges ».')); }
+    wc.appendChild(document.createTextNode(nc+' demande(s) de clarification sur votre offre : répondez à l’étape 1, « Cahier des charges & échanges ».')); }
   if(clos){ var fin=add(m,'div','warn'); fin.style.margin='18px 0'; add(fin,'strong',null,'Date limite dépassée. '); fin.appendChild(document.createTextNode('Les dépôts sont clos : aucune offre ni pièce ne peut plus être transmise.')); }
 
-  vPortailResultat(m); // dès l'attribution prononcée
-  // offre en cours : on la relit, la modifie ou la retire ; le formulaire de dépôt ne revient qu'après retrait
-  if(state.monOffre){ vPortailMonOffre(m,clos); vPortailAccuses(m); return; }
+  // offre déposée : récapitulatif, modification ou retrait à l'étape 3 ; le formulaire ne revient qu'après retrait
+  if(state.monOffre){
+    if(etape==='soumission'){ vPortailResultat(m); vPortailMonOffre(m,clos); vPortailAccuses(m); return; }
+    var nd=add(m,'div','note'); add(nd,'strong',null,'Votre offre est déposée. ');
+    nd.appendChild(document.createTextNode('Pour la relire, la modifier ou la retirer, passez à l’étape « Soumission ».'));
+    var bs=add(add(m,'div','ao-etape-pied'),'button','btn btn-primary','Voir mon offre déposée'); fk(bs,'vers-soumission');
+    bs.addEventListener('click',function(){ go('soumission'); });
+    return;
+  }
+  if(etape==='soumission') vPortailResultat(m);
+  // préparation : sections 1 à 3 ; soumission : contrôle et dépôt. L'autre part est calculée hors de l'écran.
+  var zPrep = etape==='preparation' ? m : el('div'), zSoum = etape==='soumission' ? m : el('div');
 
   /* Identification */
-  var k1=add(m,'div','card'); k1.style.marginTop='18px';
+  var k1=add(zPrep,'div','card'); k1.style.marginTop='18px';
   add(k1,'div','panel-head','1 · Identification du soumissionnaire');
   var f1=add(add(k1,'div','pad'),'div','frm');
   function fld(parent,lab,tag,val,cb,opts){
@@ -147,7 +159,7 @@ function vPortail(m){
   if(!uem) add(st,'span','chip c-grey','Retenue à la source : '+c.retenueNonResident+' %');
 
   /* Offre */
-  var k2=add(m,'div','card'); k2.style.marginTop='18px';
+  var k2=add(zPrep,'div','card'); k2.style.marginTop='18px';
   add(k2,'div','panel-head','2 · Contenu de l\u2019offre');
   var p2=add(k2,'div','pad');
   add(p2,'div','stat-k','Lots soumissionnés').style.marginBottom='8px';
@@ -181,7 +193,7 @@ function vPortail(m){
   DOCS_OFFRE.forEach(function(x){ ligneFichier(p2, x, x.aide, ''); });
 
   /* Pièces */
-  var k3=add(m,'div','card'); k3.style.marginTop='18px';
+  var k3=add(zPrep,'div','card'); k3.style.marginTop='18px';
   var ph3=add(k3,'div','panel-head');
   add(ph3,'span',null,'3 · Pièces du dossier de candidature');
   add(ph3,'span','chip '+(uem?'c-teal':'c-violet'), uem?'Liste applicable aux soumissionnaires UEMOA':'Liste applicable aux soumissionnaires hors zone');
@@ -207,8 +219,8 @@ function vPortail(m){
   }
 
   /* Contrôle avant dépôt */
-  var k4=add(m,'div','card'); k4.style.marginTop='18px';
-  add(k4,'div','panel-head','4 · Contrôle avant dépôt');
+  var k4=add(zSoum,'div','card'); k4.style.marginTop='18px';
+  add(k4,'div','panel-head','Contrôle avant dépôt');
   var b4=add(k4,'div','pad');
   var errs=[], warns=[], infos=[];
   if(!d.name.trim()) errs.push('Raison sociale non renseignée.');
@@ -267,7 +279,19 @@ function vPortail(m){
     }).catch(function(err){ sub.disabled=false; toast(err.message||'Dépôt impossible.'); });
   });
 
-  vPortailAccuses(m);
+  if(etape==='soumission'){
+    vPortailAccuses(m);
+    var rp=add(add(m,'div','ao-etape-pied'),'button','btn btn-ghost','← Revenir à la préparation'); fk(rp,'vers-preparation');
+    rp.addEventListener('click',function(){ go('portail'); });
+    return;
+  }
+  // préparation : retour au dossier, ou passage à la soumission (avec ce qui reste à compléter)
+  var pied=add(m,'div','ao-etape-pied');
+  var pr=add(pied,'button','btn btn-ghost','← Cahier des charges & échanges'); fk(pr,'vers-echanges');
+  pr.addEventListener('click',function(){ go('echanges'); });
+  if(errs.length) add(pied,'span','muted',errs.length+' point(s) à compléter avant le dépôt');
+  var su=add(pied,'button','btn btn-primary','Passer à la soumission →'); fk(su,'vers-soumission');
+  su.addEventListener('click',function(){ go('soumission'); });
 }
 
 /* Accusés de dépôt du fournisseur ; un dépôt retiré reste tracé. */

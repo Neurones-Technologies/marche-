@@ -2,7 +2,7 @@
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
 "use strict";
 
-var ROUTER={accueil:vAccueil, indicateurs:vIndicateurs, echanges:vEchanges, dashboard:vDashboard, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, envois:vEnvois, suppleances:vSuppleances, cdc:vCDC, prestataires:vPrestataires, criteres:vCriteres, portail:vPortail, reception:vReception,
+var ROUTER={accueil:vAccueil, indicateurs:vIndicateurs, echanges:vEchanges, soumission:vSoumission, dashboard:vDashboard, procedures:vProcedures, besoins:vBesoins, referencement:vReferencement, partenaires:vPartenaires, commandes:vCommandes, roles:vRoles, comptes:vComptes, qa:vQA, clarifs:vClarifs, recours:vRecours, params:vParams, regles:vRegles, envois:vEnvois, suppleances:vSuppleances, cdc:vCDC, prestataires:vPrestataires, criteres:vCriteres, portail:vPortail, reception:vReception,
   depouille:vDepouille, conformite:vConformite, evaluation:vEvaluation, decision:vDecision, pv:vPV, audit:vAudit, journal:vJournal};
 
 /* Les écrans d'administration concernent l'organisation, pas la procédure : pas de pastille de phase. */
@@ -22,7 +22,7 @@ function vueMemorisee(pid){ try{ return localStorage.getItem('marcheplus.vue.'+p
 /* Écran d'arrivée dans une procédure : la clôture si elle est terminée ; sinon l'écran où l'on s'était arrêté ;
    à défaut, le premier écran de l'étape en cours. Le prestataire arrive sur son dépôt d'offre. */
 function vueDEntree(){
-  if(!can('offres.read') && !can('cdc.edit')) return viewAllowed('portail') ? 'portail' : 'dashboard';
+  if(!can('offres.read') && !can('cdc.edit')) return viewAllowed('echanges') ? (state.monOffre ? 'soumission' : 'echanges') : 'dashboard'; // fournisseur : étape 1, ou son offre déposée
   var cur=MP.current()||{};
   var terminee = state.contractSigned || state.infructueux || cur.archive;
   if(terminee){ var fin=['recours','pv','dashboard'].filter(viewAllowed)[0]; if(fin) return fin; }

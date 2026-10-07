@@ -60,7 +60,7 @@ function icon(parent, name){
   return s;
 }
 /* Icône de chaque écran du menu. */
-var NAV_ICONS = { accueil:'home', indicateurs:'chart', echanges:'chat', dashboard:'info', envois:'chat', procedures:'folder', besoins:'demande', referencement:'badge', partenaires:'users', commandes:'camion', cdc:'file', prestataires:'users', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
+var NAV_ICONS = { accueil:'home', indicateurs:'chart', echanges:'chat', soumission:'upload', dashboard:'info', envois:'chat', procedures:'folder', besoins:'demande', referencement:'badge', partenaires:'users', commandes:'camion', cdc:'file', prestataires:'users', dao:'book', criteres:'sliders', qa:'chat', portail:'upload',
   reception:'inbox', depouille:'search', conformite:'shield', clarifs:'help', evaluation:'chart', decision:'gavel',
   recours:'scale', pv:'stamp', audit:'list', journal:'list', roles:'key', comptes:'users', suppleances:'clock', params:'cog', regles:'ring' };
 
@@ -131,7 +131,7 @@ function etapeDe(vue){ for(var i=0;i<ETAPES.length;i++) if(ETAPES[i].vues.indexO
 function vuesPermises(etape){ return etape.vues.filter(viewAllowed); }
 /* Écran où reprendre une procédure : le dernier ouvert, sinon le premier écran de l'étape en cours. */
 function vueProcedureCourante(){
-  if(fournisseurSeul() && viewAllowed('portail')) return 'portail'; // le fournisseur arrive sur sa page de l'appel d'offres
+  if(fournisseurSeul() && viewAllowed('echanges')) return 'echanges'; // le fournisseur commence par le cahier des charges
   if(UI.derniereVueProc && viewAllowed(UI.derniereVueProc)) return UI.derniereVueProc;
   var st=etapesStatut();
   for(var i=0;i<ETAPES.length;i++){ var v=vuesPermises(ETAPES[i]); if(v.length && (st[ETAPES[i].id]==='now' || st[ETAPES[i].id]==='blocked')) return v[0]; }

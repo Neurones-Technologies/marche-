@@ -35,15 +35,24 @@ function vPortailResultat(m){
 
 function paysLettre(iso){ return ({ CI:'Côte d’Ivoire', BF:'Burkina Faso', SN:'Sénégal', ML:'Mali', NE:'Niger', TG:'Togo', BJ:'Bénin', GW:'Guinée-Bissau' })[iso] || iso; }
 
-/* Onglets du fournisseur sur un appel d'offres : son offre, et ses échanges avec l'acheteur. */
+/* Parcours du fournisseur sur un appel d'offres, en trois étapes : 1. cahier des charges et échanges avec l'acheteur ;
+   2. préparation de l'offre ; 3. soumission (contrôle, dépôt, puis offre déposée et résultat). */
 function clarifsEnAttente(){ return (state.clarifs||[]).filter(function(x){ return x.statut==='envoyee'; }).length; }
-function ongletsFournisseur(m, actif){
-  var nav=add(m,'nav','ao-onglets'); nav.setAttribute('aria-label','Appel d’offres '+REF());
-  [['portail','Mon offre'],['echanges','Échanges']].forEach(function(o){
-    var b=add(nav,'button','ao-onglet'+(o[0]===actif?' on':''),o[1]); b.type='button'; fk(b,'onglet-'+o[0]);
-    if(o[0]===actif) b.setAttribute('aria-current','page');
-    if(o[0]==='echanges'){ var n=clarifsEnAttente(); if(n){ var bd=add(b,'span','ao-onglet-n',String(n)); bd.title=n+' demande(s) de clarification en attente de votre réponse'; } }
-    b.addEventListener('click',function(){ if(o[0]!==actif) go(o[0]); });
+var ETAPES_FOURNISSEUR = [['echanges','Cahier des charges & échanges'],['portail','Préparation de l’offre'],['soumission','Soumission']];
+function etapesFournisseur(m, actif){
+  var d=state.draft||{}, o=state.monOffre;
+  var prepare = !!o || ((d.lots||[]).length>0 && d.lots.every(function(id){ return Number((d.prixLots||{})[id])>0; }) && !!Number(d.delai));
+  var etat={ echanges: actif!=='echanges' || prepare ? 'done' : 'now', portail: o || (prepare && actif==='soumission') ? 'done' : (actif==='portail' ? 'now' : 'todo'),
+    soumission: o ? 'done' : (actif==='soumission' ? 'now' : 'todo') };
+  var ol=add(m,'ol','ao-etapes'); ol.setAttribute('aria-label','Étapes de votre réponse');
+  ETAPES_FOURNISSEUR.forEach(function(x,i){
+    var li=add(ol,'li','ao-etape '+etat[x[0]]+(x[0]===actif?' actif':''));
+    var b=add(li,'button'); b.type='button'; fk(b,'etape-f-'+x[0]);
+    var n=add(b,'span','ao-etape-n'); if(etat[x[0]]==='done' && x[0]!==actif) icon(n,'check'); else n.textContent=String(i+1);
+    add(b,'span','ao-etape-lab',x[1]);
+    if(x[0]==='echanges'){ var k=clarifsEnAttente(); if(k){ var bd=add(b,'span','ao-etape-badge',String(k)); bd.title=k+' demande(s) de clarification en attente de votre réponse'; } }
+    if(x[0]===actif) b.setAttribute('aria-current','step');
+    b.addEventListener('click',function(){ if(x[0]!==actif) go(x[0]); });
   });
 }
 
@@ -76,11 +85,11 @@ var AUTEURS_ECHANGE = { acheteur:'Acheteur', vous:'Vous', autre:'Une entreprise 
 function vEchanges(m){
   var c=state.cdc;
   if (!c.cdcPublie) return locked(m,"Les échanges s'ouvrent une fois le dossier publié.",'cdc','Aller au dossier');
-  var h=add(m,'div','head'); add(add(h,'div'),'h1',null,'Échanges avec l’acheteur');
+  var h=add(m,'div','head'); add(add(h,'div'),'h1',null,'Cahier des charges & échanges');
   var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
   if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
-  ficheAppelOffres(m, clos, reste, true);
-  ongletsFournisseur(m,'echanges');
+  etapesFournisseur(m,'echanges');
+  ficheAppelOffres(m, clos, reste);
 
   var k=add(m,'section','card chat'); k.setAttribute('aria-label','Conversation avec l’acheteur');
   var ph=add(k,'div','panel-head'); add(ph,'span',null,'Conversation');
@@ -112,7 +121,15 @@ function vEchanges(m){
   var limite=ech ? ech-QUESTIONS_JOURS_AVANT*86400000 : null, questionOuverte=!limite || Date.now()<=limite;
   var reclamation=(state.receipts||[]).length>0;
   var sa=add(k,'div','chat-saisie');
-  if(!questionOuverte && !reclamation){ add(sa,'p','muted','Les questions sont closes '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.'); return; }
+  if(!questionOuverte && !reclamation) add(sa,'p','muted','Les questions sont closes '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.');
+  else saisieEchange(sa, limite, questionOuverte, reclamation);
+  var pied=add(m,'div','ao-etape-pied');
+  add(pied,'span','muted', state.monOffre ? 'Votre offre est déposée.' : 'Dossier lu ? Préparez votre offre.');
+  var nx=add(pied,'button','btn btn-primary', state.monOffre ? 'Voir mon offre →' : 'Préparer mon offre →'); fk(nx,'vers-preparation');
+  nx.addEventListener('click',function(){ go(state.monOffre ? 'soumission' : 'portail'); });
+}
+/* Saisie d'une question (jusqu'à 3 jours avant l'échéance) ou d'une réclamation (après un dépôt), sous la conversation. */
+function saisieEchange(sa, limite, questionOuverte, reclamation){
   UI.typeEchange = UI.typeEchange && ((UI.typeEchange==='question' && questionOuverte) || (UI.typeEchange==='reclamation' && reclamation)) ? UI.typeEchange : (questionOuverte?'question':'reclamation');
   var types=add(sa,'div','chat-types'); types.setAttribute('role','radiogroup'); types.setAttribute('aria-label','Type de message');
   [['question','Question sur le dossier',questionOuverte],['reclamation','Réclamation',reclamation]].forEach(function(o){

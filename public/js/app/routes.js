@@ -11,7 +11,7 @@ var ROUTES_VUES = { accueil:'tableau-de-bord', besoins:'demandes-achat', procedu
   suppleances:'utilisateurs/suppleances', journal:'audit', params:'parametres', regles:'alertes', envois:'alertes/envois' };
 var ROUTES_PROCEDURE = { dashboard:'vue-ensemble', cdc:'cahier-des-charges', prestataires:'prestataires', criteres:'criteres', qa:'questions',
   reception:'reception', depouille:'depouillement', conformite:'conformite', clarifs:'clarifications', evaluation:'evaluation',
-  decision:'decision', recours:'cloture', pv:'proces-verbal', audit:'journal', portail:'depot', echanges:'echanges' };
+  decision:'decision', recours:'cloture', pv:'proces-verbal', audit:'journal', portail:'preparation', echanges:'echanges', soumission:'soumission' };
 /* Écrans qui affichent un élément sous leur liste : l'élément entre dans l'adresse. */
 var DETAILS = { besoins:'besoin', commandes:'commande', partenaires:'partenaire' };
 
@@ -28,7 +28,7 @@ function cheminCourant(){
 function lireChemin(chemin){
   var seg=String(chemin||'').replace(/^\/+|\/+$/g,'').split('/').filter(Boolean).map(function(s){ try{ return decodeURIComponent(s); }catch(e){ return s; } });
   if(!seg.length) return null;
-  if(seg[0]==='appels-offres' && seg.length===3){ var vp=cleDe(ROUTES_PROCEDURE, seg[2]); return vp ? { vue:vp, pid:seg[1] } : null; }
+  if(seg[0]==='appels-offres' && seg.length===3){ var vp=cleDe(ROUTES_PROCEDURE, seg[2]) || (seg[2]==='depot' ? 'portail' : null); return vp ? { vue:vp, pid:seg[1] } : null; } // « depot » : ancienne adresse
   if(seg.length===2){ var v2=cleDe(ROUTES_VUES, seg.join('/')); if(v2) return { vue:v2 }; }
   var v1=cleDe(ROUTES_VUES, seg[0]);
   if(!v1 || seg.length>2 || (seg.length===2 && !DETAILS[v1])) return null;

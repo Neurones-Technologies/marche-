@@ -520,6 +520,7 @@ var VIEWS=[
   {id:'qa',         label:'Questions', grp:'Procédure', perm:'offres.read'},
   {id:'portail',    label:'Déposer une offre', grp:'Procédure', role:true, perm:'portail.use'},
   {id:'echanges',   label:'Échanges', grp:'Procédure', role:true, perm:'portail.use'},
+  {id:'soumission', label:'Soumission', grp:'Procédure', role:true, perm:'portail.use'},
   {id:'reception',  label:'Réception des offres', grp:'Procédure', perm:'offres.read'},
   {id:'depouille',  label:'Dépouillement', grp:'Procédure', perm:'offres.read'},
   {id:'conformite', label:'Conformité', grp:'Procédure', perm:'offres.read'},
@@ -540,6 +541,7 @@ var VIEWS=[
 function lockReason(id){
   if(id==='portail' && !state.cdc.cdcPublie) return "Publiez le cahier des charges pour ouvrir le dépôt.";
   if(id==='echanges' && !state.cdc.cdcPublie) return "Les échanges s'ouvrent une fois le dossier publié.";
+  if(id==='soumission' && !state.cdc.cdcPublie) return "Publiez le cahier des charges pour ouvrir le dépôt.";
   if(id==='depouille' && !state.cdc.cdcPublie) return "Publiez le cahier des charges pour ouvrir le dépouillement.";
   if(id==='evaluation' && !state.depClosed) return "Clôturez le dépouillement pour ouvrir l'évaluation.";
   if(id==='decision' && !state.evalDone) return "Validez l'évaluation pour ouvrir le circuit d'approbation.";
