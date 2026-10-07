@@ -149,6 +149,25 @@
     return /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(d + 'T' + HEURE_LIMITE + ':00Z') : null;
   }
 
+  /* Résultat d'une offre pour son auteur, une fois l'attribution prononcée (évaluation validée, circuit approuvé) :
+     { statut: retenue | non_retenue | ecartee, rang, total, nb, motif, attributaire }. null tant que rien n'est décidé. */
+  function resultatOffre(ctx, offerId) {
+    if (!ctx.evalDone || !allApproved(ctx.approvals || [])) return null;
+    var o = (ctx.offers || []).filter(function (x) { return x.id === offerId; })[0];
+    if (!o) return null;
+    var rows = ranking(ctx), win = rows[0], nb = rows.length;
+    if (isExcluded(ctx, o)) {
+      var mis = missingDocs(ctx, o);
+      return { statut: 'ecartee', motif: 'Offre écartée — ' + (mis.length ? 'pièce(s) manquante(s) : ' + mis.map(function (d) { return d.label; }).join(' ; ') : 'non conforme au dossier, par décision de la commission') + '.' };
+    }
+    var r = rows.filter(function (x) { return x.o.id === offerId; })[0];
+    if (!r) return null;
+    var att = win ? { nom: win.o.name, total: Math.round(win.total * 10) / 10 } : null;
+    if (r.rank === 1) return { statut: 'retenue', rang: 1, nb: nb, total: Math.round(r.total * 10) / 10, motif: 'Votre offre est retenue : classée première sur ' + nb + ' offre(s) conforme(s).', attributaire: att };
+    return { statut: 'non_retenue', rang: r.rank, nb: nb, total: Math.round(r.total * 10) / 10, attributaire: att,
+      motif: 'Votre offre est classée ' + r.rank + 'e sur ' + nb + ' offre(s) conforme(s), avec une note de ' + (Math.round(r.total * 10) / 10) + '/100 ; l’offre retenue a obtenu ' + att.total + '/100.' };
+  }
+
   /* Ce qui manque au dossier pour être publié : liste de libellés, vide quand il est prêt. Le contexte porte aussi
      consultes (partenaires consultés). */
   function cdcManquants(ctx) {
@@ -172,7 +191,7 @@
   }
 
   return {
-    cdcManquants: cdcManquants, pieceReferencement: pieceReferencement, echeanceDepot: echeanceDepot,
+    cdcManquants: cdcManquants, resultatOffre: resultatOffre, pieceReferencement: pieceReferencement, echeanceDepot: echeanceDepot,
     profilId: profilId, cadre: cadre, prefTaux: prefTaux,
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,

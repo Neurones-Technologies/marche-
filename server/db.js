@@ -113,7 +113,7 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const frDate = () => new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abidjan' });
 
 /* Clés propres à une procédure ; toutes les autres appartiennent à l'organisation (une par instance). */
-const PROC_KEYS = ['docDefs', 'cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
+const PROC_KEYS = ['reclamations', 'docDefs', 'cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
   'qa', 'additifs', 'clarifs', 'coi', 'recours', 'standstill', 'contractSigned', 'infructueux', 'fxFrozen', 'cadre', '_sod', 'rejets', 'consultes'];
 const isProcKey = (k) => PROC_KEYS.includes(k);
 
@@ -269,7 +269,7 @@ function procDefaults(cdc, { demo = false } = {}) {
     docDefs: piecesOffreDefaut(cdc),
     cdc, criteria: demo ? clone(seed.CRITERIA) : criteresVides(), quality: {}, justif: {}, confirmed: {}, excluded: {},
     depClosed: false, evalDone: false, approvals: C.reinitialiser(circuit),
-    qa: [], additifs: [], clarifs: [], coi: {}, recours: [], rejets: [], standstill: { days: 15, startedAt: null },
+    qa: [], additifs: [], clarifs: [], coi: {}, recours: [], rejets: [], reclamations: [], standstill: { days: 15, startedAt: null },
     contractSigned: false, infructueux: null, cadre: null,
   };
 }

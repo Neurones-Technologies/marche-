@@ -83,3 +83,22 @@ test('pièce d’offre couverte par le référencement : lien réglé, sinon mê
   assert.equal(R.pieceReferencement({ id: 'd123', referencement: 'fiscal' }, ref), 'fiscal'); // pièce ajoutée, reliée
   assert.equal(R.pieceReferencement({ id: 'd124', referencement: 'inconnue' }, ref), null); // pièce de référencement retirée
 });
+
+test('résultat d’une offre : rien avant l’attribution, puis retenue, non retenue avec rang, ou écartée avec motif', () => {
+  const ctx = base();
+  ctx.cdc.prefActive = false;
+  ctx.offers.push(offre('ecartee', 'CI', 'XOF', 50000000, 90));
+  ctx.excluded = { ecartee: true };
+  assert.equal(R.resultatOffre(ctx, 'local'), null); // évaluation non validée : rien n'est communiqué
+  ctx.evalDone = true;
+  ctx.approvals = [{ role: 'Directeur', done: false }];
+  assert.equal(R.resultatOffre(ctx, 'local'), null); // circuit non approuvé
+  ctx.approvals = [{ role: 'Directeur', done: true }];
+  const gagnant = R.resultatOffre(ctx, 'etranger'), perdant = R.resultatOffre(ctx, 'local'), ecartee = R.resultatOffre(ctx, 'ecartee');
+  assert.deepEqual([gagnant.statut, gagnant.rang], ['retenue', 1]);
+  assert.deepEqual([perdant.statut, perdant.rang, perdant.nb], ['non_retenue', 2, 2]);
+  assert.match(perdant.motif, /classée 2e sur 2/);
+  assert.equal(perdant.attributaire.nom, 'etranger');
+  assert.equal(ecartee.statut, 'ecartee');
+  assert.match(ecartee.motif, /Offre écartée/);
+});

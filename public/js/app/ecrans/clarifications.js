@@ -47,15 +47,8 @@ function ouvrirClarification(i){
       var m2=add(th,'div','msg');
       add(m2,'div','t-xs','Réponse du soumissionnaire — '+cl.tRep);
       add(m2,'div',null,cl.reponse);
-    } else if(can('clarif.send')){
-      add(p,'span','muted','Délai de réponse : 3 jours ouvrés.');
-      var bt=add(p,'button','btn btn-ghost','Simuler la réponse du soumissionnaire'); fk(bt,'clarif-rep-'+i);
-      bt.addEventListener('click',function(){
-        cl.reponse="Précision apportée sans modification du prix ni du périmètre : le poste visé correspond bien à la fourniture décrite au bordereau, le libellé abrégé ayant prêté à confusion.";
-        cl.tRep=new Date().toLocaleString('fr-FR'); cl.statut='repondue';
-        logit('Réponse de clarification reçue — '+(o?o.name:cl.offerId));
-        save(); render();
-      });
+    } else {
+      add(p,'span','muted','Le soumissionnaire répond depuis son espace ; sa réponse apparaîtra ici.');
     }
   });
 }

@@ -44,6 +44,8 @@ function vPortail(m){
   add(h,'span','chip '+(clos?'c-red':'c-amber'), clos ? 'Dépôts clos depuis le '+dateLongue(c.ouverture)+' à 10 h 00' : 'Clôture '+delaiRestant(reste)+' — le '+dateLongue(c.ouverture)+' à 10 h 00');
   if(clos){ var fin=add(m,'div','warn'); fin.style.marginBottom='18px'; add(fin,'strong',null,'Date limite dépassée. '); fin.appendChild(document.createTextNode('Les dépôts sont clos : aucune offre ni pièce ne peut plus être transmise.')); }
 
+  vPortailResultat(m); // dès l'attribution prononcée
+
   /* Dossier à retirer (carte enveloppée : hors de la numérotation des sections du dépôt) */
   var k0=add(add(m,'div'),'div','card'); k0.style.marginBottom='18px';
   add(k0,'div','panel-head','Dossier d\u2019appel d\u2019offres');
@@ -51,6 +53,7 @@ function vPortail(m){
   add(b0,'p','muted','Avis, règlement de la consultation, clauses administratives et techniques, bordereau des prix et formulaires.');
   var vd=add(b0,'button','btn btn-primary btn-sm','Consulter le dossier'); vd.style.marginTop='10px'; fk(vd,'portail-dossier');
   vd.addEventListener('click',function(){ go('cdc'); });
+  vPortailQuestions(m);
 
   /* Identification */
   var k1=add(m,'div','card'); k1.style.marginTop='18px';
@@ -220,7 +223,5 @@ function vPortail(m){
     });
   }
 
-  var n=add(m,'div','note');
-  add(n,'strong',null,'Le dépôt dématérialisé supprime le problème d\u2019extraction. ');
-  n.appendChild(document.createTextNode("Une offre saisie dans ce formulaire arrive structurée : aucun OCR, aucun champ à confiance faible, aucune vérification manuelle. C'est l'argument le plus solide pour pousser vos clients à basculer leurs fournisseurs sur le portail, en gardant le module d'extraction pour les plis papier et les dossiers reçus par courriel."));
+  vPortailSuivi(m); // demandes de clarification et réclamations
 }

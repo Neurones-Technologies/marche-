@@ -67,7 +67,15 @@ function buildState(req) {
     st.rejets = []; st.coi = {}; st.notifRules = {};
     st.circuitModele = []; st.circuitBesoin = []; st.circuitReferencement = []; st.circuitCommande = [];
     if (st.consultes) st.consultes = { mode: st.consultes.mode, partenaires: moi && (st.consultes.partenaires || []).includes(moi.id) ? [moi.id] : [] };
-    st.clarifs = (st.clarifs || []).filter((c) => mesOffres.has(c.offerId));
+    st.clarifs = (st.clarifs || []).map((c, i) => ({ ...c, i })).filter((c) => mesOffres.has(c.offerId)); // i : rang, pour répondre
+    // questions : publiées sans leur auteur ; réclamations : les siennes seulement
+    st.qa = (st.qa || []).map((q) => ({ id: q.id, question: q.question, t: q.t, reponse: q.reponse, tRep: q.tRep, mienne: q.par === req.user.id }));
+    st.reclamations = (st.reclamations || []).filter((x) => x.par === req.user.id);
+    // résultat de ses offres, une fois l'attribution prononcée
+    const ctxR = { offers: req.pid ? req.store.offers() : [], org: values.org, fxFrozen: values.fxFrozen, cadre: values.cadre, cdc: values.cdc, criteria: values.criteria,
+      quality: values.quality, justif: values.justif, excluded: values.excluded, confirmed: values.confirmed, docDefs: values.docDefs, evalDone: values.evalDone, approvals: values.approvals };
+    st.monResultat = values.infructueux ? { statut: 'infructueux', motif: 'La consultation a été déclarée infructueuse' + (values.infructueux.motif ? ' : ' + values.infructueux.motif : '') + '.' }
+      : [...mesOffres].map((id) => { const r = R.resultatOffre(ctxR, id); return r && { offre: id, ...r }; }).filter(Boolean)[0] || null;
     st.recours = (st.recours || []).filter((x) => moi && nom(x.de) === nom(moi.raisonSociale));
   }
   return { state: st, revs, rev: getRev() };
@@ -214,6 +222,87 @@ function annoncer(ev, lab, titre, corps, ref) {
     if (comptes.length && mail.actif()) expedier(e);
   }
 }
+
+/** Notification émise par le serveur, hors règles d'événement : aux rôles et comptes désignés. */
+function notifierServeur({ ev, lab, titre, corps, roles = [], ids = [] }) {
+  const cur = (kvGet('notifs') || { value: [] }).value;
+  cur.unshift({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), ev, lab, titre, corps, t: frDate(), roles, ids, lu: [] });
+  require('../db').kvSet('notifs', cur.slice(0, 120), 'serveur');
+}
+
+/* ---- Dialogue avec le fournisseur : écritures ciblées, contrôlées par le serveur ----
+   Un fournisseur n'écrit jamais les clés entières (qa, clarifs, reclamations) : il pose une question, répond à une
+   demande de clarification qui vise son offre, dépose une réclamation ; l'auteur, la date et le statut sont posés ici. */
+const QUESTIONS_JOURS_AVANT = 3; // questions reçues jusqu'à 3 jours avant la date limite de dépôt
+const estFournisseur = (req) => req.can('portail.use') && !req.can('offres.read');
+const texte = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
+const ecrireCle = (req, k, v) => { req.store.set(k, v, req.user.id); require('../db').bumpRev(); };
+
+/** Question d'un fournisseur sur le dossier publié ; diffusée sans son auteur avec la réponse de l'acheteur. */
+r.post('/questions', (req, res) => {
+  if (!estFournisseur(req)) return res.status(403).json({ error: 'Réservé aux fournisseurs.', code: 'FORBIDDEN' });
+  const cdc = req.store.get('cdc') || {}, ech = R.echeanceDepot(cdc);
+  if (!cdc.cdcPublie) return res.status(409).json({ error: 'Le dossier n’est pas publié.', code: 'NOT_PUBLISHED' });
+  if (ech && Date.now() > ech - QUESTIONS_JOURS_AVANT * 86400000)
+    return res.status(409).json({ error: `Les questions sont closes ${QUESTIONS_JOURS_AVANT} jours avant la date limite de dépôt.`, code: 'QUESTIONS_CLOSED' });
+  const question = texte((req.body || {}).question, 2000);
+  if (question.length < 10) return res.status(422).json({ error: 'Votre question est trop courte.', code: 'QUESTION_SHORT' });
+  const qa = req.store.get('qa') || [];
+  if (qa.filter((q) => q.par === req.user.id).length >= 20) return res.status(429).json({ error: 'Vingt questions au plus par consultation.', code: 'TOO_MANY' });
+  const p = partenaireDe(req.user.id);
+  const q = { id: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), question, t: frDate(), anonyme: true, par: req.user.id, partenaire: p ? p.id : null };
+  ecrireCle(req, 'qa', qa.concat([q]));
+  auditAppend(req.user.id, whoLabel(req.user), 'Question posée sur le dossier', req.pid);
+  annoncer('question.recue', 'Question reçue d’un candidat', 'Question reçue — ' + (cdc.ref || ''), question, cdc.ref || '');
+  res.status(201).json({ ok: true, question: { id: q.id, question, t: q.t, mienne: true } });
+});
+
+/** Réponse du fournisseur à une demande de clarification qui vise son offre. */
+r.put('/clarifications/:i/reponse', (req, res) => {
+  if (!estFournisseur(req)) return res.status(403).json({ error: 'Réservé aux fournisseurs.', code: 'FORBIDDEN' });
+  const clarifs = req.store.get('clarifs') || [], i = Number(req.params.i), cl = clarifs[i];
+  const o = cl && req.store.offers().find((x) => x.id === cl.offerId);
+  if (!cl || !o || o.depotPar !== req.user.id) return res.status(404).json({ error: 'Demande introuvable.', code: 'CLARIF_UNKNOWN' });
+  if (cl.statut !== 'envoyee') return res.status(409).json({ error: 'Vous avez déjà répondu à cette demande.', code: 'CLARIF_ANSWERED' });
+  const reponse = texte((req.body || {}).reponse, 5000);
+  if (reponse.length < 2) return res.status(422).json({ error: 'La réponse est vide.', code: 'ANSWER_EMPTY' });
+  const maj = clarifs.slice(); maj[i] = { ...cl, reponse, tRep: frDate(), statut: 'repondue', reponduPar: req.user.id };
+  ecrireCle(req, 'clarifs', maj);
+  auditAppend(req.user.id, whoLabel(req.user), `Réponse de clarification reçue — ${o.name} : ${cl.objet}`, req.pid);
+  notifierServeur({ ev: 'clarif.repondue', lab: 'Clarification', titre: 'Réponse de clarification — ' + o.name, corps: cl.objet + '\n\n' + reponse, roles: ['achats'] });
+  res.json({ ok: true });
+});
+
+/** Réclamation d'un fournisseur qui a déposé une offre ; traitée et répondue par l'acheteur. */
+r.post('/reclamations', (req, res) => {
+  if (!estFournisseur(req)) return res.status(403).json({ error: 'Réservé aux fournisseurs.', code: 'FORBIDDEN' });
+  const offre = req.store.offers().find((x) => x.depotPar === req.user.id);
+  if (!offre) return res.status(403).json({ error: 'Seul un fournisseur ayant déposé une offre peut adresser une réclamation.', code: 'NO_OFFER' });
+  const objet = texte((req.body || {}).objet, 200), detail = texte((req.body || {}).texte, 3000);
+  if (objet.length < 3 || detail.length < 10) return res.status(422).json({ error: 'Indiquez l’objet et le détail de votre réclamation.', code: 'CLAIM_INCOMPLETE' });
+  const liste = req.store.get('reclamations') || [];
+  if (liste.filter((x) => x.par === req.user.id && x.statut === 'ouverte').length >= 3) return res.status(429).json({ error: 'Trois réclamations en cours au plus.', code: 'TOO_MANY' });
+  const x = { id: 'R' + Date.now().toString(36), par: req.user.id, de: offre.name, objet, texte: detail, t: frDate(), statut: 'ouverte' };
+  ecrireCle(req, 'reclamations', liste.concat([x]));
+  auditAppend(req.user.id, whoLabel(req.user), `Réclamation déposée — ${offre.name} : ${objet}`, req.pid);
+  notifierServeur({ ev: 'reclamation', lab: 'Réclamation', titre: 'Réclamation de ' + offre.name, corps: objet, roles: ['achats', 'approb'] });
+  res.status(201).json({ ok: true, reclamation: x });
+});
+
+/** Réponse de l'acheteur à une réclamation : elle est close, et son auteur prévenu. */
+r.put('/reclamations/:id/reponse', (req, res) => {
+  if (!req.can('recours.handle') && !req.can('qa.answer')) return res.status(403).json({ error: 'Habilitation insuffisante.', code: 'FORBIDDEN' });
+  const liste = req.store.get('reclamations') || [], i = liste.findIndex((x) => x.id === req.params.id);
+  if (i < 0) return res.status(404).json({ error: 'Réclamation introuvable.', code: 'CLAIM_UNKNOWN' });
+  if (liste[i].statut !== 'ouverte') return res.status(409).json({ error: 'Cette réclamation a déjà reçu une réponse.', code: 'CLAIM_ANSWERED' });
+  const reponse = texte((req.body || {}).reponse, 5000);
+  if (reponse.length < 2) return res.status(422).json({ error: 'La réponse est vide.', code: 'ANSWER_EMPTY' });
+  const maj = liste.slice(); maj[i] = { ...liste[i], statut: 'traitee', reponse, tRep: frDate(), reponduPar: whoLabel(req.user) };
+  ecrireCle(req, 'reclamations', maj);
+  auditAppend(req.user.id, whoLabel(req.user), `Réponse à la réclamation de ${liste[i].de} : ${liste[i].objet}`, req.pid);
+  notifierServeur({ ev: 'reclamation', lab: 'Réclamation', titre: 'Réponse à votre réclamation', corps: liste[i].objet + '\n\n' + reponse, ids: [liste[i].par] });
+  res.json({ ok: true, reclamation: maj[i] });
+});
 
 /** Modification d'une ou plusieurs clés entières, avec détection de conflit sur les révisions envoyées. */
 r.patch('/state', (req, res) => {

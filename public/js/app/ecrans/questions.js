@@ -1,12 +1,7 @@
 /* Marché+ — Écran Questions des candidats et additifs.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build.
-   Deux tableaux ; le détail d'une question (et la réponse) ou d'un additif s'ouvre dans une fenêtre. */
+   Questions des fournisseurs (posées depuis leur espace), additifs, réclamations ; le détail s'ouvre dans une fenêtre. */
 "use strict";
-
-var QUESTIONS_EXEMPLES = ["Le lot 4 (maintenance) peut-il être soumissionné séparément des lots 1 à 3 ?",
-  "La caution de soumission peut-elle être émise par une banque de notre pays d'origine avec contre-garantie locale ?",
-  "Les références exigées doivent-elles porter sur le secteur bancaire ou tout secteur est-il admis ?",
-  "Le délai d'acheminement maritime est-il inclus dans le délai d'exécution de 120 jours ?"];
 
 /* ============ Questions des candidats & additifs ============ */
 function vQA(m){
@@ -15,7 +10,7 @@ function vQA(m){
 
   var ouv=state.qa.filter(function(x){return !x.reponse;}).length;
   var tq=tableau(m,{ cle:'qa', titre:'Questions reçues', lignes:state.qa.map(function(q,i){ return {q:q,i:i}; }),
-    vide:'Aucune question reçue. Les questions déposées par les candidats apparaîtront ici.',
+    vide:'Aucune question reçue. Les fournisseurs consultés posent leurs questions depuis leur espace, jusqu’à 3 jours avant la date limite.',
     colonnes:[
       {lab:'N°', num:true, val:function(x){ return x.i+1; }},
       {lab:'Question', rendu:function(x,td){ add(td,'div','dt-extrait',x.q.question); }},
@@ -24,7 +19,6 @@ function vQA(m){
     ],
     recherche:function(x){ return x.q.question+' '+(x.q.reponse||''); },
     filtres:[{ lab:'Statut', options:[['attente','En attente'],['repondue','Répondue']], test:function(x,v){ return v==='repondue' ? !!x.q.reponse : !x.q.reponse; } }],
-    nouveau: { lab:'Simuler une question', action:simulerQuestion },
     actions:function(x,td){ boutonDetail(td,function(){ ouvrirQuestion(x.i); },'qa-ouvrir-'+x.i, !x.q.reponse && can('qa.answer') ? 'Répondre' : null); }
   });
   add(tq.querySelector('.dt-barre'),'span','chip '+(ouv?'c-amber':'c-green'), ouv? ouv+' sans réponse':'Toutes traitées');
@@ -41,14 +35,47 @@ function vQA(m){
     nouveau: can('qa.answer') ? { lab:'Publier un additif', action:publierAdditif } : null,
     actions:function(x,td){ boutonDetail(td,function(){ ouvrirAdditif(x.i); },'add-ouvrir-'+x.i); }
   });
+
+  // réclamations adressées par les fournisseurs ayant déposé une offre
+  var rec=state.reclamations||[], ouvertes=rec.filter(function(x){ return x.statut==='ouverte'; }).length;
+  var tr=tableau(m,{ cle:'reclamations', titre:'Réclamations des fournisseurs', lignes:rec,
+    vide:'Aucune réclamation. Un fournisseur ayant déposé une offre peut en adresser une depuis son espace.',
+    colonnes:[
+      {lab:'Fournisseur', val:function(x){ return x.de; }},
+      {lab:'Objet', rendu:function(x,td){ add(td,'div','dt-extrait',x.objet); }},
+      {lab:'Reçue le', val:function(x){ return x.t; }},
+      {lab:'Statut', rendu:function(x,td){ chipCellule(td, x.statut==='traitee'?'Répondue':'À traiter', x.statut==='traitee'?'c-green':'c-amber'); }}
+    ],
+    recherche:function(x){ return x.de+' '+x.objet+' '+x.texte; },
+    actions:function(x,td){ boutonDetail(td,function(){ ouvrirReclamation(x.id); },'rec-'+x.id, x.statut==='ouverte' && (can('recours.handle')||can('qa.answer')) ? 'Répondre' : null); }
+  });
+  add(tr.querySelector('.dt-barre'),'span','chip '+(ouvertes?'c-amber':'c-green'), ouvertes? ouvertes+' à traiter':'Aucune à traiter');
 }
 
-function simulerQuestion(){
-  var q=QUESTIONS_EXEMPLES[state.qa.length % QUESTIONS_EXEMPLES.length];
-  state.qa.push({ question:q, t:new Date().toLocaleString('fr-FR'), anonyme:true });
-  logit('Question de candidat enregistrée');
-  notify('question.recue','Question reçue d’un candidat', q);
-  save(); render();
+/* Réclamation d'un fournisseur : exposé, et réponse de l'acheteur (elle la clôt et prévient son auteur). */
+function ouvrirReclamation(id){
+  ouvrirFenetre(function(){ var x=(state.reclamations||[]).filter(function(r){ return r.id===id; })[0]; return 'Réclamation — '+(x?x.de:''); }, function(c,p){
+    var x=(state.reclamations||[]).filter(function(r){ return r.id===id; })[0]; if(!x) return false;
+    var ch=add(c,'div','fen-chips');
+    chipCellule(ch,'Reçue le '+x.t,'c-grey');
+    chipCellule(ch, x.statut==='traitee'?'Répondue':'À traiter', x.statut==='traitee'?'c-green':'c-amber');
+    champLecture(c,'Objet',x.objet);
+    champLecture(c,'Exposé du fournisseur',x.texte);
+    if(x.reponse){ champLecture(c,'Réponse — '+(x.reponduPar||'')+(x.tRep?' — '+x.tRep:''),x.reponse); return; }
+    if(!can('recours.handle') && !can('qa.answer')) return;
+    var d=add(c,'div','fen-champ');
+    var lb=add(d,'label','fen-lab','Réponse au fournisseur'); lb.htmlFor='rec-reponse';
+    var ta=add(d,'textarea'); ta.id='rec-reponse'; ta.rows=5; fk(ta,'rec-rep-'+id);
+    add(p,'span','muted','La réponse est communiquée au seul fournisseur concerné.');
+    var bt=add(p,'button','btn btn-primary','Envoyer la réponse'); fk(bt,'rec-envoyer-'+id);
+    bt.addEventListener('click',function(){
+      var v=ta.value.trim(); if(!v){ toast('La réponse ne peut pas être vide.'); ta.focus(); return; }
+      bt.disabled=true;
+      MP.api('PUT',MP.url('/reclamations/'+encodeURIComponent(id)+'/reponse'),{ reponse:v })
+        .then(function(){ toast('Réponse envoyée à '+x.de+'.'); return relireEtat(); })
+        .catch(function(e){ bt.disabled=false; toast(e.message||'Envoi impossible.'); });
+    });
+  });
 }
 
 function ouvrirQuestion(i){
@@ -65,7 +92,7 @@ function ouvrirQuestion(i){
       var d=add(c,'div','fen-champ');
       var lb=add(d,'label','fen-lab','Réponse — elle sera communiquée à tous les candidats'); lb.htmlFor='qa-reponse';
       var ta=add(d,'textarea'); ta.id='qa-reponse'; ta.rows=5; fk(ta,'qa-'+i);
-      add(p,'span','muted','Les questions sont closes 7 jours avant la date limite de dépôt.');
+      add(p,'span','muted','La réponse est publiée à tous les fournisseurs consultés, sans le nom de l’auteur de la question.');
       var bt=add(p,'button','btn btn-primary','Publier la réponse'); fk(bt,'qa-publier-'+i);
       bt.addEventListener('click',function(){
         if(!ta.value.trim()){ toast('La réponse ne peut pas être vide.'); ta.focus(); return; }
