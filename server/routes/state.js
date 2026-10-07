@@ -125,6 +125,20 @@ function ecrire(req, changes) {
         const cur = (kvGet(k) || { value: [] }).value;
         const byId = new Map(cur.map((x) => [x.id, x]));
         const regle = (x) => ((kvGet('notifRules') || { value: {} }).value || {})[x.ev] || { roles: [] };
+        // une règle qui vise les fournisseurs (rôle soum) ne vise que ceux de la procédure : partenaires consultés et
+        // auteurs d'une offre, jamais tous les comptes fournisseurs de l'espace (attribution, publication, additifs…)
+        let concernes = null;
+        const fournisseursConcernes = () => {
+          if (concernes) return concernes;
+          concernes = new Set();
+          if (req.pid) {
+            const { partenaireGet } = require('../db');
+            require('../consultation').consultation((kk) => req.store.get(kk)).partenaires
+              .forEach((pid) => ((partenaireGet(pid) || {}).comptes || []).forEach((u) => concernes.add(u)));
+            req.store.offers().forEach((o) => { if (o.depotPar) concernes.add(o.depotPar); });
+          }
+          return concernes;
+        };
         const out = [];
         for (const x of changes[k]) {
           if (!x || !x.id) continue;
@@ -132,8 +146,10 @@ function ecrire(req, changes) {
           if (k === 'notifs') {
             // notification enregistrée : seule la lecture change, et chacun ne marque lu que pour lui-même
             if (old) { out.push({ ...old, lu: [...new Set([...(old.lu || []), ...(Array.isArray(x.lu) && x.lu.includes(uid) ? [uid] : [])])] }); continue; }
+            const r = regle(x).roles;
             out.push({ id: String(x.id).slice(0, 40), ev: String(x.ev), lab: String(x.lab || '').slice(0, 120), titre: String(x.titre || '').slice(0, 250),
-              corps: String(x.corps || '').slice(0, 5000), t: frDate(), roles: regle(x).roles.slice(), lu: [] });
+              corps: String(x.corps || '').slice(0, 5000), t: frDate(), roles: r.filter((z) => z !== 'soum'),
+              ids: r.includes('soum') ? [...fournisseursConcernes()] : [], lu: [] });
             continue;
           }
           if (k === 'emails') {
@@ -142,7 +158,7 @@ function ecrire(req, changes) {
             // l'événement, avec leur adresse réelle (jamais une adresse fournie par le navigateur)
             const ids = [...new Set((Array.isArray(x.ids) ? x.ids : []).map(String))].slice(0, 50), roles = regle(x).roles;
             const comptes = ids.length ? db.prepare(`SELECT id, nom, email, role FROM users WHERE active=1 AND id IN (${ids.map(() => '?').join(',')})`).all(...ids)
-              .filter((u) => roles.includes(u.role)) : [];
+              .filter((u) => roles.includes(u.role) && (u.role !== 'soum' || fournisseursConcernes().has(u.id))) : [];
             const e = { id: String(x.id).slice(0, 40), ev: String(x.ev || '').slice(0, 40), de: mail.actif() ? mail.expediteur() : String(x.de || '').slice(0, 120),
               ids: comptes.map((u) => u.id), a: comptes.map((u) => u.email), noms: comptes.map((u) => u.nom),
               objet: String(x.objet || '').slice(0, 250), corps: String(x.corps || '').slice(0, 20000), t: frDate(),
