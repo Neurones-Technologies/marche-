@@ -206,16 +206,9 @@ function vPortail(m, etape){
   var mp=state.monPartenaire, couvertes=(mp && mp.statut==='reference' && mp.piecesValables) || {};
   req.forEach(function(doc){
     var cov=couvertes[R.pieceReferencement(doc,(state.formulaireReferencement||{}).pieces)];
-    ligneFichier(b3, doc, doc.id==='caution' ? 'Montant : '+c.caution+' % du montant de l’offre' :
-      (doc.id==='contreGarantie' ? 'Émise ou contre-garantie par un établissement agréé dans l’UEMOA' :
-      (doc.id==='traduction' ? 'Traduction française certifiée conforme' : 'Pièce exigée au règlement de consultation')),
+    ligneFichier(b3, doc, '',
       cov ? 'Couverte par votre référencement : '+cov.nom+(cov.expire?' (valable jusqu\u2019au '+cov.expire+')':'')+'. Joindre un fichier ici remplace cette pièce pour cette offre.' : '');
   });
-  var non = DOCS().filter(function(x){ return req.indexOf(x)<0; });
-  if(non.length){
-    var nb=add(k3,'div','panel-foot');
-    add(nb,'span','muted','Non exigé de votre profil : '+non.map(function(x){return x.label;}).join(' · '));
-  }
 
   /* Contrôle avant dépôt */
   var k4=add(zSoum,'div','card'); k4.style.marginTop='18px';
