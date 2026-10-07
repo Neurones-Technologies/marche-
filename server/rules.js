@@ -506,6 +506,18 @@ function effectsOf(changes, req) {
     kv.fxFrozen = { rates, at: frDate(), by: uid };
     audit.push('Taux de change figés à la clôture du dépouillement : ' + Object.entries(rates).map(([d, v]) => `${d} ${v}`).join(', '));
   }
+  // jalons de la procédure, datés par le serveur la première fois qu'une étape est franchie (indicateurs de délais)
+  {
+    const j = { ...(stored('jalons') || {}) }, avantJ = JSON.stringify(j), maintenant = new Date().toISOString();
+    const poser = (k, franchi) => { if (franchi && !(k in j)) j[k] = maintenant; }; // null : franchie, date inconnue
+    poser('publie', !!(next('cdc') || {}).cdcPublie);
+    poser('depouille', !!next('depClosed'));
+    poser('evalue', !!next('evalDone'));
+    poser('attribue', !!next('evalDone') && C.complet(kv.approvals || next('approvals') || []));
+    poser('signe', !!next('contractSigned'));
+    poser('infructueux', !!next('infructueux'));
+    if (JSON.stringify(j) !== avantJ) kv.jalons = j;
+  }
   if (JSON.stringify(s) !== before) kv._sod = s;
   return { kv, audit };
 }

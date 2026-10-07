@@ -3,7 +3,10 @@
      les actions qui l'attendent, calculées par le serveur selon ses habilitations (validations à donner,
      dossiers à instruire, commandes à émettre ou à réceptionner…), avec de quoi ouvrir l'écran concerné.
    - GET /api/registre : toutes les procédures visibles, passées et en cours, avec leur phase, le titulaire et le
-     montant attribués, le besoin d'origine et les commandes passées. */
+     montant attribués, le besoin d'origine et les commandes passées.
+   - GET /api/indicateurs : pilotage des achats sur une année (création de la procédure) : volumes, délais entre les
+     jalons datés par le serveur, économies (estimation du dossier comparée au montant attribué), concurrence,
+     commandes. Lecteurs des offres, de la piste d'audit ou des procès-verbaux. */
 const express = require('express');
 const { db, store, proceduresAll, besoinsAll, commandesAll, partenairesAll, partenaireDe, auditList } = require('../db');
 const { requireAuth } = require('../auth');
@@ -154,6 +157,68 @@ r.get('/accueil', requireAuth, (req, res) => {
   // activité récente : les dernières entrées du journal, pour ceux qui y ont accès
   const activite = can('audit.read') ? auditList(8) : [];
   res.json({ chiffres, taches, activite });
+});
+
+/* ---- Indicateurs ---- */
+const isoSql = (t) => (t ? String(t).replace(' ', 'T') + (/Z$/.test(t) ? '' : 'Z') : null);
+const jours = (a, b) => (a && b ? Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 864e5 * 10) / 10) : null);
+/** Montant d'un texte (« 45 000 000 XOF »), converti en XOF au taux de l'organisation quand une autre devise est citée. */
+function montantTexte(t, rates) {
+  const s = String(t || ''), n = Number(s.replace(/[^\d,.]/g, '').replace(/\s/g, '').replace(',', '.'));
+  if (!(n > 0)) return null;
+  const dev = (/\b(EUR|USD|GHS|NGN|XOF)\b/.exec(s) || [])[1] || 'XOF';
+  return n * ((rates || {})[dev] || 1);
+}
+/** Estimation d'un dossier en XOF : somme des montants estimatifs des lots, sinon budget estimé du besoin d'origine. */
+function estimation(cdc, rates) {
+  const lots = (cdc.lots || []).map((l) => montantTexte(l.montant, rates));
+  if (lots.length && lots.every((x) => x != null)) return lots.reduce((t, x) => t + x, 0);
+  return Number(cdc.budgetEstime) > 0 ? Number(cdc.budgetEstime) : null;
+}
+function resume(liste) {
+  const v = liste.filter((x) => x != null).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const m = Math.floor(v.length / 2), med = v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+  return { nb: v.length, moyenne: Math.round(v.reduce((t, x) => t + x, 0) / v.length * 10) / 10, mediane: Math.round(med * 10) / 10, min: v[0], max: v[v.length - 1] };
+}
+r.get('/indicateurs', requireAuth, (req, res) => {
+  if (!(req.can('offres.read') || req.can('audit.read') || req.can('pv.read'))) return res.status(403).json({ error: 'Habilitation insuffisante.' });
+  const annees = new Set(), annee = Number(req.query.annee) || null;
+  const toutes = proceduresAll().map((p) => { const a = new Date(isoSql(p.creee)).getUTCFullYear(); annees.add(a); return { ...p, annee: a }; });
+  const commandes = commandesAll();
+  const lignes = toutes.filter((p) => !annee || p.annee === annee).map((p) => {
+    const ctx = ctxDe(p.id), ph = phase(p, ctx), cdc = ctx.cdc || {}, j = store(p.id).get('jalons') || {};
+    const rates = (ctx.fxFrozen && ctx.fxFrozen.rates) || (ctx.org || {}).rates;
+    const win = R.allApproved(ctx.approvals) ? R.ranking(ctx)[0] : null;
+    const attribue = win ? Math.round(R.montantXOF(ctx, win.o)) : null, estime = estimation(cdc, rates);
+    const cmd = commandes.filter((c) => c.procedure.id === p.id && c.numero && c.statut !== 'annulee');
+    return { id: p.id, ref: cdc.ref, objet: cdc.objet, phase: ph, archive: p.archive,
+      offres: ctx.offers.length, enLigne: ctx.offers.filter((o) => o.submitted).length, horsPlateforme: ctx.offers.filter((o) => o.externe).length,
+      estime: estime != null ? Math.round(estime) : null, attribue, titulaire: win ? win.o.name : null,
+      economie: estime != null && attribue != null ? Math.round(estime - attribue) : null,
+      delais: { preparation: jours(isoSql(p.creee), j.publie), consultation: jours(j.publie, j.depouille), evaluation: jours(j.depouille, j.attribue),
+        cycle: jours(j.publie, j.attribue), signature: jours(j.attribue, j.signe) },
+      commandes: { nb: cmd.length, montant: Math.round(cmd.reduce((t, c) => t + c.lignes.reduce((s, l) => s + l.quantite * l.prixUnitaire, 0) * (c.taux || 1), 0)) } };
+  });
+  const avecEco = lignes.filter((l) => l.economie != null);
+  const estimeTot = avecEco.reduce((t, l) => t + l.estime, 0), attribueTot = avecEco.reduce((t, l) => t + l.attribue, 0);
+  const consultees = lignes.filter((l) => l.phase.rang >= 4 && l.phase.id !== 'archivee' || (l.phase.id === 'archivee' && l.offres));
+  const cmdAnnee = commandes.filter((c) => c.numero && lignes.some((l) => l.id === c.procedure.id));
+  res.json({
+    annee, annees: [...annees].sort(), procedures: lignes,
+    volumes: { procedures: lignes.length, enPreparation: lignes.filter((l) => l.phase.id === 'preparation').length,
+      enCours: lignes.filter((l) => ['publiee', 'evaluation', 'approbation'].includes(l.phase.id)).length,
+      attribuees: lignes.filter((l) => ['attribuee', 'signee'].includes(l.phase.id) || l.attribue != null).length,
+      infructueuses: lignes.filter((l) => l.phase.id === 'infructueuse').length, montantAttribue: lignes.reduce((t, l) => t + (l.attribue || 0), 0) },
+    concurrence: { offres: lignes.reduce((t, l) => t + l.offres, 0), enLigne: lignes.reduce((t, l) => t + l.enLigne, 0), horsPlateforme: lignes.reduce((t, l) => t + l.horsPlateforme, 0),
+      parConsultation: resume(consultees.map((l) => l.offres)), moinsDeTrois: consultees.filter((l) => l.offres < 3).length, consultations: consultees.length },
+    delais: Object.fromEntries(['preparation', 'consultation', 'evaluation', 'cycle', 'signature'].map((k) => [k, resume(lignes.map((l) => l.delais[k]))])),
+    economies: { procedures: avecEco.length, estime: Math.round(estimeTot), attribue: Math.round(attribueTot), economie: Math.round(estimeTot - attribueTot),
+      taux: estimeTot ? Math.round((estimeTot - attribueTot) / estimeTot * 1000) / 10 : null },
+    commandes: { emises: cmdAnnee.filter((c) => c.statut !== 'annulee').length, annulees: cmdAnnee.filter((c) => c.statut === 'annulee').length,
+      receptionnees: cmdAnnee.filter((c) => ['receptionnee', 'cloturee'].includes(c.statut)).length,
+      montant: Math.round(cmdAnnee.filter((c) => c.statut !== 'annulee').reduce((t, c) => t + c.lignes.reduce((s, l) => s + l.quantite * l.prixUnitaire, 0) * (c.taux || 1), 0)) },
+  });
 });
 
 module.exports = r;

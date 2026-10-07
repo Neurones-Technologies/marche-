@@ -104,7 +104,7 @@ var UI = { q:'', sort:'nom' };
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','recours','standstill','contractSigned','infructueux',
   'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','formulaireReferencement','circuitCommande','evaluationPartenaires','consultes'];
-var SERVER_ONLY = ['delegations','affectations','audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres','courriels','monResultat','reclamations','monOffre'];
+var SERVER_ONLY = ['delegations','affectations','audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres','courriels','monResultat','reclamations','monOffre','jalons'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
 var TARGETED = ['quality','justif','confirmed','excluded'];
@@ -511,6 +511,7 @@ var VIEWS=[
   {id:'procedures', label:'Appels d’offres', grp:'Registres'},
   {id:'commandes',  label:'Exécution', grp:'Registres'},
   {id:'partenaires', label:'Partenaires', grp:'Registres', perm:'partenaires.manage'},
+  {id:'indicateurs', label:'Indicateurs', grp:'Registres', perms:['offres.read','audit.read','pv.read']},
   {id:'referencement', label:'Mon référencement', grp:'Registres', role:true, perm:'portail.use'},
   {id:'dashboard',  label:'Vue d’ensemble', grp:'Procédure'},
   {id:'cdc',        label:'Cahier des charges', grp:'Procédure'}, // publié : consultable de tous (soumissionnaires compris)
@@ -547,7 +548,7 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['accueil','envois','suppleances','params','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
+var SANS_PROCEDURE = ['accueil','indicateurs','envois','suppleances','params','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
 /* Familles d'écrans : une seule entrée de menu, et des onglets en tête de page pour passer de l'un à l'autre. */
 var FAMILLES = { acces:{ lab:'Utilisateurs et accès', icone:'users' }, alertes:{ lab:'Alertes', icone:'ring' } };
 function familleDe(id){ var v=VIEWS.filter(function(x){ return x.id===id; })[0]; return v && v.famille || null; }

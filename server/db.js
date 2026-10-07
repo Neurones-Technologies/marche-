@@ -115,7 +115,7 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const frDate = () => new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abidjan' });
 
 /* Clés propres à une procédure ; toutes les autres appartiennent à l'organisation (une par instance). */
-const PROC_KEYS = ['reclamations', 'docDefs', 'cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
+const PROC_KEYS = ['jalons', 'reclamations', 'docDefs', 'cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
   'qa', 'additifs', 'clarifs', 'coi', 'recours', 'standstill', 'contractSigned', 'infructueux', 'fxFrozen', 'cadre', '_sod', 'rejets', 'consultes'];
 const isProcKey = (k) => PROC_KEYS.includes(k);
 
@@ -550,6 +550,23 @@ db.transaction(function migrate() {
   const modelePieces = (kvGet('docDefs') || { value: seed.DOC_DEFS }).value;
   for (const p of db.prepare('SELECT id FROM procedures').all()) {
     if (!db.prepare("SELECT 1 FROM pkv WHERE procedure_id=? AND key='docDefs'").get(p.id)) pkvSet(p.id, 'docDefs', clone(modelePieces), 'migration');
+  }
+  // 07/10/2026 : jalons datés des procédures (indicateurs de délais). Pour une procédure existante, repris du journal
+  // d'audit (première entrée de chaque étape).
+  const DEPUIS_JOURNAL = { publie: /^(Cahier des charges publié|Cadre réglementaire figé à la publication)/, depouille: /^(Dépouillement clôturé|Taux de change figés à la clôture)/,
+    evalue: /^Évaluation validée/, attribue: /^Attribution prononcée/, signe: /^Marché signé/, infructueux: /infructueu/i };
+  const isoDe = (t) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(t || '')); return m ? `${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:${m[6] || '00'}Z` : null; };
+  for (const p of db.prepare('SELECT id FROM procedures').all()) {
+    if (pkvGet(p.id, 'jalons')) continue;
+    const j = {};
+    for (const e of db.prepare('SELECT t, action FROM audit WHERE procedure_id=? ORDER BY seq').all(p.id))
+      for (const [k, re] of Object.entries(DEPUIS_JOURNAL)) if (!j[k] && re.test(e.action)) j[k] = isoDe(e.t);
+    // étape franchie sans trace au journal : date inconnue (jamais datée après coup)
+    const g = (k) => (pkvGet(p.id, k) || {}).value;
+    const franchies = { publie: (g('cdc') || {}).cdcPublie, depouille: g('depClosed'), evalue: g('evalDone'),
+      attribue: g('evalDone') && C.complet(g('approvals') || []), signe: g('contractSigned'), infructueux: g('infructueux') };
+    for (const [k, f] of Object.entries(franchies)) if (f && !j[k]) j[k] = null;
+    pkvSet(p.id, 'jalons', j, 'migration');
   }
   // 07/10/2026 : les clauses techniques (CCTP) deviennent propres à chaque achat (cdc.cctp). L'appel d'offres de
   // démonstration garde celles qu'il affichait jusque-là ; les autres prennent le CCTP générique, à faire rédiger.
