@@ -94,8 +94,18 @@ function vPortail(m){
       save(); render();
     });
   });
+  // un montant par lot soumissionné ; le montant de l'offre en est la somme
+  d.prixLots=d.prixLots||{};
+  if(d.lots.length){
+    var fl=add(p2,'div','frm'); fl.style.marginBottom='12px';
+    c.lots.filter(function(l){ return d.lots.indexOf(l.id)>=0; }).forEach(function(l){
+      fld(fl,'Prix HT — '+l.nom+' ('+d.devise+')','input',d.prixLots[l.id]||'',function(v){ d.prixLots[l.id]=v; },'number');
+    });
+  }
+  d.montant=d.lots.reduce(function(t,id){ return t+(Number(d.prixLots[id])||0); },0) || '';
+  var tot=add(p2,'div','prix-total'); add(tot,'span',null,'Montant total HT de l’offre');
+  add(tot,'strong',null, d.montant ? sep(d.montant)+' '+d.devise : '—');
   var f2=add(p2,'div','frm');
-  fld(f2,'Montant total HT ('+d.devise+')','input',d.montant,function(v){ d.montant=v; },'number');
   fld(f2,"Délai d'exécution (jours)",'input',d.delai,function(v){ d.delai=v; },'number');
   fld(f2,'Garantie proposée (mois)','input',d.garantie,function(v){ d.garantie=v; },'number');
   fld(f2,'Nombre de références similaires','input',d.refsCount,function(v){ d.refsCount=v; },'number');
@@ -157,6 +167,7 @@ function vPortail(m){
   var b4=add(k4,'div','pad');
   var errs=[], warns=[], infos=[];
   if(!d.name.trim()) errs.push('Raison sociale non renseignée.');
+  if(d.lots.some(function(id){ return !(Number((d.prixLots||{})[id])>0); })) errs.push('Prix manquant pour un lot soumissionné.');
   if(!Number(d.montant)) errs.push('Montant total non renseigné.');
   if(!Number(d.delai)) errs.push("Délai d'exécution non renseigné.");
   if(!d.lots.length) errs.push('Aucun lot sélectionné.');
@@ -196,7 +207,8 @@ function vPortail(m){
   sub.disabled = errs.length>0; guard('portail.use',sub);
   sub.addEventListener('click',function(){
     sub.disabled=true;
-    MP.api('POST',MP.url('/offers'),{ name:d.name.trim(), iso:d.iso, devise:d.devise, montant:Number(d.montant), delai:Number(d.delai)||0,
+    var pl={}; d.lots.forEach(function(id){ pl[id]=Number(d.prixLots[id]); });
+    MP.api('POST',MP.url('/offers'),{ name:d.name.trim(), iso:d.iso, devise:d.devise, montant:Number(d.montant), prixLots:pl, delai:Number(d.delai)||0,
       garantie:Number(d.garantie)||0, refsCount:Number(d.refsCount)||0, lots:d.lots, docs:d.docs }).then(function(r){
       var offer=r.offer, receipt=r.receipt;
       SEED_OFFERS.push(offer); state.quality[offer.id]={metho:offer.aiMetho, refs:offer.aiRefs};

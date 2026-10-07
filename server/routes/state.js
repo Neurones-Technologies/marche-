@@ -416,7 +416,8 @@ r.post('/offers', (req, res) => {
   const org = req.store.get('org'), cdc = req.store.get('cdc');
   const paysList = { CI: 'Côte d’Ivoire', BF: 'Burkina Faso', SN: 'Sénégal', ML: 'Mali', NE: 'Niger', TG: 'Togo', BJ: 'Bénin', GW: 'Guinée-Bissau' };
   const name = String(d.name || '').trim();
-  const montant = Number(d.montant), delai = Number(d.delai) || 0, garantie = Number(d.garantie) || 0, refs = Math.max(0, Math.floor(Number(d.refsCount) || 0));
+  let montant = Number(d.montant);
+  const delai = Number(d.delai) || 0, garantie = Number(d.garantie) || 0, refs = Math.max(0, Math.floor(Number(d.refsCount) || 0));
   const lotIds = new Set((cdc.lots || []).map((l) => l.id));
   const lots = Array.isArray(d.lots) ? [...new Set(d.lots.filter((x) => lotIds.has(x)))] : [];
   const errs = [];
@@ -428,8 +429,19 @@ r.post('/offers', (req, res) => {
   if (name.length < 2 || name.length > 200) errs.push('Raison sociale invalide.');
   if (!/^[A-Z]{2}$/.test(String(d.iso || ''))) errs.push('Pays invalide.');
   if (!org.rates[d.devise]) errs.push('Devise non admise.');
-  if (!Number.isFinite(montant) || montant <= 0) errs.push('Montant invalide.');
   if (!lots.length) errs.push('Au moins un lot est requis.');
+  // prix par lot : un montant positif pour chaque lot soumissionné ; le montant de l'offre en est la somme
+  let prixLots = null;
+  if (d.prixLots && typeof d.prixLots === 'object') {
+    prixLots = {};
+    for (const l of lots) {
+      const v = Number(d.prixLots[l]);
+      if (!Number.isFinite(v) || v <= 0) { errs.push('Montant manquant pour un lot soumissionné.'); break; }
+      prixLots[l] = Math.round(v * 100) / 100;
+    }
+    montant = Object.values(prixLots).reduce((t, v) => t + v, 0);
+  }
+  if (!Number.isFinite(montant) || montant <= 0) errs.push('Montant invalide.');
   if (errs.length) return res.status(422).json({ error: errs.join(' ') });
   // consultation restreinte : seuls les partenaires référencés et sélectionnés déposent ; appel d'offres ouvert d'un
   // acheteur public : toute entreprise inscrite
@@ -465,7 +477,8 @@ r.post('/offers', (req, res) => {
       { k: 'Garantie', v: garantie + ' mois', flag: false, conf: 100 },
       { k: 'Références déclarées', v: refs + ' référence(s)', flag: false, conf: 100 },
       { k: 'Lots soumissionnés', v: lots.length + ' lot(s) sur ' + (cdc.lots || []).length, flag: false, conf: 100 },
-    ],
+    ].concat(prixLots ? lots.map((l) => ({ k: 'Prix — ' + (((cdc.lots || []).find((x) => x.id === l) || {}).nom || l), v: sep(prixLots[l]) + ' ' + d.devise, flag: false, conf: 100 })) : []),
+    lots, ...(prixLots ? { prixLots } : {}),
   };
   let receipt;
   db.transaction(() => {

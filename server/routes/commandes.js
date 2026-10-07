@@ -103,7 +103,10 @@ r.post('/', (req, res) => {
     procedure: { id: e.procedure, ref: cdc.ref, objet: cdc.objet },
     titulaire: { nom: win.name, pays: win.pays, offre: win.id, partenaire: win.partenaire || null },
     devise: win.devise, taux: R.rate(ctx, win.devise), montantOffre: win.montant,
-    lignes: [{ designation: cdc.objet, quantite: 1, unite: 'forfait', prixUnitaire: e.restant }],
+    // prix par lot connus et rien encore d'engagé : une ligne par lot ; sinon le reste à engager, au forfait
+    lignes: win.prixLots && e.restant === win.montant
+      ? Object.keys(win.prixLots).map((l) => ({ designation: ((cdc.lots || []).find((x) => x.id === l) || {}).nom || l, quantite: 1, unite: 'forfait', prixUnitaire: win.prixLots[l] }))
+      : [{ designation: cdc.objet, quantite: 1, unite: 'forfait', prixUnitaire: e.restant }],
     jalons: [
       { libelle: 'Livraison sur site', pourcentage: 30 }, { libelle: 'Installation et essais', pourcentage: 40 },
       { libelle: 'Réception provisoire', pourcentage: 20 }, { libelle: 'Réception définitive', pourcentage: 10 },
