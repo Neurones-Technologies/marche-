@@ -4,6 +4,12 @@
 
 var PIECES_OK=false;
 function taille(n){ return n>=1048576 ? (n/1048576).toFixed(1).replace('.',',')+' Mo' : Math.max(1,Math.round(n/1024))+' Ko'; }
+/* Temps restant avant l'échéance de dépôt, en clair : « dans 7 j 23 h », « dans 3 h 05 ». */
+function delaiRestant(ms){
+  if(ms==null) return '';
+  var min=Math.floor(ms/60000), j=Math.floor(min/1440), h=Math.floor((min%1440)/60), mn=min%60;
+  return 'dans '+(j ? j+' j '+h+' h' : (h ? h+' h '+String(mn).padStart(2,'0') : mn+' min'));
+}
 function vPortail(m){
   var c=state.cdc, d=state.draft;
   if(!d.files) d.files={};
@@ -34,10 +40,12 @@ function vPortail(m){
 
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,c.objet);
-  add(h,'span','chip c-amber','Date limite de dépôt : '+c.ouverture);
+  var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
+  add(h,'span','chip '+(clos?'c-red':'c-amber'), clos ? 'Dépôts clos depuis le '+dateLongue(c.ouverture)+' à 10 h 00' : 'Clôture '+delaiRestant(reste)+' — le '+dateLongue(c.ouverture)+' à 10 h 00');
+  if(clos){ var fin=add(m,'div','warn'); fin.style.marginBottom='18px'; add(fin,'strong',null,'Date limite dépassée. '); fin.appendChild(document.createTextNode('Les dépôts sont clos : aucune offre ni pièce ne peut plus être transmise.')); }
 
-  /* Dossier à retirer */
-  var k0=add(m,'div','card');
+  /* Dossier à retirer (carte enveloppée : hors de la numérotation des sections du dépôt) */
+  var k0=add(add(m,'div'),'div','card'); k0.style.marginBottom='18px';
   add(k0,'div','panel-head','Dossier d\u2019appel d\u2019offres');
   var b0=add(k0,'div','pad');
   add(b0,'p','muted','Avis, règlement de la consultation, clauses administratives et techniques, bordereau des prix et formulaires.');
@@ -149,7 +157,8 @@ function vPortail(m){
   if(!Number(d.montant)) errs.push('Montant total non renseigné.');
   if(!Number(d.delai)) errs.push("Délai d'exécution non renseigné.");
   if(!d.lots.length) errs.push('Aucun lot sélectionné.');
-  req.forEach(function(x){ if(!d.docs[x.id] && !couvertes[x.id]) errs.push('Pièce manquante : '+x.label+'.'); });
+  req.forEach(function(x){ if(!d.docs[x.id] && !couvertes[R.pieceReferencement(x,(state.formulaireReferencement||{}).pieces)]) errs.push('Pièce manquante : '+x.label+'.'); });
+  if(clos) errs.push('La date limite de dépôt est dépassée.');
   if(Number(d.delai) > c.delaiMax) warns.push('Délai proposé ('+d.delai+' j) supérieur au plafond du cahier des charges ('+c.delaiMax+' j).');
   if(Number(d.garantie) && Number(d.garantie) < c.garantieMin) warns.push('Garantie proposée ('+d.garantie+' mois) inférieure au minimum exigé ('+c.garantieMin+' mois).');
   if(Number(d.refsCount) && Number(d.refsCount) < 3) warns.push('Références déclarées : '+d.refsCount+' pour 3 exigées.');

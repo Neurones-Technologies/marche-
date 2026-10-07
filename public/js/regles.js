@@ -141,6 +141,14 @@
     return ids.indexOf(docDef.id) >= 0 ? docDef.id : null;
   }
 
+  /* Échéance de dépôt des offres : la date limite du cahier des charges à 10 h 00, heure d'Abidjan (UTC, sans heure
+     d'été), comme l'annonce le dossier. Retourne un instant (ms) ou null si la date n'est pas renseignée. */
+  var HEURE_LIMITE = '10:00';
+  function echeanceDepot(cdc) {
+    var d = String((cdc || {}).ouverture || '');
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(d + 'T' + HEURE_LIMITE + ':00Z') : null;
+  }
+
   /* Ce qui manque au dossier pour être publié : liste de libellés, vide quand il est prêt. Le contexte porte aussi
      consultes (partenaires consultés). */
   function cdcManquants(ctx) {
@@ -149,6 +157,7 @@
     if (!plein(c.autorite)) out.push('l’autorité contractante');
     if (!plein(c.procedure)) out.push('le type de procédure');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(c.ouverture || ''))) out.push('la date limite de dépôt des offres (AAAA-MM-JJ)');
+    else if (echeanceDepot(c) <= (ctx.maintenant || Date.now())) out.push('une date limite de dépôt à venir (celle saisie est passée)');
     if (!(c.lots || []).some(function (l) { return l && plein(l.nom); })) out.push('au moins un lot');
     if (!(c.specs || []).some(plein)) out.push('au moins une spécification technique');
     if (!(ctx.criteria || []).length || weightTotal(ctx) !== 100) out.push('une grille de critères totalisant 100 %');
@@ -163,7 +172,7 @@
   }
 
   return {
-    cdcManquants: cdcManquants, pieceReferencement: pieceReferencement,
+    cdcManquants: cdcManquants, pieceReferencement: pieceReferencement, echeanceDepot: echeanceDepot,
     profilId: profilId, cadre: cadre, prefTaux: prefTaux,
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,

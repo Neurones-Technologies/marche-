@@ -332,6 +332,9 @@ r.post('/offers', (req, res) => {
   const lots = Array.isArray(d.lots) ? [...new Set(d.lots.filter((x) => lotIds.has(x)))] : [];
   const errs = [];
   if (!cdc.cdcPublie) errs.push('Le dossier n’est pas publié.');
+  const echeance = R.echeanceDepot(cdc);
+  if (echeance && Date.now() > echeance)
+    return res.status(409).json({ error: 'La date limite de dépôt est dépassée : aucune offre ne peut plus être déposée.', code: 'DEADLINE_PASSED' });
   if (req.store.get('depClosed')) errs.push('Le dépouillement est clôturé : aucune offre ne peut plus être déposée.');
   if (name.length < 2 || name.length > 200) errs.push('Raison sociale invalide.');
   if (!/^[A-Z]{2}$/.test(String(d.iso || ''))) errs.push('Pays invalide.');

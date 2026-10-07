@@ -446,7 +446,7 @@ function seedAll(withUsers = true, options = null) {
     for (const [k, v] of Object.entries(org)) kvSet(k, v, 'seed');
     if (demo) {
       // procédure de démonstration : AO-2026-014, telle que dans le prototype, avec ses offres
-      const demo = procDefaults(clone(seed.CDC), { demo: true });
+      const demo = procDefaults({ ...clone(seed.CDC), ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
       seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
       procedureInsert('p1', demo, 'seed');
       seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));

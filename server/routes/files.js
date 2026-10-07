@@ -47,6 +47,9 @@ const corpsBrut = express.raw({ type: () => true, limit: MAX });
 
 /** Dépôt d'une pièce (soumissionnaire) pour une offre de la procédure req.pid. */
 r.post('/', needPerm('portail.use'), corpsBrut, (req, res) => {
+  const echeance = require('../../public/js/regles.js').echeanceDepot(req.store.get('cdc'));
+  if (echeance && Date.now() > echeance)
+    return res.status(409).json({ error: 'La date limite de dépôt est dépassée : aucune pièce ne peut plus être jointe.', code: 'DEADLINE_PASSED' });
   const fx = lireFichier(req);
   if (fx.erreur) return res.status(fx.status).json({ error: fx.erreur });
   const { doc, name, body, sha } = fx, t = { mime: fx.mime };
