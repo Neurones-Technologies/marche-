@@ -74,9 +74,6 @@ test('l’espace neuf est vide et à son nom ; les espaces sont isolés', async 
   // les comptes d'un espace n'existent pas dans l'autre
   assert.equal((await req(ACME, 'POST', '/api/auth/login', { email: 'administrateur@bal.ci', password: PW })).status, 401);
   assert.equal((await req(DEMO, 'POST', '/api/auth/login', { email: ESPACE.email, password: ESPACE.motDePasse })).status, 401);
-  // la page de connexion d'une entreprise n'affiche pas ses comptes ; celle de la démonstration, si
-  assert.deepEqual((await req(ACME, 'GET', '/api/auth/demo')).json.accounts, []);
-  assert.ok((await req(DEMO, 'GET', '/api/auth/demo')).json.accounts.length > 1);
   // l'espace demo garde ses données
   assert.ok((await req(DEMO, 'GET', '/api/procedures', null, cookieDemo)).json.procedures.length >= 1);
 });

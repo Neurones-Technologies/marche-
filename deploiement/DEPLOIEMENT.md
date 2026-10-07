@@ -61,7 +61,7 @@ sudo bash /opt/marcheplus/deploiement/deployer.sh
 
 Le script :
 - crée `/opt/marcheplus/.env` **une seule fois** (`chmod 600`) avec `JWT_SECRET` et `SEED_PASSWORD`
-  tirés au hasard, `HTTP_PORT=3610`, `HTTP_BIND=127.0.0.1`, `SHOW_DEMO_ACCOUNTS=0` ;
+  tirés au hasard, `HTTP_PORT=3610`, `HTTP_BIND=127.0.0.1` ;
 - signale les clés en double dans le `.env` (Compose retient la dernière) ;
 - construit l'image, démarre le conteneur et attend qu'il soit sain.
 
@@ -161,7 +161,6 @@ Paramètres du `.env` utiles :
 | Clé | Valeur | Effet |
 |---|---|---|
 | `SEED_DEMO` | `1` | Crée les comptes de démonstration si la base est vide. `0` en production réelle (comptes à créer par `POST /api/auth/users`). |
-| `SHOW_DEMO_ACCOUNTS` | `0` | **Ne jamais mettre `1` sur Internet** : l'écran de connexion afficherait le mot de passe. |
 | `ALLOW_RESET` | `1` | Bouton « Réinitialiser la démo » (réservé aux droits paramètres/rôles). `0` pour le désactiver. |
 | `MAX_FILE_MB` | `10` | Taille maximale d'une pièce jointe. Garder `client_max_body_size` du vhost au-dessus. |
 | `MARCHES_PUBLICS` | `0` | Marchés publics en attente : seul le profil « Achats privés » se choisit ; au démarrage, l'organisation et ses appels d'offres non publiés y passent. `1` les rouvre. |

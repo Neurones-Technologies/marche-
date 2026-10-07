@@ -25,17 +25,6 @@ r.post('/login', limiter, (req, res) => {
   res.json({ user: pub(user) });
 });
 
-/** Comptes de démonstration, sur la page de connexion : jamais dans l'espace d'une entreprise (ses comptes sont réels). */
-r.get('/demo', (req, res) => {
-  const show = !cfg.prod || process.env.SHOW_DEMO_ACCOUNTS === '1';
-  const E = require('../espaces');
-  const espaceDemo = !E.actif() || require('../contexte').espace() === E.INITIAL();
-  if (!show || !cfg.seedDemo || !espaceDemo) return res.json({ accounts: [] });
-  const rows = db.prepare('SELECT nom,email,role FROM users WHERE active=1 ORDER BY rowid').all()
-    .map((u) => ({ ...u, roleLab: roleDef(u.role).lab }));
-  res.json({ accounts: rows, hint: cfg.seedPassword });
-});
-
 r.post('/logout', (req, res) => { clearCookie(res); res.json({ ok: true }); });
 
 /** Connexion par jeton à usage unique (arrivée dans un espace qui vient d'être créé), puis l'accueil. */

@@ -196,15 +196,4 @@
   if (jetonReinit) { showLogin(); vueConnexion('reinit-form'); setTimeout(function () { $('ri-pw1').focus(); }, 0); }
   else api('GET', '/api/auth/me').then(function () { return enter(false); }).catch(function () { showLogin(); });
 
-  // Comptes de démonstration (affichés seulement si l'instance les expose)
-  api('GET', '/api/auth/demo').then(function (r) {
-    if (!r.accounts || !r.accounts.length) return;
-    var box = $('lg-demo-list'); $('lg-demo').hidden = false;
-    r.accounts.forEach(function (a) {
-      var b = document.createElement('button'); b.type = 'button'; b.textContent = a.nom + ' — ' + a.roleLab + ' (' + a.email + ')';
-      b.onclick = function () { $('lg-email').value = a.email; $('lg-pw').focus(); };
-      box.appendChild(b);
-    });
-    var n = document.createElement('div'); n.className = 'muted'; n.style.marginTop = '8px'; n.textContent = 'Mot de passe de démonstration : ' + r.hint; box.appendChild(n);
-  }).catch(function () {});
 })();

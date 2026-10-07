@@ -24,13 +24,6 @@
 .lg-switch { margin-top: var(--space-4); background: none; border: none; padding: var(--space-1) 0; color: var(--color-brand-text); text-decoration: underline; cursor: pointer; font: inherit; font-size: var(--fs-table); text-align: left; }
 /* Piège à robots : hors de l'écran et hors du parcours clavier, sans display:none (que certains robots détectent). */
 .lg-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
-.lg-demo { margin-top: var(--space-5); font-size: var(--fs-table); color: var(--color-text-2); }
-.lg-demo summary { cursor: pointer; }
-.lg-demo button {
-  display: block; width: 100%; text-align: left; padding: var(--space-1) var(--space-2); margin-top: var(--space-1);
-  border: var(--border-w) solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text); font-size: var(--fs-table);
-}
-.lg-demo button:hover { background: var(--color-bg); }
 .dlg { position: fixed; inset: 0; z-index: 210; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: var(--color-overlay); }
 .dlg[hidden] { display: none; }
 .dlg form {

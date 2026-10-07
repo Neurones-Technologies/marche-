@@ -55,8 +55,6 @@ if [ ! -f .env ]; then
     # est public sur GitHub — avec lui, n'importe qui serait administrateur.
     echo "SEED_DEMO=${SEED_DEMO:-1}"
     echo "SEED_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=')"
-    # Jamais 1 sur Internet : l'écran de connexion afficherait le mot de passe.
-    echo "SHOW_DEMO_ACCOUNTS=0"
     echo "ALLOW_RESET=${ALLOW_RESET:-1}"
     echo "MAX_FILE_MB=10"
     # Liens envoyés par courriel ; envoi réel par Microsoft 365 : renseigner MAIL_MODE=graph et
@@ -72,9 +70,6 @@ fi
 DOUBLONS=$(grep -oE '^[A-Z_][A-Z0-9_]*=' .env | sort | uniq -d | tr -d '=')
 if [ -n "$DOUBLONS" ]; then
   printf '\033[1;33m⚠ Clés EN DOUBLE dans .env — Compose retient la DERNIÈRE : %s\033[0m\n' "$DOUBLONS"
-fi
-if grep -q '^SHOW_DEMO_ACCOUNTS=1' .env; then
-  printf '\033[1;33m⚠ SHOW_DEMO_ACCOUNTS=1 : le mot de passe de démo est affiché publiquement.\033[0m\n'
 fi
 
 # ── 3. Construction et démarrage ──────────────────────────────────────────────

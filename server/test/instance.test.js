@@ -7,7 +7,6 @@ const assert = require('node:assert/strict');
 
 test('instance vide : ni procédure, ni partenaire, ni compte de démonstration', async () => {
   assert.equal((await call('POST', '/api/auth/login', { email: 'administrateur@bal.ci', password: 'Marche+2026!' })).status, 401);
-  assert.deepEqual((await call('GET', '/api/auth/demo')).json.accounts, []);
   const l = await call('POST', '/api/auth/login', { email: 'achats@exemple.org', password: 'Plateforme2026!x' });
   assert.equal(l.status, 200, JSON.stringify(l.json));
   const admin = l.cookie;
