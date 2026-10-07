@@ -122,11 +122,10 @@ function vPortail(m, etape){
 
   // offre déposée : récapitulatif, modification ou retrait à l'étape 3 ; le formulaire ne revient qu'après retrait
   if(state.monOffre){
-    if(etape==='soumission'){ vPortailResultat(m); vPortailMonOffre(m,clos); vPortailAccuses(m); return; }
+    if(etape==='soumission'){ vPortailResultat(m); vPortailMonOffre(m,clos); vPortailAccuses(m); piedEtapesFournisseur(m,'soumission'); return; }
     var nd=add(m,'div','note'); add(nd,'strong',null,'Votre offre est déposée. ');
     nd.appendChild(document.createTextNode('Pour la relire, la modifier ou la retirer, passez à l’étape « Soumission ».'));
-    var bs=add(add(m,'div','ao-etape-pied'),'button','btn btn-primary','Voir mon offre déposée'); fk(bs,'vers-soumission');
-    bs.addEventListener('click',function(){ go('soumission'); });
+    piedEtapesFournisseur(m,'portail');
     return;
   }
   if(etape==='soumission') vPortailResultat(m);
@@ -273,17 +272,11 @@ function vPortail(m, etape){
 
   if(etape==='soumission'){
     vPortailAccuses(m);
-    var rp=add(add(m,'div','ao-etape-pied'),'button','btn btn-ghost','← Revenir à « Monter mon offre »'); fk(rp,'vers-preparation');
-    rp.addEventListener('click',function(){ go('portail'); });
+    piedEtapesFournisseur(m,'soumission');
     return;
   }
   // préparation : retour au dossier, ou passage à la soumission (avec ce qui reste à compléter)
-  var pied=add(m,'div','ao-etape-pied');
-  var pr=add(pied,'button','btn btn-ghost','← Cahier des charges & échanges'); fk(pr,'vers-echanges');
-  pr.addEventListener('click',function(){ go('echanges'); });
-  if(errs.length) add(pied,'span','muted',errs.length+' point(s) à compléter avant le dépôt');
-  var su=add(pied,'button','btn btn-primary','Passer à la soumission →'); fk(su,'vers-soumission');
-  su.addEventListener('click',function(){ go('soumission'); });
+  piedEtapesFournisseur(m,'portail', errs.length ? errs.length+' point(s) à compléter avant le dépôt' : '');
 }
 
 /* Accusés de dépôt du fournisseur ; un dépôt retiré reste tracé. */

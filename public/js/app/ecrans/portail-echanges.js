@@ -38,6 +38,20 @@ function paysLettre(iso){ return ({ CI:'Côte d’Ivoire', BF:'Burkina Faso', SN
 /* Parcours du fournisseur sur un appel d'offres, en trois étapes : 1. cahier des charges et échanges avec l'acheteur ;
    2. montage de l'offre ; 3. soumission (contrôle, dépôt, puis offre déposée et résultat). */
 function clarifsEnAttente(){ return (state.clarifs||[]).filter(function(x){ return x.statut==='envoyee'; }).length; }
+/* Pied d'écran : étape précédente et suivante, en liens de navigation (comme chez l'acheteur, cadreProcedureBas) ;
+   les boutons pleins restent réservés aux actions. note : une indication entre les deux (ce qui reste à faire). */
+function piedEtapesFournisseur(m, actif, note){
+  var i=ETAPES_FOURNISSEUR.map(function(x){ return x[0]; }).indexOf(actif), pied=add(m,'div','proc-foot');
+  function lien(e, suivante){
+    var bt=add(pied,'button','etape-lien'+(suivante?' suivante':'')); bt.type='button'; fk(bt,'vers-'+e[0]);
+    add(bt,'span','etape-lien-lab', suivante?'Étape suivante':'Étape précédente');
+    add(bt,'span','etape-lien-nom', suivante ? e[1]+' →' : '← '+e[1]);
+    bt.addEventListener('click',function(){ go(e[0]); });
+  }
+  if(i>0) lien(ETAPES_FOURNISSEUR[i-1], false);
+  if(note) add(pied,'span','muted ao-etape-note',note);
+  if(i<ETAPES_FOURNISSEUR.length-1) lien(ETAPES_FOURNISSEUR[i+1], true);
+}
 var ETAPES_FOURNISSEUR = [['echanges','Cahier des charges & échanges'],['portail','Monter mon offre'],['soumission','Soumission']];
 function etapesFournisseur(m, actif){
   var d=state.draft||{}, o=state.monOffre;
@@ -124,10 +138,7 @@ function vEchanges(m){
   var sa=add(k,'div','chat-saisie');
   if(!questionOuverte && !reclamation) add(sa,'p','muted','Il n’est plus possible de poser de question : elles s’arrêtent '+QUESTIONS_JOURS_AVANT+' jours avant la date limite de dépôt.');
   else saisieEchange(sa, limite, questionOuverte, reclamation);
-  var pied=add(m,'div','ao-etape-pied');
-  add(pied,'span','muted', state.monOffre ? 'Votre offre est déposée.' : 'Dossier lu ? Montez votre offre.');
-  var nx=add(pied,'button','btn btn-primary', state.monOffre ? 'Voir mon offre →' : 'Monter mon offre →'); fk(nx,'vers-preparation');
-  nx.addEventListener('click',function(){ go(state.monOffre ? 'soumission' : 'portail'); });
+  piedEtapesFournisseur(m,'echanges');
 }
 /* Saisie d'une question (jusqu'à 3 jours avant l'échéance) ou d'une réclamation (après un dépôt), sous la conversation. */
 function saisieEchange(sa, limite, questionOuverte, reclamation){

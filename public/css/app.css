@@ -1126,3 +1126,4 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
   .ao-cote { grid-template-columns: 1fr; }
   .ao-cote .ao-fiche { position: static; }
 }
+.ao-etape-note { align-self: center; font-size: var(--fs-small); }
