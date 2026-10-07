@@ -89,9 +89,11 @@ function vEchanges(m){
   var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
   if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
   etapesFournisseur(m,'echanges');
-  ficheAppelOffres(m, clos, reste);
+  // le résumé de l'appel d'offres (colonne étroite) à côté de la conversation (colonne large)
+  var cote=add(m,'div','ao-cote');
+  ficheAppelOffres(cote, clos, reste);
 
-  var k=add(m,'section','card chat'); k.setAttribute('aria-label','Conversation avec l’acheteur');
+  var k=add(cote,'section','card chat'); k.setAttribute('aria-label','Conversation avec l’acheteur');
   var ph=add(k,'div','panel-head'); add(ph,'span',null,'Conversation');
   add(ph,'span','muted chat-aide','Questions et réponses : visibles de toutes les entreprises consultées, sans nom. Clarifications et réclamations : entre l’acheteur et vous.');
   var fil=add(k,'div','chat-fil'); fil.setAttribute('role','log'); fil.setAttribute('aria-live','polite');

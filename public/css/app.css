@@ -1041,7 +1041,6 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .side-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
 /* Fournisseur : onglets « Mon offre » / « Échanges » */
-.ao-fiche.compact .ao-fiche-tete { padding-bottom: var(--space-5); }
 .ao-onglets { display: flex; gap: var(--space-1); margin: 0 0 18px; border-bottom: var(--border-w) solid var(--color-border); }
 .ao-onglet { background: none; border: 0; border-bottom: 3px solid transparent; padding: var(--space-3) var(--space-4); font: inherit; font-weight: var(--fw-strong); color: var(--color-text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: var(--space-2); }
 .ao-onglet:hover { color: var(--color-text); }
@@ -1095,4 +1094,35 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
   .ao-etapes { flex-direction: column; }
   .ao-etape-pied { justify-content: stretch; }
   .ao-etape-pied .btn { flex: 1 1 100%; }
+}
+
+/* Étape 1 du fournisseur : résumé de l'appel d'offres (colonne étroite) à côté de la conversation */
+.ao-cote { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2.2fr); gap: 18px; align-items: start; }
+.ao-cote .ao-fiche { margin-bottom: 0; position: sticky; top: 76px; }
+.ao-cote .ao-fiche-tete { flex-direction: column; gap: var(--space-3); padding: var(--space-4) var(--space-4) var(--space-2); }
+.ao-cote .ao-fiche-titre { flex: none; }
+.ao-cote .ao-fiche-titre h2 { font-size: 16px; }
+.ao-cote .ao-echeance { width: 100%; text-align: left; }
+.ao-cote .ao-fiche .pad { padding: var(--space-2) var(--space-4) var(--space-4); }
+.ao-cote .ao-fiche .fen-grille { grid-template-columns: 1fr; gap: 0; margin-bottom: var(--space-2); }
+/* résumé resserré : « libellé  valeur » sur une ligne, en petit */
+.ao-cote .ao-fiche .fen-champ { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px var(--space-3); padding: 6px 0; border-bottom: var(--border-w) solid var(--color-border); font-size: var(--fs-small); }
+.ao-cote .ao-fiche .fen-lab { margin: 0; text-transform: none; letter-spacing: 0; font-weight: normal; color: var(--color-text-muted); font-size: var(--fs-small); flex: 0 0 auto; }
+.ao-cote .ao-fiche .fen-val { text-align: right; flex: 1 1 140px; }
+.ao-cote .ao-fiche .stat-k { font-size: var(--fs-small); }
+.ao-cote .ao-lots { font-size: var(--fs-small); }
+.ao-cote .ao-fiche-titre .muted { font-size: var(--fs-small); }
+.ao-cote .ao-echeance { padding: var(--space-2) var(--space-3); }
+.ao-cote .ao-echeance-date { font-size: 15px; }
+.ao-cote .chat { min-height: 520px; display: flex; flex-direction: column; }
+.ao-cote .chat-fil { flex: 1 1 auto; min-height: 280px; }
+.ao-cote .ao-fiche-pied { flex-direction: column; align-items: stretch; }
+.ao-cote .ao-fiche-actions { margin-left: 0; flex-direction: column; width: 100%; }
+.ao-cote .ao-fiche-pied .chip { white-space: normal; max-width: 100%; }
+.ao-cote .ao-fiche-pied { padding: var(--space-3) var(--space-4); }
+.ao-cote .ao-fiche-actions .btn { width: 100%; }
+.ao-cote .chat-fil { max-height: 58vh; }
+@media (max-width: 980px) {
+  .ao-cote { grid-template-columns: 1fr; }
+  .ao-cote .ao-fiche { position: static; }
 }

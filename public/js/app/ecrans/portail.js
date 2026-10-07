@@ -46,8 +46,9 @@ function ligneFichier(parent, doc, aide, sinon){
     });
   }
 }
-/* Fiche de l'appel d'offres : ce qu'il faut savoir avant de répondre, l'échéance, l'état de son offre, le dossier. */
-function ficheAppelOffres(m, clos, reste, compact){
+/* Fiche de l'appel d'offres (étape 1, colonne à côté de la conversation) : ce qu'il faut savoir avant de répondre,
+   l'échéance, l'état de son offre, le dossier. */
+function ficheAppelOffres(m, clos, reste){
   var c=state.cdc, adds=(state.additifs||[]).length;
   var k=add(m,'section','card ao-fiche'); k.setAttribute('aria-label','Appel d’offres '+REF());
   var tete=add(k,'div','ao-fiche-tete');
@@ -59,7 +60,6 @@ function ficheAppelOffres(m, clos, reste, compact){
   add(e,'div','ao-echeance-lab', clos ? 'Dépôts clos depuis le' : 'Date limite de dépôt');
   add(e,'div','ao-echeance-date', dateLongue(c.ouverture)+' à 10 h 00');
   if(!clos && reste!=null) add(e,'div','ao-echeance-reste','Clôture '+delaiRestant(reste));
-  if(compact){ k.classList.add('compact'); return; } // écran « Échanges » : l'en-tête seul
   var b=add(k,'div','pad');
   grilleLecture(b,[
     ['Devise de soumission', c.deviseSoumission], ['Langue', c.langue],
@@ -73,7 +73,7 @@ function ficheAppelOffres(m, clos, reste, compact){
   var pied=add(k,'div','panel-foot ao-fiche-pied');
   var o=state.monOffre;
   chipCellule(pied, o ? 'Votre offre est déposée' : (clos ? 'Aucune offre déposée' : 'Votre offre n’est pas encore déposée'), o ? 'c-green' : (clos ? 'c-grey' : 'c-amber'));
-  if(adds) chipCellule(pied, adds+' additif'+(adds>1?'s':'')+' au dossier — voir les échanges ci-dessous','c-amber');
+  if(adds) chipCellule(pied, adds+' additif'+(adds>1?'s':'')+' au dossier, dans la conversation','c-amber');
   var act=add(pied,'div','ao-fiche-actions');
   var tl=add(act,'button','btn btn-ghost btn-sm','Télécharger le dossier (PDF)'); fk(tl,'ao-pdf'); tl.setAttribute('data-consult','');
   tl.addEventListener('click',telechargerDossierPdf);
@@ -115,7 +115,6 @@ function vPortail(m, etape){
   var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
   if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
   etapesFournisseur(m, etape==='soumission' ? 'soumission' : 'portail');
-  ficheAppelOffres(m, clos, reste, true);
   var nc=clarifsEnAttente();
   if(nc){ var wc=add(m,'div','warn'); wc.style.marginBottom='18px'; add(wc,'strong',null,'L’acheteur attend votre réponse. ');
     wc.appendChild(document.createTextNode(nc+' demande(s) de clarification sur votre offre : répondez à l’étape 1, « Cahier des charges & échanges ».')); }
