@@ -5,6 +5,8 @@
    - POST /cctp         : clauses techniques (CCTP) rédigées à partir du cahier des charges
    - POST /notation/:o  : notes proposées pour les critères qualitatifs d'une offre, d'après son mémoire technique
                           (évaluateur) ; la proposition est enregistrée sur l'offre, l'évaluateur la reprend ou non
+   - POST /offre-externe : lecture d'une offre reçue hors plateforme (corps brut : PDF, Word ou image) ; le fichier
+                          est conservé, l'acheteur relit la lecture puis enregistre l'offre (POST /offers/externe)
    - GET  /taches/:id   : état d'une demande, et la proposition quand elle est prête
    Une proposition prend jusqu'à une ou deux minutes : la demande est lancée en tâche de fond (réponse 202 immédiate,
    sous le délai du proxy) et le navigateur interroge son état. Réservé au rédacteur du dossier (cdc.edit). Chaque
@@ -18,7 +20,7 @@ const R = require('../../public/js/regles.js');
 const cfg = require('../config');
 const fs = require('fs');
 const { auditAppend, kvGet, db, offersReplace, frDate } = require('../db');
-const { diskPath } = require('./files');
+const { diskPath, lireFichier } = require('./files');
 const { needPerm, whoLabel } = require('../auth');
 const contexte = require('../contexte');
 
@@ -28,8 +30,8 @@ const err = (res, status, code, error) => res.status(status).json({ error, code 
 r.get('/', (req, res) => res.json({ actif: IA.actif() }));
 
 // rédaction du dossier : cdc.edit ; notation d'une offre : eval.score (sa route le vérifie) ; une tâche se lit par son auteur
-r.use((req, res, next) => (/^\/(notation|taches)\//.test(req.path) ? next() : needPerm('cdc.edit')(req, res, next)));
-r.use((req, res, next) => (IA.actif() ? next() : err(res, 503, 'AI_DISABLED', 'L’IA n’est pas configurée sur ce serveur (clé ANTHROPIC_API_KEY absente).')));
+r.use((req, res, next) => (/^\/(notation|taches|offre-externe)(\/|$)/.test(req.path) ? next() : needPerm('cdc.edit')(req, res, next)));
+r.use((req, res, next) => (IA.actif() || req.path === '/offre-externe' ? next() : err(res, 503, 'AI_DISABLED', 'L’IA n’est pas configurée sur ce serveur (clé ANTHROPIC_API_KEY absente).')));
 // chaque demande a un coût : débit limité par compte (les interrogations d'état ne comptent pas)
 const limite = rateLimit({ windowMs: 3600000, limit: Number(process.env.IA_PAR_HEURE) || 30, keyGenerator: (req) => 'u:' + req.user.id,
   standardHeaders: true, legacyHeaders: false, message: { error: 'Trop de demandes à l’IA : réessayez dans une heure.', code: 'AI_TOO_MANY' } });
@@ -115,13 +117,15 @@ r.post('/notation/:offre', needPerm('eval.score'), limite, (req, res) => {
   if (!coi || !coi.declare || coi.conflit) return err(res, 403, 'COI_REQUIRED', 'Déclaration d’absence de conflit d’intérêts requise avant de noter.');
   if (!req.store.get('depClosed')) return err(res, 409, 'GATE_DEPOUILLEMENT_NOT_CLOSED', 'L’évaluation est fermée tant que le dépouillement n’est pas clôturé.');
   if (req.store.get('evalDone')) return err(res, 409, 'EVALUATION_VALIDATED', 'L’évaluation est validée : les notes ne peuvent plus être modifiées.');
-  const p = (o.pieces || []).find((x) => x.doc === 'memoire');
+  // le mémoire technique joint en ligne ; pour une offre reçue hors plateforme, le document reçu qui le contient
+  const p = (o.pieces || []).find((x) => x.doc === 'memoire') || (o.pieces || []).find((x) => x.doc === 'offre-recue');
   const f = p && db.prepare('SELECT id, mime FROM files WHERE id=? AND offer_id=?').get(p.id, o.id);
   if (!f) return err(res, 422, 'NO_MEMOIRE', 'Aucun mémoire technique joint à cette offre : rien à analyser.');
   let corps;
   try { corps = fs.readFileSync(diskPath(f.id)); } catch (e) { return err(res, 410, 'FILE_MISSING', 'Le fichier du mémoire technique est introuvable sur le serveur.'); }
-  const memoire = f.mime === 'application/pdf' ? { pdf: corps } : (/wordprocessingml/.test(f.mime) ? { word: corps } : null);
-  if (!memoire) return err(res, 415, 'FILE_TYPE', 'Le mémoire technique doit être un PDF ou un document Word pour être analysé.');
+  const memoire = f.mime === 'application/pdf' ? { pdf: corps } : /wordprocessingml/.test(f.mime) ? { word: corps }
+    : /^image\/(png|jpeg)$/.test(f.mime) ? { image: corps, mime: f.mime } : null;
+  if (!memoire) return err(res, 415, 'FILE_TYPE', 'Le mémoire technique doit être un PDF, un document Word ou une image pour être analysé.');
   const criteres = (req.store.get('criteria') || []).filter((c) => c.kind === 'qual').map((c) => ({ id: c.id, label: c.label, weight: c.weight, hint: c.hint }));
   const cdc = req.store.get('cdc') || {};
   return lancerTravail(req, res, () => IA.noterMemoire(memoire, cdc, criteres, ctx(req)).then((out) => {
@@ -139,6 +143,25 @@ r.post('/notation/:offre', needPerm('eval.score'), limite, (req, res) => {
     }
     return out;
   }), `Mémoire technique analysé par l’IA — notes proposées pour ${o.name}`);
+});
+
+/** Offre reçue hors plateforme : le document est conservé (pièce « offre-recue », rattachée à l'offre à son
+    enregistrement), puis lu par l'IA. Avant la clôture du dépouillement, par qui confirme les données extraites. */
+r.post('/offre-externe', needPerm('depouille.confirm'), limite, corpsBrut, (req, res) => {
+  const cdc = req.store.get('cdc') || {};
+  if (!cdc.cdcPublie) return err(res, 409, 'CDC_NOT_PUBLISHED', 'Le dossier n’est pas publié : aucune offre ne peut être reçue.');
+  if (req.store.get('depClosed')) return err(res, 409, 'DEPOUILLEMENT_CLOSED', 'Le dépouillement est clôturé : aucune offre ne peut plus être enregistrée.');
+  const fx = lireFichier(req, 'offre-recue');
+  if (fx.erreur) return err(res, fx.status, 'FILE_INVALID', fx.erreur);
+  const source = fx.mime === 'application/pdf' ? { pdf: fx.body } : /wordprocessingml/.test(fx.mime) ? { word: fx.body }
+    : /^image\/(png|jpeg)$/.test(fx.mime) ? { image: fx.body, mime: fx.mime } : null;
+  if (!source) return err(res, 415, 'FILE_TYPE', 'Format non lisible : chargez un PDF, un document Word ou une image (PNG, JPEG).');
+  const id = crypto.randomUUID();
+  fs.writeFileSync(diskPath(id), fx.body, { mode: 0o600 });
+  db.prepare('INSERT INTO files(id,owner,doc_id,name,mime,size,sha256,procedure_id) VALUES(?,?,?,?,?,?,?,?)').run(id, req.user.id, 'offre-recue', fx.name, fx.mime, fx.body.length, fx.sha, req.pid);
+  const fichier = { id, name: fx.name, size: fx.body.length, sha256: fx.sha };
+  if (!IA.actif()) return res.status(201).json({ fichier }); // sans IA : saisie à la main, le document reste joint
+  return lancerTravail(req, res, () => IA.lireOffre(source, cdc, ctx(req)).then((out) => ({ ...out, fichier })), `Offre reçue hors plateforme lue par l’IA — « ${fx.name} »`);
 });
 
 module.exports = r;

@@ -239,6 +239,8 @@ function notifierServeur({ ev, lab, titre, corps, roles = [], ids = [] }) {
 /* ---- Dialogue avec le fournisseur : écritures ciblées, contrôlées par le serveur ----
    Un fournisseur n'écrit jamais les clés entières (qa, clarifs, reclamations) : il pose une question, répond à une
    demande de clarification qui vise son offre, dépose une réclamation ; l'auteur, la date et le statut sont posés ici. */
+const paysList = { CI: 'Côte d’Ivoire', BF: 'Burkina Faso', SN: 'Sénégal', ML: 'Mali', NE: 'Niger', TG: 'Togo', BJ: 'Bénin', GW: 'Guinée-Bissau' };
+const sepMilliers = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const QUESTIONS_JOURS_AVANT = 3; // questions reçues jusqu'à 3 jours avant la date limite de dépôt
 // documents de l'offre elle-même, joints depuis le portail à côté des pièces administratives
 const DOCS_OFFRE = { memoire: 'Mémoire technique', bordereau: 'Bordereau des prix' };
@@ -422,7 +424,6 @@ r.post('/offers', (req, res) => {
   if (!req.can('portail.use')) return res.status(403).json({ error: 'Habilitation insuffisante.', needs: ['portail.use'] });
   const d = req.body || {};
   const org = req.store.get('org'), cdc = req.store.get('cdc');
-  const paysList = { CI: 'Côte d’Ivoire', BF: 'Burkina Faso', SN: 'Sénégal', ML: 'Mali', NE: 'Niger', TG: 'Togo', BJ: 'Bénin', GW: 'Guinée-Bissau' };
   const name = String(d.name || '').trim();
   let montant = Number(d.montant);
   const delai = Number(d.delai) || 0, garantie = Number(d.garantie) || 0, refs = Math.max(0, Math.floor(Number(d.refsCount) || 0));
@@ -515,6 +516,72 @@ r.post('/offers', (req, res) => {
       `Accusé ${receipt.num}. Soumissionnaire : ${name} (${offer.pays}). Montant : ${receipt.montant}. Lots : ${lots.length}.`, cdc.ref);
   })();
   res.status(201).json({ offer, receipt, rev: getRev() });
+});
+
+/* Offre reçue hors plateforme (pli papier numérisé, courriel) : enregistrée par qui confirme les données extraites,
+   d'après le document reçu (déjà chargé : pièce « offre-recue ») et sa lecture relue. Le pli doit avoir été reçu avant
+   la date limite de dépôt. Chaque valeur garde sa confiance de lecture (100 si saisie ou corrigée à la main) : sous
+   le seuil, elle reste à confirmer au dépouillement ; les pièces administratives sont toujours à contrôler sur le pli. */
+r.post('/offers/externe', (req, res) => {
+  if (!req.can('depouille.confirm')) return res.status(403).json({ error: 'Habilitation insuffisante.', needs: ['depouille.confirm'] });
+  const d = req.body || {}, cdc = req.store.get('cdc') || {}, org = req.store.get('org') || {};
+  if (!cdc.cdcPublie) return res.status(409).json({ error: 'Le dossier n’est pas publié : aucune offre ne peut être reçue.', code: 'CDC_NOT_PUBLISHED' });
+  if (req.store.get('depClosed')) return res.status(409).json({ error: 'Le dépouillement est clôturé : aucune offre ne peut plus être enregistrée.', code: 'DEPOUILLEMENT_CLOSED' });
+  const f = db.prepare("SELECT * FROM files WHERE id=? AND procedure_id=? AND doc_id='offre-recue' AND offer_id IS NULL").get(String(d.fichier || ''), req.pid);
+  if (!f) return res.status(422).json({ error: 'Document de l’offre introuvable : chargez-le à nouveau.', code: 'FILE_UNKNOWN' });
+  const recu = Date.parse(String(d.recuLe || ''));
+  if (!Number.isFinite(recu) || recu > Date.now() + 5 * 60000) return res.status(422).json({ error: 'Date de réception invalide.', code: 'RECEIPT_DATE_INVALID' });
+  const echeance = R.echeanceDepot(cdc);
+  if (echeance && recu > echeance) return res.status(409).json({ error: 'Pli reçu après la date limite de dépôt : il est écarté et ne s’enregistre pas.', code: 'LATE' });
+  const name = String(d.name || '').trim(), iso = String(d.iso || '').toUpperCase();
+  const lotIds = new Set((cdc.lots || []).map((l) => l.id));
+  const lots = Array.isArray(d.lots) ? [...new Set(d.lots.filter((x) => lotIds.has(x)))] : [];
+  const errs = [], nb = (x) => (x === '' || x == null ? 0 : Number(x));
+  if (name.length < 2 || name.length > 200) errs.push('Raison sociale invalide.');
+  if (!/^[A-Z]{2}$/.test(iso)) errs.push('Pays invalide (code à deux lettres).');
+  if (!(org.rates || {})[d.devise]) errs.push('Devise non admise.');
+  if (!lots.length) errs.push('Au moins un lot est requis.');
+  let montant = Number(d.montant), prixLots = null;
+  if (d.prixLots && typeof d.prixLots === 'object' && lots.every((l) => Number(d.prixLots[l]) > 0)) {
+    prixLots = {}; for (const l of lots) prixLots[l] = Math.round(Number(d.prixLots[l]) * 100) / 100;
+    montant = Object.values(prixLots).reduce((t, v) => t + v, 0);
+  }
+  if (!Number.isFinite(montant) || montant <= 0) errs.push('Montant invalide.');
+  const delai = nb(d.delai), garantie = nb(d.garantie), validite = nb(d.validite), refs = Math.max(0, Math.floor(nb(d.refsCount)));
+  if (![delai, garantie, validite].every((x) => Number.isFinite(x) && x >= 0)) errs.push('Délai, garantie ou validité invalide.');
+  if (errs.length) return res.status(422).json({ error: errs.join(' ') });
+  const texte = (x, n) => String(x == null ? '' : x).trim().slice(0, n) || null;
+  const seuil = Number(((kvGet('seuils') || {}).value || {}).confianceMin) || 75;
+  const conf = (k) => { const v = Number((d.confiances || {})[k]); return Number.isFinite(v) ? Math.round(Math.min(100, Math.max(0, v))) : 100; };
+  const champ = (k, label, v) => ({ k: label, v, conf: conf(k), flag: conf(k) < seuil });
+  const nomLot = (l) => ((cdc.lots || []).find((x) => x.id === l) || {}).nom || l;
+  const id = 'ext' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const lecture = d.lecture === 'ia' ? 'ia' : 'manuelle';
+  const offer = {
+    id, name, pays: paysList[iso] || iso, iso, doc: f.name + ' — reçue hors plateforme', devise: d.devise, montant,
+    delai, garantie, refsCount: refs, aiMetho: 70, aiRefs: Math.min(100, refs * 20),
+    aiWhy: 'Offre reçue hors plateforme : le document n’a pas encore été analysé, les notes proposées sont provisoires et doivent être arrêtées par l’évaluateur.',
+    docs: Object.fromEntries((req.store.get('docDefs') || []).map((x) => [x.id, true])), submitted: false,
+    externe: { par: req.user.id, recuLe: new Date(recu).toISOString(), lecture, remarques: (Array.isArray(d.remarques) ? d.remarques : []).slice(0, 15).map((x) => texte(x, 400)).filter(Boolean) },
+    depot: new Date(recu).toLocaleString('fr-FR', { timeZone: 'Africa/Abidjan', dateStyle: 'short', timeStyle: 'short' }),
+    contact: texte(d.contact, 200), validite: validite || null, paiement: texte(d.paiement, 200), incoterm: texte(d.incoterm, 60),
+    fields: [champ('montant', 'Montant total HT', sepMilliers(montant) + ' ' + d.devise)]
+      .concat(prixLots ? lots.map((l) => champ('lot:' + l, 'Prix — ' + nomLot(l), sepMilliers(prixLots[l]) + ' ' + d.devise)) : [])
+      .concat([champ('delai', 'Délai d\'exécution', delai + ' jours'), champ('garantie', 'Garantie', garantie + ' mois')])
+      .concat(validite ? [champ('validite', 'Validité de l’offre', validite + ' jours')] : [])
+      .concat([champ('caution', 'Caution de soumission', texte(d.caution, 200) || 'Non indiquée'),
+        { k: 'Pièces du dossier de candidature', v: 'À contrôler sur le pli reçu', conf: 0, flag: true }]),
+    lots, ...(prixLots ? { prixLots } : {}),
+    pieces: [{ id: f.id, doc: 'offre-recue', name: f.name, size: f.size, sha256: f.sha256, offre: true }],
+  };
+  db.transaction(() => {
+    offerInsert(offer, false, req.pid);
+    db.prepare('UPDATE files SET offer_id=? WHERE id=?').run(id, f.id);
+    const q = req.store.get('quality'); q[id] = { metho: offer.aiMetho, refs: offer.aiRefs }; req.store.set('quality', q, req.user.id);
+    auditAppend(req.user.id, whoLabel(req.user), `Offre reçue hors plateforme enregistrée — ${name} (${offer.pays}) — reçue le ${offer.depot}, ` +
+      (lecture === 'ia' ? 'lue par l’IA et relue' : 'saisie à la main') + ` — document ${f.name} (SHA-256 ${f.sha256.slice(0, 12)}…)`, req.pid);
+  })();
+  res.status(201).json({ offer, rev: getRev() });
 });
 
 /* Retrait de son offre par le fournisseur, jusqu'à la date limite de dépôt. L'offre quitte la consultation, son accusé

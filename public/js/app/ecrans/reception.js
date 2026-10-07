@@ -8,6 +8,10 @@ function confianceMoyenne(o){ return Math.round(o.fields.reduce(function(s,f){re
 function vReception(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Réception des offres');
+  if(state.cdc.cdcPublie && !state.depClosed && can('depouille.confirm')){
+    var ext=add(h,'button','btn btn-ghost','Enregistrer une offre reçue hors plateforme'); fk(ext,'offre-externe');
+    ext.addEventListener('click',ouvrirOffreExterne);
+  }
 
   var seuilC=Number(state.seuils.confianceMin);
   var t=tableau(m,{ cle:'plis', titre:'Plis reçus', lignes:SEED_OFFERS,
@@ -51,12 +55,13 @@ function ouvrirPli(id){
     champLecture(c,'Confiance de lecture — '+avg+' %',bar).parentNode.style.maxWidth='320px';
     bar.setAttribute('role','img'); bar.setAttribute('aria-label','Confiance de lecture : '+avg+' %');
     var pieces=o.pieces||[];
-    listeFichiersPli(c,'Offre technique et financière', pieces.filter(function(f){ return f.offre; }),'Ni mémoire technique ni bordereau des prix joint.');
+    if(o.externe) champLecture(c,'Reçue hors plateforme', 'le '+o.depot+(o.externe.lecture==='ia'?' — lue par l’IA puis relue':' — saisie à la main'));
+    listeFichiersPli(c, o.externe ? 'Document reçu' : 'Offre technique et financière', pieces.filter(function(f){ return f.offre; }), o.externe || o.submitted ? 'Ni mémoire technique ni bordereau des prix joint.' : 'Offre de démonstration : aucun document réel.');
     listeFichiersPli(c,'Pièces administratives', pieces.filter(function(f){ return !f.offre; }),'Aucune pièce jointe enregistrée.');
   }, { large:true });
 }
 /* Fichiers d'un pli, téléchargeables ; l'empreinte SHA-256 en infobulle. */
-var LIB_DOCS_OFFRE = { memoire:'Mémoire technique', bordereau:'Bordereau des prix' };
+var LIB_DOCS_OFFRE = { memoire:'Mémoire technique', bordereau:'Bordereau des prix', 'offre-recue':'Offre reçue' };
 function listeFichiersPli(c, titre, liste, vide){
   var sec=add(c,'div','fen-section'); add(sec,'h3',null,titre);
   if(!liste.length){ add(sec,'p','muted',vide); return; }

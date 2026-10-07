@@ -30,9 +30,9 @@ const diskPath = (id) => { const d = require('../contexte').fichiers() || cfg.fi
 /**
  * Lit un fichier téléversé (corps brut, nom dans x-filename, pièce visée dans ?doc=) et vérifie son format sur son
  * contenu. Retourne { erreur, status } ou { doc, name, mime, body, sha }. Partagé avec les pièces de référencement.
+ * doc : la pièce visée, quand la route l'impose (sinon ?doc=).
  */
-function lireFichier(req) {
-  const doc = String(req.query.doc || '');
+function lireFichier(req, doc = String(req.query.doc || '')) {
   let name = '';
   try { name = decodeURIComponent(String(req.headers['x-filename'] || '')); } catch (e) { /* nom invalide */ }
   name = path.basename(name).replace(/[^\w.\- ()àâçéèêëîïôûùüÿ]/gi, '_').slice(0, 120);

@@ -14,7 +14,7 @@ function ecartsNonJustifies(o){
    provisoire d'une offre déposée en ligne pas encore analysée, ou note simulée (offres de démonstration). */
 function origineNoteIA(o){
   if(o.aiIA) return { lab:'IA', cls:'ai', titre:'Note proposée par l’IA après lecture du mémoire technique ('+o.aiIA.le+')' };
-  if(o.submitted) return { lab:'Provisoire', cls:'ai ai-sim', titre:'Offre pas encore analysée : note provisoire de 70, à arrêter par l’évaluateur' };
+  if(o.submitted || o.externe) return { lab:'Provisoire', cls:'ai ai-sim', titre:'Offre pas encore analysée : note provisoire de 70, à arrêter par l’évaluateur' };
   return { lab:'Simulé', cls:'ai ai-sim', titre:'Note simulée (offre de démonstration) : aucune analyse réelle' };
 }
 function badgeNoteIA(parent,o){ var x=origineNoteIA(o), b=add(parent,'span',x.cls,x.lab); b.title=x.titre; return b; }
@@ -199,7 +199,7 @@ function etatNotationIA(){
 }
 function vAnalyseMemoire(card,o){
   var z=add(card,'div','fen-section analyse-ia'); z.style.marginTop='14px';
-  var x=etatNotationIA(), t=x.taches[o.id], memoire=(o.pieces||[]).some(function(p){ return p.doc==='memoire'; });
+  var x=etatNotationIA(), t=x.taches[o.id], memoire=(o.pieces||[]).some(function(p){ return p.doc==='memoire' || p.doc==='offre-recue'; });
   var qual=state.criteria.filter(function(c){ return c.kind==='qual'; });
   var h=add(z,'h3',null,'Analyse du mémoire technique'); badgeNoteIA(h,o);
   if(t){ var pr=add(z,'p',null,'Lecture du mémoire technique par l’IA… '+t.depuis+' s'); pr.setAttribute('role','status'); add(z,'p','muted','Cela prend en général une à trois minutes.'); return; }
@@ -217,7 +217,7 @@ function vAnalyseMemoire(card,o){
       var ul=add(z,'ul'); ul.style.margin='4px 0 0 18px'; g[1].forEach(function(v){ add(ul,'li',null,v); });
     });
   } else {
-    add(z,'p','muted', o.submitted ? (memoire ? 'Le mémoire technique joint à cette offre n’a pas encore été analysé : les notes affichées sont provisoires.' : 'Aucun mémoire technique joint à cette offre : les notes affichées sont provisoires, à arrêter par l’évaluateur.')
+    add(z,'p','muted', o.submitted || o.externe ? (memoire ? 'Le mémoire technique joint à cette offre n’a pas encore été analysé : les notes affichées sont provisoires.' : 'Aucun mémoire technique joint à cette offre : les notes affichées sont provisoires, à arrêter par l’évaluateur.')
       : 'Offre de démonstration : les notes proposées sont simulées, aucun mémoire technique n’a été lu.');
     if(o.aiWhy) add(z,'p','muted','Appréciation simulée : '+o.aiWhy);
   }

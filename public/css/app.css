@@ -999,3 +999,4 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .analyse-ia h3 { display: flex; align-items: center; gap: var(--space-2); }
 .analyse-crit { margin-top: var(--space-3); }
 .analyse-crit p { margin: 2px 0 0; }
+.fen label .conf { margin-left: var(--space-2); }

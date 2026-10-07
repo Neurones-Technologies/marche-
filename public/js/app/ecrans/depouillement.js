@@ -41,7 +41,7 @@ function vDepouille(m){
     colonnes:[
       {lab:'Soumissionnaire', rendu:function(o,td){ add(td,'strong',null,o.name); add(td,'div','muted',o.doc); }},
       {lab:'Origine', rendu:function(o,td){ originChip(td,o); }},
-      {lab:'Lecture', val:function(o){ return o.submitted ? 'Saisie en ligne' : 'Lecture automatique'; }},
+      {lab:'Lecture', val:function(o){ return o.submitted ? 'Saisie en ligne' : (o.externe ? (o.externe.lecture==='ia' ? 'Lue par l’IA, relue' : 'Saisie à la main') : 'Lecture simulée (démonstration)'); }},
       {lab:'Confiance moyenne', rendu:function(o,td){ var a=confianceMoyenne(o); chipCellule(td,a+' %',a>=seuil?'c-green':'c-amber'); }},
       {lab:'Vérification', rendu:function(o,td){ var r=aVerifier(o); chipCellule(td, r ? r+' valeur'+(r>1?'s':'')+' à vérifier' : 'Vérifiée', r?'c-amber':'c-green'); }}
     ],
@@ -87,6 +87,13 @@ function ouvrirOffreDepouillement(id){
     if(o.submitted){
       var hs=add(dc,'p','hint top'); icon(hs,'info');
       hs.appendChild(document.createTextNode('Offre saisie en ligne par le soumissionnaire : aucune lecture automatique, rien à vérifier.'));
+    } else if(o.externe){
+      var he=add(dc,'p','hint top'); icon(he,'info');
+      he.appendChild(document.createTextNode('Offre reçue hors plateforme le '+o.depot+(o.externe.lecture==='ia' ? ', lue par l’IA puis relue' : ', saisie à la main')+'. Vérifiez sur le document les valeurs signalées et les pièces administratives.'));
+      (o.pieces||[]).forEach(function(f){
+        var a=add(add(dc,'p'),'a','pill',f.name+' · '+taille(f.size)); a.href='/api/files/'+f.id; a.setAttribute('download',f.name); a.title='SHA-256 '+f.sha256;
+      });
+      if((o.externe.remarques||[]).length){ var nr=add(dc,'div','note'); add(nr,'strong',null,'Remarques de la lecture : '); var ur=add(nr,'ul'); ur.style.margin='6px 0 0 18px'; o.externe.remarques.forEach(function(r){ add(ur,'li',null,r); }); }
     } else {
       var en=o.devise!=='XOF';
       var sheet=add(add(dc,'div','doc-stage'),'div','doc-sheet');
@@ -102,7 +109,7 @@ function ouvrirOffreDepouillement(id){
         for(var i=0;i<4;i++) add(d,'span',null,rw[i]);
       });
       var hi=add(dc,'p','hint'); icon(hi,'info');
-      hi.appendChild(document.createTextNode(en ? 'Document en '+o.devise+' : les lignes encadrées sont à vérifier avant conversion.' : 'Les lignes encadrées sont celles que vous devez vérifier.'));
+      hi.appendChild(document.createTextNode((en ? 'Document en '+o.devise+' : les lignes encadrées sont à vérifier avant conversion.' : 'Les lignes encadrées sont celles que vous devez vérifier.')+' Offre de démonstration : document et lecture simulés.'));
     }
     var dl=add(dc,'dl','dl');
     [['Contact',o.contact],['Déposé le',o.depot],['Validité',o.validite?o.validite+' jours':null],
