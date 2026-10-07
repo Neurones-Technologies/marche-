@@ -145,6 +145,7 @@ r.post('/espaces', (req, res) => {
   if (!courrielValide(email)) return err(res, 422, 'SPACE_EMAIL', 'Courriel invalide.');
   if (!mdpValide(mdp)) return err(res, 422, 'SPACE_PASSWORD', MDP_REGLE);
   if (!P.existe(profil)) return err(res, 422, 'SPACE_PROFILE', 'Type d’acheteur inconnu.');
+  if (!require('../config').profilChoisissable(profil)) return err(res, 409, 'PROFILE_ON_HOLD', 'Les marchés publics ne sont pas encore disponibles : choisissez « Achats privés ».');
   if (!E.valideSousDomaine(slug) || E.RESERVES.includes(slug)) return err(res, 422, 'SPACE_SLUG', 'Adresse invalide ou réservée.');
   if (!E.libre(slug)) return err(res, 409, 'SPACE_TAKEN', 'Cette adresse est déjà prise.');
   const e = ouvrir({ slug, nom, pays, profil, admin: { nom: adminNom, email, hash: bcrypt.hashSync(mdp, 10) } }, 'console', qui(req));
@@ -167,6 +168,7 @@ r.patch('/espaces/:slug', (req, res) => {
   if (!nom || nom.length > 120) return err(res, 422, 'SPACE_NAME', 'La raison sociale est obligatoire (120 caractères au plus).');
   if (pays.length > 60) return err(res, 422, 'SPACE_COUNTRY', 'Pays trop long.');
   if (!P.existe(profil)) return err(res, 422, 'SPACE_PROFILE', 'Type d’acheteur inconnu.');
+  if (!require('../config').profilChoisissable(profil, e.profil)) return err(res, 409, 'PROFILE_ON_HOLD', 'Les marchés publics ne sont pas encore disponibles : choisissez « Achats privés ».');
   if (email && !courrielValide(email)) return err(res, 422, 'SPACE_EMAIL', 'Courriel invalide.');
   const changes = [];
   if (nom !== e.nom) changes.push(`raison sociale : ${e.nom} → ${nom}`);

@@ -49,6 +49,7 @@ r.post('/espaces', limite, (req, res) => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return err(res, 422, 'SPACE_EMAIL', 'Courriel invalide.');
   if (mdp.length < 10 || !/[a-z]/.test(mdp) || !/[A-Z]/.test(mdp) || !/\d/.test(mdp)) return err(res, 422, 'SPACE_PASSWORD', 'Mot de passe : 10 caractères minimum, avec majuscule, minuscule et chiffre.');
   if (!P.existe(profil)) return err(res, 422, 'SPACE_PROFILE', 'Type d’acheteur inconnu.');
+  if (!require('../config').profilChoisissable(profil)) return err(res, 409, 'PROFILE_ON_HOLD', 'Les marchés publics ne sont pas encore disponibles : choisissez « Achats privés ».');
   if (!E.valideSousDomaine(slug) || E.RESERVES.includes(slug)) return err(res, 422, 'SPACE_SLUG', 'Adresse invalide ou réservée.');
   if (!E.libre(slug)) return err(res, 409, 'SPACE_TAKEN', 'Cette adresse est déjà prise.');
   const jeton = E.demander(slug, { slug, nom, pays, profil, admin: { nom: adminNom, email, hash: bcrypt.hashSync(mdp, 10) } });

@@ -139,6 +139,14 @@ function vueProcedureCourante(){
 }
 /* Le cadre (frise, sous-onglets) s'adresse à ceux qui conduisent la procédure ; un prestataire ou un demandeur
    n'en voit qu'un ou deux écrans, sans cadre. */
+/* Profils réglementaires d'une liste de choix ; les marchés publics, en attente, y figurent grisés (sauf
+   MARCHES_PUBLICS=1 sur le serveur). */
+function optionsProfils(select){
+  Object.keys(MPProfils.PROFILS).forEach(function(id){
+    var pr=MPProfils.PROFILS[id], attente=pr.public && !state.marchesPublics;
+    var op=add(select,'option',null,pr.lab+(attente?' — en attente':'')); op.value=id; op.disabled=attente;
+  });
+}
 function avecCadreProcedure(){ return !fournisseurSeul() && VIEWS.filter(function(v){ return v.grp==='Procédure' && vueVisible(v); }).length>=3; }
 /* Compte d'une entreprise qui répond (portail), sans rôle d'acheteur : il ne voit ni le parcours interne ni la vue d'ensemble. */
 function fournisseurSeul(){ return can('portail.use') && !can('offres.read') && !can('cdc.edit'); }

@@ -392,6 +392,7 @@ function partenaireDemo() {
   p.referenceLe = frDate();
   p.historique.push({ t: frDate(), who: 'Système', action: 'référencé (jeu de démonstration)' });
   partenaireSave(p);
+  return p;
 }
 
 /* ---- bons de commande (module 4) : rattachés à une procédure, numérotés à l'émission ---- */
@@ -421,7 +422,7 @@ function commandeNumero(prefixe) {
 function defaultOrgKv() {
   return {
     org: { nom: 'Banque Atlantique du Littoral', pays: 'Côte d’Ivoire', ville: 'Abidjan', devisePivot: 'XOF', accent: '#1F6F6B', initiales: 'BAL',
-      rates: clone(seed.RATES_DEF), profilDefaut: 'uemoa-ci', reglages: {}, inscriptionOuverte: true, prefixeCommande: 'BC' },
+      rates: clone(seed.RATES_DEF), profilDefaut: cfg.marchesPublics ? 'uemoa-ci' : 'prive', reglages: {}, inscriptionOuverte: true, prefixeCommande: 'BC' },
     seuils: { confianceMin: 75, prixBas: 25, structureEcart: 0.8, refsMin: 3, validiteMin: 90, ecartIaMax: 0 },
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
     notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT), formulaireReferencement: formulaireDefaut(seed.DOC_DEFS), circuitCommande: clone(CIRCUIT_COMMANDE), evaluationPartenaires: clone(EVALUATION_PARTENAIRES),
@@ -485,7 +486,11 @@ function seedAll(withUsers = true, options = null) {
         db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)').run('u0', a.nom, a.email, 'admin', a.hash);
       } else adminInitial();
     }
-    if (demo) partenaireDemo();
+    if (demo) {
+      const p = partenaireDemo();
+      // achats privés (marchés publics en attente) : l'appel d'offres de démonstration consulte SOTRAP
+      if (!cfg.marchesPublics && p && db.prepare("SELECT 1 FROM procedures WHERE id='p1'").get()) pkvSet('p1', 'consultes', { mode: 'restreint', partenaires: [p.id] }, 'seed');
+    }
     auditAppend(null, 'Système', 'Instance initialisée');
   });
   tx();
@@ -582,6 +587,17 @@ db.transaction(function migrate() {
   for (const p of db.prepare('SELECT id FROM procedures').all()) {
     const c = pkvGet(p.id, 'cdc');
     if (c && !c.value.cctp && c.value.ref === seed.CDC.ref && c.value.objet === seed.CDC.objet) pkvSet(p.id, 'cdc', { ...c.value, cctp: clone(CCTP_EXEMPLE) }, 'migration');
+  }
+  // 08/10/2026 : marchés publics en attente (MARCHES_PUBLICS) : l'organisation et ses appels d'offres non publiés passent
+  // en achats privés ; un appel d'offres déjà publié garde le cadre figé à sa publication.
+  if (!cfg.marchesPublics) {
+    const org = kvGet('org');
+    if (org && P.profil(org.value.profilDefaut || P.DEFAUT).public) kvSet('org', { ...org.value, profilDefaut: 'prive' }, 'migration');
+    for (const p of db.prepare('SELECT id FROM procedures').all()) {
+      const c = pkvGet(p.id, 'cdc');
+      if (!c || c.value.cdcPublie) continue;
+      if (c.value.profil && P.profil(c.value.profil).public) pkvSet(p.id, 'cdc', { ...c.value, profil: 'prive' }, 'migration');
+    }
   }
   // 07/10/2026 : budget et engagement. Sans ligne budgétaire, le contrôle des crédits reste inactif.
   if (kvGet('org') && !kvGet('budget')) kvSet('budget', { lignes: [] }, 'migration');

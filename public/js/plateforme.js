@@ -62,7 +62,7 @@
     e.preventDefault();
     message('');
     var profil = document.querySelector('input[name="profil"]:checked');
-    var corps = { nom: $('pf-nom').value.trim(), pays: $('pf-pays').value, profil: profil ? profil.value : 'uemoa-ci', slug: $('pf-slug').value.trim(),
+    var corps = { nom: $('pf-nom').value.trim(), pays: $('pf-pays').value, profil: profil ? profil.value : 'prive', slug: $('pf-slug').value.trim(),
       adminNom: $('pf-admin').value.trim(), email: $('pf-email').value.trim(), motDePasse: $('pf-mdp').value, site: $('pf-site').value };
     if (!corps.nom || !corps.slug || !corps.adminNom || !corps.email || !corps.motDePasse) { message('Tous les champs sont obligatoires.'); return; }
     if (!dispo) { message('Choisissez une adresse disponible pour votre espace.'); $('pf-slug').focus(); return; }

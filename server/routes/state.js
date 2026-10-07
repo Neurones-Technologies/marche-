@@ -26,6 +26,7 @@ function buildState(req) {
     ...values, users, me: req.user.id, procedure: req.pid,
     offers: canSeeOffers ? req.store.offers() : [],
     receipts: receipts.map((x) => JSON.parse(x.data)),
+    marchesPublics: require('../config').marchesPublics, // marchés publics en attente : profil public non proposé
     audit: req.pid && (req.can('audit.read') || req.can('pv.read')) ? auditList(200, req.pid) : [],
   };
   delete st._sod; // historique de séparation des fonctions : interne au serveur

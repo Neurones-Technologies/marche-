@@ -140,6 +140,7 @@ r.post('/:id/procedure', (req, res) => {
   if (!ref || ref.length > 40) return err(res, 422, 'REFERENCE_INVALID', 'La référence est obligatoire (40 caractères au plus).');
   if (proceduresAll().some((p) => String(p.ref).toLowerCase() === ref.toLowerCase())) return err(res, 409, 'REFERENCE_TAKEN', `La référence ${ref} est déjà utilisée.`);
   if (d.profil != null && !P.existe(d.profil)) return err(res, 422, 'PROFILE_UNKNOWN', 'Profil réglementaire inconnu.');
+  if (d.profil != null && !require('../config').profilChoisissable(d.profil)) return err(res, 409, 'PROFILE_ON_HOLD', 'Les marchés publics ne sont pas encore disponibles : choisissez « Achats privés ».');
   let pid;
   db.transaction(() => {
     pid = procedureCreate({ ref, objet: b.objet, profil: d.profil, extra: {

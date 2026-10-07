@@ -167,7 +167,7 @@ function vBesoins(m){
       var ir=add(w1,'input'); ir.type='text'; ir.id='bes-ref'; ir.maxLength=40; ir.placeholder='AO-2026-040'; fk(ir,'bes-ref');
       var w2=add(f,'div'); add(w2,'label',null,'Profil réglementaire').setAttribute('for','bes-profil');
       var sp=add(w2,'select'); sp.id='bes-profil'; fk(sp,'bes-profil');
-      Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(sp,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
+      optionsProfils(sp);
       sp.value=(state.org && state.org.profilDefaut) || MPProfils.DEFAUT;
       var fp2=add(kp,'div','panel-foot');
       add(fp2,'span','muted','Objet, budget estimé, service demandeur et type de procédure ('+b.typeLab+') sont repris dans le cahier des charges.');

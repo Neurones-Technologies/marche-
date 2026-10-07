@@ -114,6 +114,8 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         return refus(409, 'PREFERENCE_LOCKED', 'Le dépouillement est clôturé : la marge de préférence ne peut plus être modifiée, elle conditionne le classement.');
       if (value.profil != null && !P.existe(value.profil))
         return refus(422, 'PROFILE_UNKNOWN', 'Profil réglementaire inconnu.');
+      if (value.profil != null && !require('./config').profilChoisissable(value.profil, cur && cur.profil))
+        return refus(409, 'PROFILE_ON_HOLD', 'Les marchés publics ne sont pas encore disponibles : choisissez « Achats privés ».');
       if (cur && cur.cdcPublie && R.profilId({ cdc: value, org: next('org') }) !== R.profilId({ cdc: cur, org: next('org') }))
         return refus(409, 'PROFILE_LOCKED', 'Le dossier est publié : son profil réglementaire ne peut plus être modifié.');
       if (value.prefActive) {
@@ -362,6 +364,8 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (!isObj(value) || !isObj(value.rates)) return 'Paramètres de l’organisation invalides.';
       for (const v of Object.values(value.rates)) if (!(Number(v) > 0)) return 'Taux de change invalide.';
       if (value.profilDefaut != null && !P.existe(value.profilDefaut)) return refus(422, 'PROFILE_UNKNOWN', 'Profil réglementaire inconnu.');
+      if (value.profilDefaut != null && !require('./config').profilChoisissable(value.profilDefaut, cur && cur.profilDefaut))
+        return refus(409, 'PROFILE_ON_HOLD', 'Les marchés publics ne sont pas encore disponibles : choisissez « Achats privés ».');
       if (value.reglages != null && !isObj(value.reglages)) return 'Réglages invalides.';
       if (value.verrouillageMinutes != null && ![5, 10, 15, 30, 60].includes(Number(value.verrouillageMinutes)))
         return refus(422, 'LOCK_DELAY_INVALID', 'Délai de verrouillage : 5, 10, 15, 30 ou 60 minutes.');

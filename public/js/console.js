@@ -324,7 +324,7 @@
       ouvrir('Modifier ' + e.nom, '<form class="cs-form" novalidate>' + MSG +
         '<label for="me-nom">Raison sociale</label><input id="me-nom" type="text" maxlength="120" value="' + esc(e.nom) + '">' +
         '<div class="cs-deux"><div><label for="me-pays">Pays</label><select id="me-pays">' + PAYS.map(function (p) { return '<option' + (p === e.pays ? ' selected' : '') + '>' + esc(p) + '</option>'; }).join('') + '</select></div>' +
-        '<div><label for="me-profil">Type d’acheteur</label><select id="me-profil">' + Object.keys(PROFILS).map(function (p) { return '<option value="' + p + '"' + (p === (e.profil || 'uemoa-ci') ? ' selected' : '') + '>' + esc(PROFILS[p]) + '</option>'; }).join('') + '</select></div></div>' +
+        '<div><label for="me-profil">Type d’acheteur</label><select id="me-profil">' + Object.keys(PROFILS).map(function (p) { var cur = p === (e.profil || 'prive'), attente = p === 'uemoa-ci' && !cur; return '<option value="' + p + '"' + (cur ? ' selected' : '') + (attente ? ' disabled' : '') + '>' + esc(PROFILS[p]) + (attente ? ' — en attente' : '') + '</option>'; }).join('') + '</select></div></div>' +
         '<label for="me-email">Courriel de contact de l’administrateur</label><input id="me-email" type="email" value="' + esc(e.adminEmail || '') + '">' +
         '<label>Adresse</label><div class="cs-adresse cs-fixe">' + esc(e.adresse.replace(/^https?:\/\//, '')) + '</div>' +
         '<div class="pf-aide">L’adresse ne se modifie pas : les liens et les sessions des utilisateurs en dépendent. Raison sociale, pays et type d’acheteur sont aussi mis à jour dans les paramètres de l’espace (pour les nouvelles procédures).</div>' +
@@ -362,7 +362,7 @@
         '<fieldset><legend>L’entreprise</legend>' +
         '<label for="ne-nom">Raison sociale</label><input id="ne-nom" type="text" maxlength="120">' +
         '<div class="cs-deux"><div><label for="ne-pays">Pays</label><select id="ne-pays"><option>Côte d’Ivoire</option><option>Sénégal</option><option>Burkina Faso</option><option>Mali</option><option>Bénin</option><option>Togo</option><option>Niger</option><option>Guinée-Bissau</option><option>Autre</option></select></div>' +
-        '<div><label for="ne-profil">Type d’acheteur</label><select id="ne-profil"><option value="uemoa-ci">Marchés publics</option><option value="prive">Achats privés</option></select></div></div>' +
+        '<div><label for="ne-profil">Type d’acheteur</label><select id="ne-profil"><option value="uemoa-ci" disabled>Marchés publics — en attente</option><option value="prive" selected>Achats privés</option></select></div></div>' +
         '<label for="ne-slug">Adresse</label><div class="pf-adresse"><input id="ne-slug" type="text" maxlength="30" autocomplete="off" spellcheck="false"><span class="pf-suffixe">.' + esc(location.hostname) + '</span></div><div class="pf-aide" id="ne-dispo"></div></fieldset>' +
         '<fieldset><legend>L’administrateur</legend>' +
         '<div class="cs-deux"><div><label for="ne-admin">Nom et prénom</label><input id="ne-admin" type="text" maxlength="120"></div><div><label for="ne-email">Courriel</label><input id="ne-email" type="email"></div></div>' +

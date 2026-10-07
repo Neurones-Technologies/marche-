@@ -147,7 +147,7 @@ function vParamsCadre(m,o){
   var w=add(add(b,'div','frm'),'div');
   add(w,'label',null,'Profil par défaut des nouvelles procédures').setAttribute('for','par-profil');
   var s=add(w,'select'); s.id='par-profil'; fk(s,'par-profil');
-  Object.keys(P.PROFILS).forEach(function(id){ var op=add(s,'option',null,P.PROFILS[id].lab); op.value=id; });
+  optionsProfils(s);
   s.value=o.profilDefaut||P.DEFAUT;
   s.addEventListener('change',function(){ o.profilDefaut=s.value; logit('Profil réglementaire par défaut : '+P.profil(s.value).lab); save(); render(); });
   add(b,'p','muted','Règles du profil « '+prof.lab+' », celui de la procédure en cours. '+prof.note).style.marginTop='12px';

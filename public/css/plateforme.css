@@ -284,3 +284,4 @@ body.pt { min-height: 100vh; display: flex; flex-direction: column;
 .pt-nav { display: flex; gap: 10px; align-items: center; margin-top: 22px; }
 .pt-nav .btn-primary { flex: 1; }
 @media (max-width: 640px) { .pt-doc { grid-template-columns: 1fr; } .pt-pas li { font-size: 0; } .pt-pas li.on { font-size: 12px; } }
+.pf-option-attente { opacity: .55; cursor: not-allowed; }

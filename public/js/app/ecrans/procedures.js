@@ -97,7 +97,7 @@ function nouvelleProcedure(){
     var ir=champ('Référence','np-ref'); ir.maxLength=40; ir.placeholder='AO-2026-020';
     var io=champ('Objet du marché','np-objet','textarea'); io.maxLength=500;
     var sp=champ('Profil réglementaire','np-profil','select');
-    Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(sp,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
+    optionsProfils(sp);
     sp.value=(state.org && state.org.profilDefaut) || MPProfils.DEFAUT;
     add(c,'p','muted','Le dossier part du cahier des charges modèle, de la grille de critères par défaut et du circuit d’approbation par défaut. Il reste à compléter avant publication.').style.marginTop='12px';
     var an=add(p,'button','btn btn-ghost','Annuler'); fk(an,'np-annuler'); an.addEventListener('click',fermerFenetre);

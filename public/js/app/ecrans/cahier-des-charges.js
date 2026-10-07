@@ -53,7 +53,7 @@ function vCDC(m){
   (function(){
     var w=add(f1,'div'); add(w,'label',null,'Profil réglementaire').setAttribute('for','cdc-profil');
     var s=add(w,'select'); s.id='cdc-profil'; fk(s,'cdc-profil');
-    Object.keys(MPProfils.PROFILS).forEach(function(id){ var op=add(s,'option',null,MPProfils.PROFILS[id].lab); op.value=id; });
+    optionsProfils(s);
     s.value=R.profilId(RCTX());
     s.disabled=!!c.cdcPublie;
     s.addEventListener('change',function(){

@@ -31,6 +31,7 @@ r.post('/', needPerm('cdc.edit'), (req, res) => {
   if (!ref || ref.length > 40) return res.status(422).json({ error: 'La référence est obligatoire (40 caractères au plus).', code: 'REFERENCE_INVALID' });
   if (!objet || objet.length > 500) return res.status(422).json({ error: 'L’objet est obligatoire (500 caractères au plus).', code: 'OBJECT_INVALID' });
   if (d.profil != null && !P.existe(d.profil)) return res.status(422).json({ error: 'Profil réglementaire inconnu.', code: 'PROFILE_UNKNOWN' });
+  if (d.profil != null && !require('../config').profilChoisissable(d.profil)) return res.status(409).json({ error: 'Les marchés publics ne sont pas encore disponibles : choisissez « Achats privés ».', code: 'PROFILE_ON_HOLD' });
   if (proceduresAll().some((p) => String(p.ref).toLowerCase() === ref.toLowerCase()))
     return res.status(409).json({ error: `La référence ${ref} est déjà utilisée par une autre procédure.`, code: 'REFERENCE_TAKEN' });
   let pid;

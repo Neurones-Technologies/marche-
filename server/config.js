@@ -16,6 +16,15 @@ module.exports = {
   maxFileMb: Number(process.env.MAX_FILE_MB) || 10,
   seedPassword: process.env.SEED_PASSWORD || 'Marche+2026!',
   seedDemo: process.env.SEED_DEMO !== '0',
+  // Marchés publics (profil réglementaire « public ») : en attente, donc indisponibles sauf MARCHES_PUBLICS=1.
+  // Indisponibles : ni choisis pour une organisation, un espace ou un appel d'offres, ni proposés à l'écran.
+  marchesPublics: process.env.MARCHES_PUBLICS === '1',
+  /** Un profil peut-il être choisi ? Un profil public ne l'est que si les marchés publics sont ouverts ; avant : la
+      valeur déjà en place, qui reste admise telle quelle. */
+  profilChoisissable(id, avant) {
+    const P = require('../public/js/profils.js');
+    return P.existe(id) && (module.exports.marchesPublics || !P.profil(id).public || id === avant);
+  },
   allowReset: process.env.ALLOW_RESET !== '0',
   // Inscription publique des prestataires : tentatives par adresse IP et par heure
   inscriptionParHeure: Number(process.env.INSCRIPTION_RATE_LIMIT) || 5,

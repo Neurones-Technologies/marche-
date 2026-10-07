@@ -159,6 +159,7 @@ Paramètres du `.env` utiles :
 | `SHOW_DEMO_ACCOUNTS` | `0` | **Ne jamais mettre `1` sur Internet** : l'écran de connexion afficherait le mot de passe. |
 | `ALLOW_RESET` | `1` | Bouton « Réinitialiser la démo » (réservé aux droits paramètres/rôles). `0` pour le désactiver. |
 | `MAX_FILE_MB` | `10` | Taille maximale d'une pièce jointe. Garder `client_max_body_size` du vhost au-dessus. |
+| `MARCHES_PUBLICS` | `0` | Marchés publics en attente : seul le profil « Achats privés » se choisit ; au démarrage, l'organisation et ses appels d'offres non publiés y passent. `1` les rouvre. |
 | `SAUVEGARDE_HEURES` | `24` | Sauvegarde automatique des bases et des pièces dans le volume `marcheplus-sauvegardes`. `0` la désactive. |
 | `SAUVEGARDE_CONSERVER` | `14` | Nombre de sauvegardes gardées. |
 | `RAPPELS` | `1` | Rappels automatiques à 3 jours et la veille de la date limite aux entreprises concernées qui n'ont pas déposé. `0` les désactive. |

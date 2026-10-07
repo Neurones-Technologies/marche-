@@ -1,6 +1,7 @@
 /* Client HTTP de test partagé : chaque fichier *.test.js démarre son propre serveur sur une base en mémoire. */
 process.env.DB_FILE = ':memory:';
 process.env.NODE_ENV = 'test';
+if (process.env.MARCHES_PUBLICS == null) process.env.MARCHES_PUBLICS = '1'; // le moteur des marchés publics reste testé, bien qu'en attente
 process.env.LOGIN_RATE_LIMIT = '1000';
 process.env.INSCRIPTION_RATE_LIMIT = '1000';
 const test = require('node:test');
