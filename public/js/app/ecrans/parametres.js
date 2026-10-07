@@ -142,7 +142,7 @@ function vParams(m){
 var LIB_REGLES = {
   niveauxApprobationMin:'Nombre minimum de validations', separationFonctions:'La personne qui note les offres ne peut pas approuver l’attribution',
   recoursActif:'Permettre la contestation', delaiRecoursJours:'Délai pour contester (jours)',
-  preferenceAutorisee:'Autoriser une marge de préférence', preferenceTauxMax:'Taux maximal de la marge (%)', zonePreference:'Pays favorisés',
+  preferenceAutorisee:'Favoriser les entreprises de certains pays', preferenceTauxMax:'Majoration maximale des autres offres (%)', zonePreference:'Pays favorisés',
   paysLocal:'Pays de l’organisation', piecesImposees:'Pièces exigées dans tous les appels d’offres',
   seuilConsultation:'Appel d’offres restreint à partir de (XOF)', seuilAppelOffresOuvert:'Appel d’offres ouvert à partir de (XOF)'
 };
@@ -202,7 +202,7 @@ function vParamsCadre(m,o){
     ['niveauxApprobationMin','separationFonctions']);
   bloc('Contestation','Après l’attribution, les entreprises non retenues peuvent contester la décision pendant un délai, avant la signature du marché.',
     eff.recoursActif ? ['recoursActif','delaiRecoursJours'] : ['recoursActif']);
-  bloc('Préférence géographique','Favoriser les entreprises de certains pays : pour la seule comparaison des prix, les offres des autres entreprises sont majorées du taux choisi dans chaque appel d’offres.',
+  bloc('Préférence géographique','Pour comparer les prix, les offres des entreprises établies hors des pays favorisés sont majorées d’un pourcentage, choisi dans chaque appel d’offres sans dépasser le maximum fixé ici. Le prix payé ne change pas.',
     eff.preferenceAutorisee ? ['preferenceAutorisee','preferenceTauxMax','zonePreference'] : ['preferenceAutorisee']);
   bloc('Entreprises locales','Les entreprises établies dans ce pays fournissent, en plus, les pièces propres au pays (attestation de sécurité sociale…).',
     ['paysLocal']);
