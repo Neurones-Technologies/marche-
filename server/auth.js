@@ -14,7 +14,7 @@ function parseCookies(h) {
 
 function sign(user) {
   // l'espace de l'entreprise entre dans le jeton : il ne vaut que dans cet espace (plateforme multi-entreprises)
-  return jwt.sign({ sub: user.id, role: user.role, esp: contexte.espace(), v: user.session_v || 0 }, cfg.jwtSecret, { expiresIn: cfg.jwtTtl });
+  return jwt.sign({ sub: user.id, role: user.role, esp: contexte.espace(), v: user.session_v || 0 }, cfg.jwtSecret, { expiresIn: cfg.jwtTtl, algorithm: 'HS256' });
 }
 
 function setCookie(res, token) {
@@ -32,7 +32,7 @@ function requireAuth(req, res, next) {
   const token = h.startsWith('Bearer ') ? h.slice(7) : parseCookies(req.headers.cookie)[COOKIE];
   if (!token) return res.status(401).json({ error: 'Authentification requise.' });
   try {
-    const p = jwt.verify(token, cfg.jwtSecret);
+    const p = jwt.verify(token, cfg.jwtSecret, { algorithms: ['HS256'] });
     if ((p.esp || null) !== contexte.espace()) return res.status(401).json({ error: 'Session d’un autre espace : reconnectez-vous.' });
     const u = db.prepare('SELECT id,nom,email,role,active,session_v FROM users WHERE id=?').get(p.sub);
     if (!u || !u.active) return res.status(401).json({ error: 'Compte introuvable ou désactivé.' });
