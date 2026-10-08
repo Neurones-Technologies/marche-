@@ -70,3 +70,28 @@ test('comptes : vidés sauf celui de l’auteur, puis recréés en données fict
   assert.equal(moi.status, 200, JSON.stringify(moi.json));
   assert.equal((await call('POST', '/api/admin/fictives', { zones: ['comptes'] }, admin)).json.ajout.comptes, 0);
 });
+
+test('données fictives, zone Exécution : appel d’offres attribué et bons de commande à divers stades, visibles des acteurs concernés', async () => {
+  const admin = await login('administrateur@bal.ci'), achats = await login('y.koffi@bal.ci');
+  const r = await call('POST', '/api/admin/fictives', { zones: ['budget', 'partenaires', 'commandes'] }, admin);
+  ok(r, 201);
+  assert.equal(r.json.ajout.commandes.n, 5);
+  const cmds = (await call('GET', '/api/commandes', null, achats)).json.commandes;
+  assert.deepEqual(cmds.map((c) => c.statut).sort(), ['brouillon', 'emise', 'en_reception', 'receptionnee', 'validation']);
+  assert.equal(new Set(cmds.map((c) => c.numero).filter(Boolean)).size, 3); // trois numéros distincts, attribués à l’émission
+  assert.ok(cmds.every((c) => c.total > 0 && c.total <= c.montantOffre));
+  const rec = cmds.find((c) => c.statut === 'en_reception');
+  assert.ok(rec.rapprochement.some((x) => x.recu > 0 && x.ecart > 0), 'livraison partielle');
+  // la procédure est attribuée : le budget engagé suit les commandes
+  const lignes = (await call('GET', '/api/budget', null, achats)).json.lignes;
+  assert.ok(lignes.some((l) => l.engage > 0));
+  // les indicateurs de délais s’alimentent des jalons posés
+  const ind = (await call('GET', '/api/indicateurs', null, achats)).json;
+  assert.ok(ind.delais.cycle && ind.delais.cycle.nb >= 1);
+  assert.equal(ind.commandes.emises, 3);
+  // une seconde fois : une nouvelle référence, rien ne se mélange
+  const r2 = await call('POST', '/api/admin/fictives', { zones: ['commandes'] }, admin);
+  ok(r2, 201);
+  assert.notEqual(r2.json.ajout.commandes.ref, r.json.ajout.commandes.ref);
+  assert.equal((await call('GET', '/api/audit', null, admin)).json.verification.ok, true);
+});

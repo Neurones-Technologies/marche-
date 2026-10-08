@@ -142,7 +142,7 @@ document.addEventListener('keydown',function(e){
 /* Données fictives et vidage : une fenêtre où l'on coche les zones concernées. */
 var ZONES_VIDER=[
   ['appels','Appels d’offres','Cahiers des charges, offres, accusés de réception, questions, pièces déposées. Les commandes partent avec eux.'],
-  ['commandes','Commandes','Bons de commande, réceptions et leurs pièces.'],
+  ['commandes','Exécution (commandes)','Bons de commande, livraisons, réceptions et leurs pièces.'],
   ['besoins','Demandes d’achat','Toutes les demandes d’achat et leur circuit.'],
   ['partenaires','Partenaires','Fiches, pièces de référencement, inscriptions en cours ; les comptes fournisseurs sont gardés.'],
   ['budget','Budget','Lignes budgétaires.'],
@@ -156,6 +156,7 @@ var ZONES_FICTIVES=[
   ['budget','Budget','Trois lignes budgétaires (informatique, maintenance, agences).'],
   ['partenaires','Partenaires','Quatre entreprises, dont deux référencées (SOTRAP, Delta Bâtiment).'],
   ['appels','Appel d’offres','Un appel d’offres réseau et télécoms avec huit offres reçues.'],
+  ['commandes','Exécution','Un appel d’offres attribué et cinq bons de commande à divers stades : brouillon, en validation, émis, en réception, réceptionné. Alimente aussi les indicateurs de délais.'],
   ['besoins','Demandes d’achat','Deux demandes : un brouillon et une demande soumise à validation.']
 ];
 function fenetreZones(o){
@@ -220,6 +221,7 @@ function ouvrirFictives(){
       MP.api('POST','/api/admin/fictives',{ zones:zones }).then(function(r){
         var a=r.ajout||{}, m=[];
         if(a.appels) m.push('appel d’offres '+a.appels);
+        if(a.commandes) m.push(a.commandes.n+' bons de commande (appel d’offres '+a.commandes.ref+')');
         if(a.partenaires!=null) m.push(a.partenaires+' partenaire'+(a.partenaires>1?'s':''));
         if(a.besoins!=null) m.push(a.besoins+' demande'+(a.besoins>1?'s':'')+' d’achat');
         if(a.budget!=null) m.push(a.budget+' ligne'+(a.budget>1?'s':'')+' budgétaire'+(a.budget>1?'s':''));

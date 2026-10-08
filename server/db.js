@@ -676,7 +676,7 @@ function viderDonnees(uid, who, zones) {
 }
 
 /* ---- données fictives, ajoutées à la demande, par zone, sans rien effacer ---- */
-const ZONES_FICTIVES = { comptes: 'comptes', budget: 'lignes budgétaires', partenaires: 'partenaires', appels: 'appel d’offres avec ses offres', besoins: 'demandes d’achat' };
+const ZONES_FICTIVES = { comptes: 'comptes', budget: 'lignes budgétaires', partenaires: 'partenaires', appels: 'appel d’offres avec ses offres', commandes: 'exécution (appel d’offres attribué et bons de commande)', besoins: 'demandes d’achat' };
 const PARTENAIRES_FICTIFS = [
   { raisonSociale: 'SOTRAP Ingénierie SA', pays: 'CI', immatriculation: 'CI-ABJ-2009-B-14522', adresse: 'Abidjan, Plateau',
     contact: { nom: 'K. Amani', email: 'contact.sotrap@bal.ci', tel: '' }, domaines: ['Réseaux et télécoms'], statut: 'reference', compte: 'contact.sotrap@bal.ci' },
@@ -700,6 +700,105 @@ function nouveauPid() {
   let pid = 'p' + (ids.length ? Math.max(...ids) + 1 : 1);
   while (procedureGet(pid)) pid = 'p' + (Number(pid.slice(1)) + 1);
   return pid;
+}
+/** Exécution fictive : un appel d'offres attribué (offres, évaluation, circuit d'attribution complet, marché signé) et
+    cinq bons de commande à divers stades — brouillon, en validation, émis avec livraison annoncée, en réception,
+    réceptionné. Retourne { ref, n }. Les dates de jalons sont étalées dans le passé : les indicateurs de délais s'en servent. */
+function executionFictive(uid, who) {
+  const org = (kvGet('org') || { value: {} }).value;
+  const refs = new Set(proceduresAll().map((p) => String(p.ref).toLowerCase()));
+  let ref = 'AO-2026-031';
+  while (refs.has(ref.toLowerCase())) ref = ref.replace(/(\d+)$/, (n) => String(Number(n) + 1).padStart(n.length, '0'));
+  const pid = nouveauPid();
+  const ligneBudget = ((((kvGet('budget') || { value: {} }).value.lignes) || []).some((l) => l.id === 'b-dsi-inv')) ? 'b-dsi-inv' : null;
+  const il = (n) => new Date(Date.now() - n * 86400000), jour = (d) => d.toISOString().slice(0, 10);
+  const objet = 'Fourniture et installation d’équipements informatiques pour les agences';
+  const cdc = { ...clone(seed.CDC), ref, objet, cdcPublie: true, ligneBudget, ouverture: jour(il(40)), cctp: clone(CCTP_EXEMPLE),
+    ...(cfg.marchesPublics ? {} : { prefActive: false, prefTaux: 0 }) };
+  const v = procDefaults(cdc, { demo: true });
+  const approb = db.prepare("SELECT id FROM users WHERE role='approb' AND active=1 ORDER BY id").get();
+  // trois des offres de démonstration, avec des identifiants propres à cette procédure
+  const offres = ['sotrap', 'delta', 'kora'].map((id) => seed.OFFERS.find((o) => o.id === id)).filter(Boolean)
+    .map((o) => ({ ...clone(o), id: o.id + '-' + pid }));
+  offres.forEach((o) => { v.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
+  Object.assign(v, {
+    depClosed: true, evalDone: true, contractSigned: true,
+    approvals: v.approvals.map((e) => ({ ...e, done: true, by: approb ? approb.id : uid, at: frDate() })),
+    fxFrozen: { rates: { ...(org.rates || {}) }, at: frDate(), by: uid },
+    cadre: { profil: R.profilId({ cdc, org }), regles: R.cadre({ cdc, org }), at: frDate(), by: 'seed' },
+    jalons: { publie: il(40).toISOString(), depouille: il(26).toISOString(), evalue: il(20).toISOString(), attribue: il(14).toISOString(), signe: il(10).toISOString() },
+  });
+  procedureInsert(pid, v, uid);
+  db.prepare('UPDATE procedures SET created_at=? WHERE id=?').run(il(55).toISOString().replace('T', ' ').slice(0, 19), pid);
+  offres.forEach((o) => offerInsert(o, false, pid));
+  const ctx = { offers: offres, org, fxFrozen: v.fxFrozen, cadre: v.cadre, cdc, criteria: v.criteria, quality: v.quality, justif: {}, excluded: {}, confirmed: {}, docDefs: v.docDefs };
+  const rang = R.ranking(ctx);
+  if (!rang.length) throw new Error('Appel d’offres fictif : aucune offre classée.');
+  const win = rang[0].o;
+  const part = partenairesAll().find((p) => String(p.raisonSociale).toLowerCase() === String(win.name).toLowerCase()) || null;
+  if (part) pkvSet(pid, 'consultes', { mode: 'restreint', partenaires: [part.id] }, uid);
+  const titulaireCompte = part && (part.comptes || [])[0] ? db.prepare('SELECT id, nom FROM users WHERE id=?').get(part.comptes[0]) : null;
+  const demandeur = db.prepare("SELECT id, nom FROM users WHERE role='demandeur' AND active=1 ORDER BY id").get() || db.prepare('SELECT id, nom FROM users WHERE id=?').get(uid);
+  const lignesBudget = ((kvGet('budget') || { value: {} }).value.lignes) || [];
+  const circuitModele = (kvGet('circuitCommande') || { value: [] }).value;
+
+  const MODELES = [
+    { statut: 'receptionnee', part: 0.30, lignes: [['Postes de travail', 40], ['Écrans 24 pouces', 40]] },
+    { statut: 'en_reception', part: 0.25, lignes: [['Commutateurs réseau 48 ports', 10], ['Câblage et connectique', 10]] },
+    { statut: 'emise', part: 0.20, lignes: [['Serveurs de virtualisation', 4], ['Licences et support 3 ans', 4]] },
+    { statut: 'validation', part: 0.10, lignes: [['Onduleurs 3 kVA', 20], ['Baies de brassage', 20]] },
+    { statut: 'brouillon', part: 0.05, lignes: [['Imprimantes multifonctions', 15], ['Consommables initiaux', 15]] },
+  ];
+  const h = (action) => ({ t: frDate(), who, action });
+  let n = 0;
+  for (const m of MODELES) {
+    const montant = Math.round(win.montant * m.part), [l1, l2] = m.lignes;
+    const p1 = Math.floor(montant * 0.7 / l1[1]), p2 = Math.floor((montant - l1[1] * p1) / l2[1]);
+    const lignes = [{ designation: l1[0], quantite: l1[1], unite: 'unité', prixUnitaire: p1 }, { designation: l2[0], quantite: l2[1], unite: 'unité', prixUnitaire: p2 }];
+    const total = lignes.reduce((t, l) => t + l.quantite * l.prixUnitaire, 0);
+    const circuit = C.appliquerMontant(C.reinitialiser(circuitModele), total * (R.rate(ctx, win.devise) || 1));
+    const emise = ['emise', 'en_reception', 'receptionnee'].includes(m.statut);
+    const c = {
+      id: 'cmd' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'), numero: null, statut: m.statut,
+      procedure: { id: pid, ref, objet }, titulaire: { nom: win.name, pays: win.pays, offre: win.id, partenaire: part ? part.id : null },
+      devise: win.devise, taux: R.rate(ctx, win.devise), montantOffre: win.montant, lignes,
+      jalons: [{ libelle: 'Livraison sur site', pourcentage: 30 }, { libelle: 'Installation et essais', pourcentage: 40 }, { libelle: 'Réception provisoire', pourcentage: 20 }, { libelle: 'Réception définitive', pourcentage: 10 }],
+      dateLivraison: jour(m.statut === 'receptionnee' ? il(6) : new Date(Date.now() + (m.statut === 'en_reception' ? 7 : 15) * 86400000)),
+      receptionnaire: { id: demandeur.id, nom: demandeur.nom },
+      conditions: { penaliteParJour: Number(cdc.penalite) || 0, plafondPenalite: 10, garantieMois: Number(cdc.garantieMin) || 0, avance: Number(cdc.avance) || 0, tva: Number(cdc.tva) || 0 },
+      circuit: m.statut === 'brouillon' ? [] : (['validation'].includes(m.statut) ? circuit : circuit.map((e) => ({ ...e, done: true, by: approb ? approb.id : uid, at: frDate() }))),
+      receptions: [], historique: [h('brouillon établi pour ' + win.name)], creePar: uid, cree: frDate(),
+      ligneBudget: lignesBudget.some((l) => l.id === ligneBudget) ? ligneBudget : null,
+    };
+    if (m.statut === 'validation') c.historique.push(h('soumise à validation'));
+    if (emise) {
+      c.historique.push(h('validée : prête à être émise'));
+      c.numero = commandeNumero(org.prefixeCommande);
+      c.emiseLe = frDate(); c.emisePar = { id: uid, nom: who }; c.emetteur = { nom: org.nom, ville: org.ville, pays: org.pays };
+      const doc = { numero: c.numero, emiseLe: c.emiseLe, emetteur: c.emetteur, procedure: c.procedure, titulaire: c.titulaire, devise: c.devise,
+        lignes: c.lignes, total, jalons: c.jalons, dateLivraison: c.dateLivraison, conditions: c.conditions, receptionnaire: c.receptionnaire };
+      c.empreinte = crypto.createHash('sha256').update(JSON.stringify(doc)).digest('hex');
+      c.historique.push(h(`émise sous le numéro ${c.numero} — empreinte ${c.empreinte.slice(0, 16)}…`));
+    }
+    const par = { id: demandeur.id, nom: demandeur.nom };
+    if (m.statut === 'emise') {
+      c.livraisons = [{ n: 1, date: jour(il(1)), t: frDate(), par: titulaireCompte || { id: null, nom: win.name }, quantites: lignes.map((l) => Math.ceil(l.quantite / 2)), bon: null, commentaire: 'Première livraison sur site.', statut: 'declaree' }];
+      c.historique.push(h('livraison n° 1 déclarée par le titulaire'));
+    }
+    if (m.statut === 'en_reception') {
+      c.receptions = [{ n: 1, date: jour(il(3)), t: frDate(), par, quantites: lignes.map((l) => Math.floor(l.quantite / 2)), reserves: null, levee: null }];
+      c.historique.push(h('réception n° 1 — livraison partielle'));
+    }
+    if (m.statut === 'receptionnee') {
+      c.receptions = [{ n: 1, date: jour(il(8)), t: frDate(), par, quantites: lignes.map((l) => l.quantite), reserves: null, levee: null }];
+      c.receptionProvisoire = { date: jour(il(8)), t: frDate() }; c.retardConstate = 0;
+      c.historique.push(h('réception n° 1 — tout est livré : réception provisoire'));
+    }
+    commandeInsert(c);
+    n++;
+  }
+  auditAppend(uid, who, `Exécution fictive ajoutée — appel d’offres ${ref} attribué à ${win.name}, ${n} bons de commande`, pid);
+  return { ref, n };
 }
 /** Ajoute les données fictives des zones choisies, à côté des données existantes. Retourne ce qui a été ajouté. */
 function ajouterFictives(uid, who, zones) {
@@ -763,6 +862,7 @@ function ajouterFictives(uid, who, zones) {
       auditAppend(uid, who, `Appel d’offres fictif ajouté — ${ref} : ${seed.CDC.objet}`, pid);
       ajout.appels = ref;
     }
+    if (z.has('commandes')) ajout.commandes = executionFictive(uid, who);
     if (z.has('besoins')) {
       const dem = db.prepare("SELECT id, nom FROM users WHERE role='demandeur' AND active=1 ORDER BY id").get() || db.prepare('SELECT id, nom FROM users WHERE id=?').get(uid);
       const lignes = ((kvGet('budget') || { value: {} }).value.lignes) || [];
