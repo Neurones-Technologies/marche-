@@ -1241,3 +1241,8 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .conso-depasse .conso-e { background: var(--color-blocked); }
 .conso-depasse + .conso-pc { color: var(--color-blocked); font-weight: var(--fw-strong); }
 .conso-pc { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+
+/* Indicateurs : onglets de détail sous les chiffres clés */
+.ind-onglet > .card, .ind-onglet > .dt, .ind-onglet > .card + .card { margin-top: 0; }
+.ind-onglet > * + * { margin-top: var(--space-5); }
+.ind-kpis { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
