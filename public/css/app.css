@@ -1183,3 +1183,61 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .fait-texte { margin-top: var(--space-4); }
 .fait-texte h4 { font-size: var(--fs-small); font-weight: var(--fw-strong); color: var(--color-text-2); margin: 0 0 var(--space-1); }
 .fait-texte p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Indicateurs : tuiles, barres empilées, délais, concurrence, consommation du budget */
+.ind-intro { margin: var(--space-1) 0 0; }
+.ind-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
+.ind-kpi { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-5); border: var(--border-w) solid var(--color-border); }
+.ind-kpi-tete { display: flex; align-items: center; gap: var(--space-3); }
+.ind-kpi .kpi-ic { padding: var(--space-2); border-radius: var(--radius); }
+.ind-kpi .kpi-lab { font-weight: var(--fw-strong); }
+.ind-val { font-size: var(--fs-display); font-weight: var(--fw-strong); line-height: var(--lh-tight); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ind-val small { font-size: var(--fs-body); font-weight: var(--fw-regular); color: var(--color-text-2); }
+.ind-puce { margin-top: var(--space-1); }
+.ind-carte { margin-top: var(--space-5); }
+.ind-aide { font-size: var(--fs-small); font-weight: var(--fw-regular); margin-left: var(--space-3); }
+.ind-note { margin: var(--space-4) 0 0; }
+.ind-sous-titre { font-weight: var(--fw-strong); margin-bottom: var(--space-2); }
+.ind-vide { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) 0; }
+.ind-vide .kpi-ic { padding: var(--space-3); border-radius: var(--radius); flex: none; }
+
+/* barre empilée : segments séparés par un filet de la couleur du fond */
+.segbar { display: flex; gap: 2px; height: 10px; border-radius: var(--radius-pill); overflow: hidden; background: var(--color-border); margin-top: var(--space-1); }
+.seg { flex: 1 1 0; min-width: 6px; }
+.s-ok { background: var(--color-ok); }
+.s-cours { background: var(--color-accent-ring); box-shadow: inset 0 0 0 1px var(--color-accent); } /* clair : se distingue du rouge « infructueux » */
+.s-prep { background: var(--color-border-field); }
+.s-ko { background: var(--color-blocked); }
+.s-c1 { background: var(--color-accent); }
+.s-c2 { background: var(--color-accent-ring); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.s-c3 { background: var(--color-border-field); }
+.ind-legende { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-1); font-size: var(--fs-small); color: var(--color-text-2); }
+.ind-leg { display: inline-flex; align-items: center; gap: var(--space-1); }
+.ind-pastille { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+/* délais : une ligne par étape, étendue et médiane sur une échelle commune */
+.ind-delai { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(160px, 2fr) 120px; align-items: center; gap: var(--space-4); padding: var(--space-3) 0; border-top: var(--border-w) solid var(--color-border); }
+.ind-delai:first-child { border-top: none; padding-top: 0; }
+.ind-delai-val { text-align: right; }
+.plage { position: relative; height: 12px; border-radius: var(--radius-pill); background: var(--color-border); }
+.plage-etendue { position: absolute; top: 3px; bottom: 3px; border-radius: var(--radius-pill); background: var(--color-accent-ring); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.plage-med { position: absolute; top: -2px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 0 2px var(--color-surface); }
+@media (max-width: 720px) { .ind-delai { grid-template-columns: 1fr auto; } .ind-delai .plage { grid-column: 1 / -1; order: 3; } }
+
+/* concurrence */
+.ind-minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+.ind-mini { padding: var(--space-3) var(--space-4); background: var(--color-surface-2); border: var(--border-w) solid var(--color-border); border-radius: var(--radius); }
+.ind-mini-val { font-size: var(--fs-title); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; }
+.ind-mini-lab { font-size: var(--fs-small); color: var(--color-text-2); }
+.ind-mini-alerte { background: var(--color-blocked-bg); border-color: transparent; }
+.ind-mini-alerte .ind-mini-val { color: var(--color-blocked); }
+
+/* budget : jauge engagé / réservé */
+.conso-cell { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); min-width: 150px; }
+.conso { display: flex; flex: 1 1 90px; max-width: 140px; height: 8px; border-radius: var(--radius-pill); overflow: hidden; background: var(--color-border); gap: 2px; }
+.conso-e { background: var(--color-accent); }
+.conso-r { background: var(--color-accent-ring); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.conso-depasse { background: var(--color-blocked-bg); }
+.conso-depasse .conso-e { background: var(--color-blocked); }
+.conso-depasse + .conso-pc { color: var(--color-blocked); font-weight: var(--fw-strong); }
+.conso-pc { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
