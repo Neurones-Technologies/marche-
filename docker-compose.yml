@@ -44,6 +44,7 @@ services:
       SAUVEGARDE_HEURES: ${SAUVEGARDE_HEURES:-24}
       SAUVEGARDE_CONSERVER: ${SAUVEGARDE_CONSERVER:-14}
       RAPPELS: ${RAPPELS:-1}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       # Marchés publics en attente : 1 pour rouvrir le profil public
       MARCHES_PUBLICS: ${MARCHES_PUBLICS:-0}
     volumes: ["marcheplus-data:/data", "marcheplus-sauvegardes:/sauvegardes"]

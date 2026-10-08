@@ -9,6 +9,8 @@ module.exports = {
   prod,
   port: Number(process.env.PORT) || 3000,
   dbFile: process.env.DB_FILE || path.join(__dirname, '..', 'data', 'marcheplus.db'),
+  // nombre de proxys inverses devant l'application (nginx : 1) ; l'adresse du client est lue dans X-Forwarded-For à ce rang
+  trustProxy: process.env.TRUST_PROXY == null || process.env.TRUST_PROXY === '' ? 1 : Math.max(0, Number(process.env.TRUST_PROXY) || 0),
   jwtSecret: process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex'),
   jwtTtl: process.env.JWT_TTL || '8h',
   // Mot de passe des comptes de démonstration (à changer dès la première connexion)

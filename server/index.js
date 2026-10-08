@@ -7,7 +7,7 @@ const { requireAuth } = require('./auth');
 
 const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+app.set('trust proxy', cfg.trustProxy || false);
 app.use(require('./contexte').middleware); // adresse IP de la requête, pour le journal d'audit
 const espaces = require('./espaces');
 app.use(espaces.aiguillage); // plateforme multi-entreprises : l'espace d'après le sous-domaine (inactif sans PLATEFORME_DOMAINE)
