@@ -167,6 +167,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (!value) return refus(409, 'SCREENING_CLOSED', 'Un dépouillement clôturé ne peut pas être rouvert.');
       if (!(next('cdc') || {}).cdcPublie) return refus(409, 'GATE_CDC_NOT_PUBLISHED', 'Le dépouillement ne peut pas être clôturé avant la publication du cahier des charges.');
       const ctx = ctxOf(next);
+      if (!(ctx.offers || []).length) return refus(409, 'NO_OFFERS', 'Aucune offre reçue : le dépouillement ne peut pas être clôturé.');
       const n = R.flagsRemaining(ctx);
       if (n > 0) return refus(409, 'UNCONFIRMED_FIELDS', `${n} champ(s) extrait(s) à faible confiance reste(nt) à confirmer avant la clôture du dépouillement.`);
       const wt = R.weightTotal(ctx);

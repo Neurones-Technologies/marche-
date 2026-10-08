@@ -147,6 +147,7 @@ test('consultation : seuls les partenaires référencés et sélectionnés voien
   refusé(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid), 409, 'CDC_INCOMPLETE');
   ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, pid));
   ok(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid));
+  refusé(await patch(achats, { depClosed: true }, pid), 409, 'NO_OFFERS'); // rien à dépouiller
   const lot = s.cdc.lots[0].id;
   // un second prestataire, inscrit et vérifié, mais pas référencé
   const r = await require('./_client').inscrire({ ...INSCRIPTION, raisonSociale: 'Autre SA', email: 'contact@autre.ci' });

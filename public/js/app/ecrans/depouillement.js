@@ -13,7 +13,13 @@ function vDepouille(m){
   /* Prochaine étape */
   var suivante=null;
   for(var j=0;j<nb;j++){ var x=SEED_OFFERS[(state.offerIndex+j)%nb]; if(aVerifier(x)>0){ suivante=x; break; } }
-  if(state.depClosed){
+  if(!nb && !state.depClosed){
+    // rien à dépouiller : la clôture n'est pas proposée (le serveur la refuse aussi)
+    var ech=R.echeanceDepot(state.cdc), passee=ech && Date.now()>ech;
+    guideCard(m,{ icon:'inbox', titre:'Aucune offre reçue',
+      texte: passee ? 'La date limite de dépôt est passée sans aucune offre : le dépouillement ne peut pas être clôturé.'
+        : 'Les offres déposées apparaîtront ici. Le dépouillement se clôture une fois au moins une offre reçue.' });
+  } else if(state.depClosed){
     guideCard(m,{ ok:true, titre:'Dépouillement clôturé', texte: state.fxFrozen ? 'Données figées le '+state.fxFrozen.at+'. Les offres conformes peuvent maintenant être évaluées.' : 'Les offres conformes peuvent maintenant être évaluées.',
       action: viewAllowed('evaluation') ? 'Passer à l’évaluation' : null, go:function(){ go('evaluation'); } });
   } else if(suivante){
@@ -53,7 +59,7 @@ function vDepouille(m){
 
 /* Clôture du dépouillement : fige les données lues et ouvre l'évaluation. */
 function cloturerDepouillement(){
-  if(flagsRemaining()>0 || state.depClosed || !can('depouille.close')) return;
+  if(!SEED_OFFERS.length || flagsRemaining()>0 || state.depClosed || !can('depouille.close')) return;
   ask('Les données lues dans les offres seront figées et l’évaluation s’ouvrira.', function(){
     state.depClosed=true; logit('Dépouillement clôturé — évaluation ouverte');
     notify('dep.cloture','Dépouillement clôturé',
