@@ -430,7 +430,7 @@ function ouvrirFenetre(titre, remplir, o){
   document.body.appendChild(ov);
   document.body.classList.add('fen-ouverte');
   dessinerFenetre();
-  if(UI.fenetre===f){ var premier=corps.querySelector('textarea,input,select') || x; premier.focus(); }
+  if(UI.fenetre===f){ var premier=corps.querySelector('textarea,input,select') || x; premier.focus({ preventScroll:true }); }
 }
 function dessinerFenetre(){
   var f=UI.fenetre; if(!f) return;

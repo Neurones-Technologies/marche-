@@ -28,6 +28,7 @@ function vCommandes(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Exécution');
   var zone=add(m,'div'); add(zone,'p','muted','Chargement…');
+  var corps=null, piedFen=null, cmds=[]; // contenu et pied de la fenêtre ouverte ; commandes chargées
 
   function charger(){
     MP.api('GET','/api/commandes').then(function(r){
@@ -54,10 +55,26 @@ function vCommandes(m){
       recherche:function(c){ return [c.numero, c.titulaire.nom, c.procedure.ref, c.procedure.objet].join(' '); },
       filtres:[{ lab:'Statut', options:Object.keys(STATUTS_COMMANDE).map(function(k){ return [k, STATUTS_COMMANDE[k][0]]; }), test:function(c,v){ return c.statut===v; } }],
       nouveau: can('commande.manage') ? { lab:'Nouvelle commande', action:function(){ nouvelleCommande(eligibles); } } : null,
-      actions:function(c,td){ boutonCellule(td, UI.commande===c.id?'Affichée':'Ouvrir', function(){ UI.commande=c.id; majUrl(); zone.textContent=''; dessiner(list,eligibles); }, 'cmd-open-'+c.id).disabled=UI.commande===c.id; }
+      actions:function(c,td){ boutonCellule(td,'Ouvrir',function(){ ouvrirCommande(c.id); },'cmd-open-'+c.id); }
     });
-    var cur=list.filter(function(c){ return c.id===UI.commande; })[0];
-    if(cur) fiche(cur);
+    cmds=list;
+    // adresse d'une commande (/execution/<commande>) : sa fenêtre s'ouvre ; une fenêtre déjà ouverte se met à jour
+    if(UI.fenetre) dessinerFenetre();
+    else if(UI.commande && list.some(function(c){ return c.id===UI.commande; })) ouvrirCommande(UI.commande);
+  }
+
+  /* Fenêtre d'une commande : en-tête, document, circuit de validation, actions, avenants, réceptions, historique. */
+  function ouvrirCommande(id){
+    UI.commande=id; majUrl();
+    ouvrirFenetre(function(){
+      var c=cmds.filter(function(x){ return x.id===id; })[0];
+      return !c ? 'Commande' : (c.numero ? 'Bon de commande '+c.numero : 'Commande — '+c.titulaire.nom);
+    }, function(f,pied){
+      var c=cmds.filter(function(x){ return x.id===id; })[0]; if(!c) return false;
+      corps=f; piedFen=pied;
+      fiche(c);
+      if(!pied.children.length){ add(pied,'span','muted','Commande '+(c.numero||'en brouillon')+' · '+c.procedure.ref); var fe=add(pied,'button','btn btn-ghost','Fermer'); fk(fe,'cmd-fermer'); fe.addEventListener('click',fermerFenetre); }
+    }, { large:true, fermer:function(){ UI.commande=null; majUrl(); } });
   }
 
   /* Fenêtre « Nouvelle commande » : la procédure attribuée à commander. */
@@ -79,18 +96,49 @@ function vCommandes(m){
     });
   }
 
+  /* Parcours d'une commande : où elle en est de son cycle de vie. */
+  var PARCOURS=['Brouillon','Validation','Émission','Réception','Clôture'];
+  var RANG_PARCOURS={ brouillon:0, rejete:0, validation:1, validee:2, emise:3, en_reception:3, receptionnee:4, cloturee:5 };
+  function fait(parent, lab, val, large){
+    var w=add(parent,'div','fait'+(large?' fait-large':'')); add(w,'div','fait-k',lab); add(w,'div','fait-v',val||'—'); return w;
+  }
+  function enteteCommande(c){
+    var st=STATUTS_COMMANDE[c.statut]||[c.statut,'c-grey'];
+    var ch=add(corps,'div','fen-chips'); chipCellule(ch,st[0],st[1]); chipCellule(ch,montantDevise(c.total,c.devise),'c-grey');
+    if(c.retard>0) chipCellule(ch,'Retard de '+c.retard+' j','c-red');
+    if(c.reservesOuvertes) chipCellule(ch,c.reservesOuvertes+' réserve(s) ouverte(s)','c-amber');
+    add(corps,'h3','fen-objet',c.procedure.objet||c.procedure.ref);
+    add(corps,'p','muted fen-origine','Procédure '+c.procedure.ref+' · titulaire '+c.titulaire.nom);
+    if(c.statut!=='annulee'){
+      var rang=RANG_PARCOURS[c.statut]; if(rang==null) rang=0;
+      var pc=add(corps,'div','parcours'); pc.setAttribute('role','list');
+      PARCOURS.forEach(function(lab,i){
+        var e=add(pc,'div','parcours-etape'+(i<rang?' acquis':(i===rang?' now':''))); e.setAttribute('role','listitem');
+        add(e,'div','parcours-pt', i<rang?'✓':String(i+1)); add(e,'div','parcours-lab',lab);
+      });
+    }
+    var g=add(corps,'div','faits');
+    fait(g,'Titulaire',c.titulaire.nom+(c.titulaire.pays?' ('+c.titulaire.pays+')':''));
+    fait(g,'Montant total HT',montantDevise(c.total,c.devise));
+    fait(g,'Livraison prévue',(c.dateLivraison||'').split('-').reverse().join('/'));
+    if(c.receptionnaire) fait(g,'Réceptionnaire',c.receptionnaire.nom);
+    var lb=c.ligneBudget && (situationBudget()||[]).filter(function(x){ return x.id===c.ligneBudget; })[0];
+    if(lb) fait(g,'Imputation budgétaire',libelleLigneBudget(lb),true);
+    if(c.penalite>0) fait(g,'Pénalité de retard estimée',montantDevise(c.penalite,c.devise));
+  }
+
   function fiche(c){
-    var rt=retourListe(zone,'Toutes les commandes',function(){ UI.commande=null; majUrl(); charger(); },'cmd-retour'); rt.style.marginTop='18px';
+    enteteCommande(c);
     var modifiable = can('commande.manage') && (c.statut==='brouillon' || c.statut==='rejete');
-    if(c.rejet && c.statut==='rejete'){ var w=add(zone,'div','warn'); w.style.marginTop='18px'; add(w,'strong',null,'Rejetée ('+c.rejet.role+', '+c.rejet.at+') : '); w.appendChild(document.createTextNode(c.rejet.motif)); }
-    if(c.annulation){ var wa=add(zone,'div','warn'); wa.style.marginTop='18px'; add(wa,'strong',null,'Annulée le '+c.annulation.at+' : '); wa.appendChild(document.createTextNode(c.annulation.motif)); }
+    if(c.rejet && c.statut==='rejete'){ var w=add(corps,'div','warn'); w.style.marginTop='18px'; add(w,'strong',null,'Rejetée ('+c.rejet.role+', '+c.rejet.at+') : '); w.appendChild(document.createTextNode(c.rejet.motif)); }
+    if(c.annulation){ var wa=add(corps,'div','warn'); wa.style.marginTop='18px'; add(wa,'strong',null,'Annulée le '+c.annulation.at+' : '); wa.appendChild(document.createTextNode(c.annulation.motif)); }
     if(modifiable) brouillon(c); else documentCommande(c);
     if(vueTitulaireCommande()){ executionTitulaire(c); return; } // le titulaire : son exécution, sans le circuit interne
     circuitCommande(c);
     actions(c);
     avenants(c);
     if(c.numero && c.statut!=='annulee'){ suiviTitulaire(c); receptions(c); }
-    var kh=add(zone,'div','card'); kh.style.marginTop='18px';
+    var kh=add(corps,'div','card'); kh.style.marginTop='18px';
     add(kh,'div','panel-head','Historique');
     var bh=add(kh,'div','pad');
     c.historique.slice().reverse().forEach(function(x){ var row=add(bh,'div','docline'); var lf=add(row,'div'); add(lf,'div',null,x.action); add(lf,'div','muted',x.who); add(row,'span','chip c-grey',x.t); });
@@ -98,7 +146,7 @@ function vCommandes(m){
 
   /* Brouillon : lignes, jalons, date de livraison, réceptionnaire. */
   function brouillon(c){
-    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var k=add(corps,'div','card'); k.style.marginTop='18px';
     add(k,'div','panel-head','Brouillon — '+c.titulaire.nom+' ('+c.procedure.ref+')');
     var b=add(k,'div','pad');
     var lignes=JSON.parse(JSON.stringify(c.lignes)), jalons=JSON.parse(JSON.stringify(c.jalons));
@@ -146,20 +194,21 @@ function vCommandes(m){
     var cd=c.conditions||{};
     add(b,'p','muted','Conditions reprises du cahier des charges : pénalité de retard de '+cd.penaliteParJour+' ‰ par jour, plafonnée à '+cd.plafondPenalite+' % ; garantie de '+cd.garantieMois+' mois ; avance de démarrage de '+cd.avance+' % ; TVA '+cd.tva+' %.').style.marginTop='10px';
 
-    var foot=add(k,'div','panel-foot');
-    var be=add(foot,'button','btn btn-ghost btn-sm','Enregistrer'); fk(be,'cmd-enr');
-    var corps=function(){ return { lignes:lignes, jalons:jalons, dateLivraison:dl.value, receptionnaire:rs.value, ligneBudget:ligneBudget||'' }; };
-    be.addEventListener('click',function(){ agir('PUT',enc(c.id),corps(),'Brouillon enregistré.'); });
-    var bs=add(foot,'button','btn btn-primary btn-sm','Soumettre à validation'); fk(bs,'cmd-soum');
+    var foot=piedFen;
+    add(foot,'span','muted','Le brouillon n’a aucune valeur d’engagement tant qu’il n’est pas émis.');
+    var be=add(foot,'button','btn btn-ghost','Enregistrer'); fk(be,'cmd-enr');
+    var saisie=function(){ return { lignes:lignes, jalons:jalons, dateLivraison:dl.value, receptionnaire:rs.value, ligneBudget:ligneBudget||'' }; };
+    be.addEventListener('click',function(){ agir('PUT',enc(c.id),saisie(),'Brouillon enregistré.'); });
+    var bs=add(foot,'button','btn btn-primary','Soumettre à validation'); fk(bs,'cmd-soum');
     bs.addEventListener('click',function(){
-      MP.api('PUT','/api/commandes/'+enc(c.id),corps()).then(function(){ return agir('POST',enc(c.id)+'/soumettre',{},'Commande soumise.'); })
+      MP.api('PUT','/api/commandes/'+enc(c.id),saisie()).then(function(){ return agir('POST',enc(c.id)+'/soumettre',{},'Commande soumise.'); })
         .catch(function(e){ toast(e.message); });
     });
   }
 
   /* Document : la pièce telle qu'elle est (ou sera) émise ; imprimable et enregistrable en PDF depuis le navigateur. */
   function documentCommande(c){
-    var k=add(zone,'div','card pad bc-doc doc-imprimable'); k.id='bc-doc'; k.style.marginTop='18px';
+    var k=add(corps,'div','card pad bc-doc doc-imprimable'); k.id='bc-doc'; k.style.marginTop='18px';
     var t=add(k,'div'); t.style.cssText='display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap';
     var g=add(t,'div'); add(g,'strong',null,(c.emetteur||state.org||{}).nom||''); add(g,'div','muted',[(c.emetteur||state.org||{}).ville,(c.emetteur||state.org||{}).pays].filter(Boolean).join(' · '));
     var d=add(t,'div'); d.style.textAlign='right';
@@ -187,7 +236,7 @@ function vCommandes(m){
 
   function circuitCommande(c){
     if(!c.circuit || !c.circuit.length) return;
-    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var k=add(corps,'div','card'); k.style.marginTop='18px';
     add(k,'div','panel-head','Circuit de validation — '+MPCircuits.nbRequises(c.circuit)+' niveau(x) requis');
     var b=add(k,'div','pad');
     var fp = c.statut==='validation' ? MPCircuits.prochaine(c.circuit) : -1;
@@ -212,7 +261,7 @@ function vCommandes(m){
   function actions(c){
     if(!can('commande.manage')) return;
     var foot=null;
-    function barre(){ if(!foot){ foot=add(zone,'div','note'); foot.style.cssText='margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap'; } return foot; }
+    function barre(){ if(!foot){ foot=add(corps,'div','note'); foot.style.cssText='margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap'; } return foot; }
     if(c.statut==='validee'){
       var be=add(barre(),'button','btn btn-primary','Émettre le bon de commande'); fk(be,'cmd-emettre');
       be.addEventListener('click',function(){ ask('Le serveur attribue le numéro et scelle le document : il ne pourra plus être modifié. Le titulaire le verra dans son portail.',function(){ agir('POST',enc(c.id)+'/emettre',{},'Bon de commande émis.'); },'Émettre le bon de commande ?','Émettre'); });
@@ -228,7 +277,7 @@ function vCommandes(m){
     var liste=c.avenants||[], ouvert=liste.some(function(a){ return a.statut==='validation' || a.statut==='validee'; });
     var possible = can('commande.manage') && ['emise','en_reception','receptionnee'].indexOf(c.statut)>=0 && !ouvert;
     if(!liste.length && !possible) return;
-    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var k=add(corps,'div','card'); k.style.marginTop='18px';
     add(k,'div','panel-head','Avenants');
     var b=add(k,'div','pad');
     var ST={ validation:['En validation','c-amber'], validee:['Validé, à émettre','c-teal'], emis:['Émis','c-green'], rejete:['Rejeté','c-red'] };
@@ -285,7 +334,7 @@ function vCommandes(m){
 
   /* Réceptions, rapprochement commandé / reçu, réserves, retard et pénalités. */
   function receptions(c){
-    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var k=add(corps,'div','card'); k.style.marginTop='18px';
     var ph=add(k,'div','panel-head'); add(ph,'span',null,'Réceptions');
     if(c.retard>0) add(ph,'span','chip c-red','Retard : '+c.retard+' jour(s) · pénalité '+montantDevise(c.penalite,c.devise));
     var b=add(k,'div','pad');
@@ -353,7 +402,7 @@ function vCommandes(m){
   /* Côté achats : accusé du titulaire, livraisons qu'il a déclarées, factures à rapprocher et à décider. */
   function suiviTitulaire(c){
     var liv=c.livraisons||[], fac=c.factures||[];
-    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var k=add(corps,'div','card'); k.style.marginTop='18px';
     var ph=add(k,'div','panel-head'); add(ph,'span',null,'Titulaire : livraisons et factures');
     chipCellule(ph, c.accuse ? 'Bon de commande accepté le '+c.accuse.t : 'Pas encore accusé par le titulaire', c.accuse ? 'c-green' : 'c-amber');
     var b=add(k,'div','pad');
@@ -391,7 +440,7 @@ function vCommandes(m){
   /* Côté titulaire : accusé de réception, livraisons déclarées, factures déposées. */
   function executionTitulaire(c){
     var enCours=['emise','en_reception','receptionnee','cloturee'].indexOf(c.statut)>=0;
-    var k=add(zone,'div','card'); k.style.marginTop='18px';
+    var k=add(corps,'div','card'); k.style.marginTop='18px';
     var ph=add(k,'div','panel-head'); add(ph,'span',null,'Votre exécution');
     var b=add(k,'div','pad');
     if(!c.accuse && enCours){

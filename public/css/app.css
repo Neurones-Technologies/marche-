@@ -421,7 +421,7 @@ button.kpi:hover { border-color: var(--color-accent); }
 /* Impression : le document affiché (bon de commande, procès-verbal, dossier d'appel d'offres) et lui seul. */
 @media print {
   body:has(.doc-imprimable) * { visibility: hidden; }
-  .doc-imprimable, .doc-imprimable * { visibility: visible; }
+  body .doc-imprimable, body .doc-imprimable * { visibility: visible; } /* « body » : plus spécifique que la règle qui masque tout */
   .doc-imprimable { position: absolute; inset: 0 auto auto 0; width: 100%; max-width: none; margin: 0; border: none; box-shadow: none; }
   .doc-imprimable .no-print { display: none; }
 }
@@ -1173,8 +1173,8 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .acces-donnees { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
 /* Demande d'achat (fenêtre) : en-tête et faits */
-.bes-objet { font-size: var(--fs-title); font-weight: var(--fw-strong); line-height: var(--lh-tight, 1.3); margin: 0; overflow-wrap: anywhere; }
-.bes-origine { margin: var(--space-1) 0 var(--space-4); }
+.bes-objet, .fen-objet { font-size: var(--fs-title); font-weight: var(--fw-strong); line-height: var(--lh-tight, 1.3); margin: 0; overflow-wrap: anywhere; }
+.bes-origine, .fen-origine { margin: var(--space-1) 0 var(--space-4); }
 .faits { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
 .fait { padding: var(--space-3) var(--space-4); background: var(--color-surface-2); border: var(--border-w) solid var(--color-border); border-radius: var(--radius); min-width: 0; }
 .fait-large { grid-column: 1 / -1; }
@@ -1246,3 +1246,20 @@ td.num .mono, td.ref { font-family: var(--font-mono); }
 .ind-onglet > .card, .ind-onglet > .dt, .ind-onglet > .card + .card { margin-top: 0; }
 .ind-onglet > * + * { margin-top: var(--space-5); }
 .ind-kpis { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+
+/* Commande (fenêtre) : parcours, cartes sans ombre dans la fenêtre, impression du bon de commande */
+.parcours { display: flex; margin: var(--space-4) 0 var(--space-5); }
+.parcours-etape { position: relative; flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: var(--space-1); text-align: center; font-size: var(--fs-small); color: var(--color-text-2); }
+.parcours-etape::before { content: ''; position: absolute; top: 13px; right: 50%; width: 100%; height: 2px; background: var(--color-border-strong); }
+.parcours-etape:first-child::before { display: none; }
+.parcours-pt { position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--color-draft-bg); color: var(--color-draft); font-weight: var(--fw-strong); box-shadow: 0 0 0 3px var(--color-surface); }
+.parcours-etape.acquis::before, .parcours-etape.now::before { background: var(--color-ok); }
+.parcours-etape.acquis .parcours-pt { background: var(--color-ok); color: #fff; }
+.parcours-etape.now .parcours-pt { background: var(--color-accent); color: var(--color-on-accent); }
+.parcours-etape.now { color: var(--color-text); font-weight: var(--fw-strong); }
+.fen-corps .card { box-shadow: none; margin-top: var(--space-5); }
+@media print {
+  .fen-ov:has(.doc-imprimable) { display: block !important; position: static; padding: 0; background: none; }
+  .fen:has(.doc-imprimable), .fen:has(.doc-imprimable) .fen-corps { position: static; overflow: visible; max-height: none; box-shadow: none; border: none; }
+  .fen-ov:has(.doc-imprimable), .fen:has(.doc-imprimable) { animation: none; transform: none; } /* une animation de transform ferait de la fenêtre le repère de position du document */
+}
