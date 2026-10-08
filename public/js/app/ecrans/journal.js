@@ -17,16 +17,6 @@ function vJournal(m){
     add(bt,'strong',null, v.ok ? 'Chaîne d’empreintes intègre' : 'Chaîne d’empreintes rompue');
     add(bt,'div','muted', v.ok ? v.entries+' entrée(s) vérifiée(s) : aucune n’a été modifiée, supprimée ou déplacée.' : 'Rupture à l’entrée n° '+v.brokenAt+' : le journal a été altéré à partir de ce point.');
 
-    /* Adresse vue par le serveur pour la connexion de l'auditeur : si aucun proxy ne la transmet, toutes les actions
-       portent l'adresse du dernier relais (passerelle Docker, nginx local), la même pour tout le monde. */
-    var cn=r.connexion;
-    if(cn){
-      var interne=/^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|f[cd])/i.test(cn.ip||'');
-      var bi=add(zone,'div',interne ? 'warn' : 'note'); bi.style.marginTop='12px';
-      add(bi,'strong',null,'Votre connexion, vue par le serveur : ');
-      bi.appendChild(document.createTextNode(cn.ip+'. '+(cn.chaine ? 'Adresse transmise par le proxy (X-Forwarded-For) : '+cn.chaine+'.' : 'Aucune adresse transmise par un proxy ; adresse du dernier relais : '+cn.pair+'.')));
-      if(interne) bi.appendChild(document.createTextNode(' Cette adresse est interne : tant que le proxy inverse ne transmet pas l’adresse des postes (en-tête X-Forwarded-For, TRUST_PROXY='+cn.proxys+'), toutes les actions du journal portent la même adresse.'));
-    }
     var E=r.entrees||[];
     var auteurs=[], procs=[];
     E.forEach(function(e){ if(auteurs.indexOf(e.who)<0) auteurs.push(e.who); if(e.procedure && procs.indexOf(e.procedure)<0) procs.push(e.procedure); });

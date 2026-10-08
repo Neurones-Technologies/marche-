@@ -13,9 +13,7 @@ r.get('/audit/verify', needPerm('audit.read'), (req, res) => res.json(auditVerif
    procédure concernée et l'adresse IP de l'auteur. */
 r.get('/audit', needPerm('audit.read'), (req, res) => {
   const refs = {}; proceduresAll().forEach((p) => { refs[p.id] = p.ref; });
-  // ce que le serveur voit de la connexion en cours : de quoi vérifier que le proxy inverse transmet bien l'adresse du client
-  const connexion = { ip: require('../contexte').ip(), chaine: req.headers['x-forwarded-for'] || null, pair: String(req.socket.remoteAddress || '').replace(/^::ffff:/, ''), proxys: cfg.trustProxy };
-  res.json({ entrees: auditJournal().map((e) => ({ ...e, procedure: e.pid ? (refs[e.pid] || e.pid) : null })), verification: auditVerify(), connexion });
+  res.json({ entrees: auditJournal().map((e) => ({ ...e, procedure: e.pid ? (refs[e.pid] || e.pid) : null })), verification: auditVerify() });
 });
 
 r.post('/admin/reset', needPerm('params.edit', 'roles.edit'), (req, res) => {

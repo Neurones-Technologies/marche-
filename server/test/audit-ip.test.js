@@ -23,18 +23,6 @@ test('audit : une adresse par utilisateur, celle du proxy ; l’en-tête forgé 
   assert.equal(j.verification.ok, true); // la chaîne d'empreintes couvre ces adresses
 });
 
-test('audit : l’écran peut vérifier ce que le serveur voit de la connexion', async () => {
-  const admin = await login('administrateur@bal.ci');
-  const r = await fetch(base() + '/api/audit', { headers: { cookie: admin, 'x-forwarded-for': '203.0.113.50' } });
-  const c = (await r.json()).connexion;
-  assert.equal(c.ip, '203.0.113.50');
-  assert.equal(c.chaine, '203.0.113.50');
-  assert.equal(c.proxys, 1);
-  const sans = (await call('GET', '/api/audit', null, admin)).json.connexion;
-  assert.equal(sans.chaine, null); // aucun proxy : l'adresse du pair
-  assert.ok(sans.ip && sans.pair);
-});
-
 test('audit : le poste (navigateur, système, identifiant) et les adresses relayées sont consignés et couverts par la chaîne', async () => {
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
   const r = await fetch(base() + '/api/auth/login', { method: 'POST', body: JSON.stringify({ email: 'a.diomande@bal.ci', password: 'Marche+2026!' }),
