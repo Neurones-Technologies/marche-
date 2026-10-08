@@ -26,6 +26,18 @@ function roleDef(roleId) {
   return roles[roleId] || { lab: roleId, perms: {} };
 }
 
+/** État du mot de passe d'un compte : à changer (provisoire, posé par un administrateur) ou expiré (délai réglé dans les
+    paramètres de l'organisation, 0 = jamais). */
+function etatMotDePasse(u) {
+  const jours = Number((((kvGet('org') || {}).value) || {}).mdpExpirationJours) || 0;
+  const depuis = Date.parse(String(u.mdp_change_le || u.created_at || '').replace(' ', 'T') + 'Z');
+  const expire = jours > 0 && !Number.isNaN(depuis) && Date.now() - depuis > jours * 86400000;
+  const provisoire = !!u.mdp_a_changer;
+  return { aChanger: provisoire || expire, motif: provisoire ? 'provisoire' : (expire ? 'expire' : null) };
+}
+/* Tant que le mot de passe est à changer, seules la lecture du compte et le changement du mot de passe sont permis. */
+const CHEMINS_MDP = /^\/api\/auth\/(me|password)$/;
+
 /** Middleware : charge req.user (depuis la base : rôle et statut toujours à jour). */
 function requireAuth(req, res, next) {
   const h = req.headers.authorization || '';
@@ -34,12 +46,17 @@ function requireAuth(req, res, next) {
   try {
     const p = jwt.verify(token, cfg.jwtSecret, { algorithms: ['HS256'] });
     if ((p.esp || null) !== contexte.espace()) return res.status(401).json({ error: 'Session d’un autre espace : reconnectez-vous.' });
-    const u = db.prepare('SELECT id,nom,email,role,active,session_v FROM users WHERE id=?').get(p.sub);
+    const u = db.prepare('SELECT id,nom,email,role,active,session_v,mdp_a_changer,mdp_change_le,created_at FROM users WHERE id=?').get(p.sub);
     if (!u || !u.active) return res.status(401).json({ error: 'Compte introuvable ou désactivé.' });
     if ((p.v || 0) !== (u.session_v || 0)) return res.status(401).json({ error: 'Mot de passe changé : reconnectez-vous.' });
     delete u.session_v;
+    const mp = etatMotDePasse(u);
+    delete u.mdp_a_changer; delete u.mdp_change_le; delete u.created_at;
     const rd = roleDef(u.role);
-    req.user = { ...u, roleLab: rd.lab, perms: rd.perms || {} };
+    req.user = { ...u, roleLab: rd.lab, perms: rd.perms || {}, mdpAChanger: mp.aChanger, mdpMotif: mp.motif };
+    if (mp.aChanger && !CHEMINS_MDP.test(req.originalUrl.split('?')[0]))
+      return res.status(403).json({ error: mp.motif === 'expire' ? 'Votre mot de passe a expiré : choisissez-en un nouveau pour continuer.' : 'Votre mot de passe est provisoire : choisissez le vôtre pour continuer.',
+        code: 'PASSWORD_CHANGE_REQUIRED', motif: mp.motif });
     req.can = (perm) => !!req.user.perms[perm];
     next();
   } catch (e) {
@@ -52,4 +69,4 @@ const needPerm = (...perms) => (req, res, next) =>
 
 const whoLabel = (u) => `${u.nom} — ${u.roleLab}`;
 
-module.exports = { sign, setCookie, clearCookie: (res) => res.clearCookie(COOKIE, { path: '/' }), requireAuth, needPerm, whoLabel, bcrypt, roleDef };
+module.exports = { etatMotDePasse, sign, setCookie, clearCookie: (res) => res.clearCookie(COOKIE, { path: '/' }), requireAuth, needPerm, whoLabel, bcrypt, roleDef };

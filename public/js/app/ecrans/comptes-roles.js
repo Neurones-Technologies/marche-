@@ -56,7 +56,7 @@ function vComptes(m){
       var mail=champ(c,'Courriel','nc-mail','email','prenom.nom'+(state.mailSuffix||'@exemple.ci'));
       var rs=champ(c,'Rôle','nc-role','select'); selectRoles(rs, state.roles.audit ? 'audit' : Object.keys(state.roles)[0]); /* moindre privilège par défaut */
       var pw=champ(c,'Mot de passe initial','nc-pw','password','10 caractères minimum');
-      add(c,'p','muted','Le titulaire change ce mot de passe à sa première connexion (menu du compte, en haut à droite).').style.marginTop='12px';
+      add(c,'p','muted','Mot de passe provisoire : dès sa première connexion, la personne doit en choisir un autre avant de pouvoir continuer.').style.marginTop='12px';
       var an=add(p,'button','btn btn-ghost','Annuler'); an.addEventListener('click',fermerFenetre);
       var go_=add(p,'button','btn btn-primary','Créer le compte'); fk(go_,'nc-creer');
       go_.addEventListener('click',function(){
@@ -80,7 +80,7 @@ function vComptes(m){
       add(c,'p','muted','Le courriel sert d’identifiant de connexion : prévenez la personne si vous le changez.').style.marginTop='8px';
       var sec=add(c,'div','fen-section'); add(sec,'h3',null,'Sécurité');
       var lg=add(sec,'div','acces-ligne');
-      var tl=add(lg,'div'); add(tl,'strong',null,'Mot de passe'); add(tl,'div','muted','Un mot de passe provisoire, à transmettre par un canal sûr.');
+      var tl=add(lg,'div'); add(tl,'strong',null,'Mot de passe'); add(tl,'div','muted','Un mot de passe provisoire, à transmettre par un canal sûr ; la personne le change à sa prochaine connexion.');
       var rp=add(lg,'button','btn btn-ghost btn-sm','Réinitialiser'); fk(rp,'cpt-mdp-'+u.id);
       rp.addEventListener('click',function(){
         demander('Saisissez un mot de passe provisoire (10 caractères minimum), à transmettre à '+u.nom+' par un canal sûr.', function(pw){

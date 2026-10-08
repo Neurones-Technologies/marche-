@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var pollTimer = null, VERSION = null, TOURS = 0;
+  var pollTimer = null, VERSION = null, TOURS = 0, MDP_OBLIGE = false;
   var SONDAGE_MS = 4000; // mise à jour des données : toutes les 4 s, et dès qu'on revient sur l'onglet
 
   /* Sondage : l'état du serveur, et toutes les 30 s environ la version de l'application (rechargement après mise à
@@ -30,6 +30,8 @@
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (r.status === 401 && url.indexOf('/api/auth/login') < 0) { showLogin('Session expirée, reconnectez-vous.'); }
         if (r.status === 403 && j.code === 'SPACE_SUSPENDED') { location.reload(); } // l'espace vient d'être suspendu : sa page le dit
+        // le mot de passe est devenu provisoire ou a expiré en cours de session : on demande le nouveau avant de continuer
+        if (r.status === 403 && j.code === 'PASSWORD_CHANGE_REQUIRED' && !MDP_OBLIGE) { suspendre(); enter(false); }
         if (!r.ok) { var e = new Error(j.error || ('Erreur ' + r.status)); e.status = r.status; e.data = j; throw e; }
         return j;
       });
@@ -97,9 +99,43 @@
     setTimeout(function () { $('lg-email').focus(); }, 0);
   }
 
+  /* Changement de mot de passe obligatoire (provisoire ou expiré) : une fenêtre qu'on ne ferme pas, avant tout le reste.
+     Résolue une fois le nouveau mot de passe enregistré (et l'application ouverte) ou la session fermée. */
+  function changementObligatoire(user, fromLogin) {
+    MDP_OBLIGE = true;
+    return new Promise(function (resolve) {
+      var d = $('dlg'); d.hidden = false; d.textContent = '';
+      var f = document.createElement('form');
+      f.innerHTML = '<strong>Choisissez votre mot de passe</strong>' +
+        '<p class="muted">' + (user.mdpMotif === 'expire' ? 'Votre mot de passe a expiré.' : 'Votre mot de passe est provisoire.') + ' Choisissez-en un nouveau pour continuer.</p>' +
+        '<label for="pw0">' + (user.mdpMotif === 'expire' ? 'Mot de passe actuel' : 'Mot de passe provisoire reçu') + '</label><input id="pw0" type="password" autocomplete="current-password" required>' +
+        '<label for="pw1">Nouveau mot de passe</label><input id="pw1" type="password" autocomplete="new-password" required>' +
+        '<label for="pw2">Confirmer le nouveau mot de passe</label><input id="pw2" type="password" autocomplete="new-password" required>' +
+        '<small class="muted">10 caractères minimum, avec majuscule, minuscule et chiffre, différent de l’actuel.</small>' +
+        '<div class="lg-err" id="pw-err" hidden></div>' +
+        '<div class="acts"><button type="button" class="btn btn-ghost" id="pw-quitter">Se déconnecter</button><button type="submit" class="btn btn-primary" id="pw-go">Enregistrer et continuer</button></div>';
+      d.appendChild(f);
+      $('pw0').focus();
+      var sortir = function () { MDP_OBLIGE = false; d.hidden = true; };
+      $('pw-quitter').onclick = function () {
+        api('POST', '/api/auth/logout', {}).catch(function () {}).then(function () { sortir(); showLogin(); resolve(); });
+      };
+      f.onsubmit = function (e) {
+        e.preventDefault();
+        var er = $('pw-err'); er.hidden = true;
+        if ($('pw1').value !== $('pw2').value) { er.hidden = false; er.textContent = 'Les deux saisies du nouveau mot de passe ne correspondent pas.'; return; }
+        var b = $('pw-go'); b.disabled = true;
+        api('POST', '/api/auth/password', { current: $('pw0').value, next: $('pw1').value })
+          .then(function () { sortir(); resolve(enter(fromLogin)); })
+          .catch(function (err) { er.hidden = false; er.textContent = err.message; b.disabled = false; });
+      };
+    });
+  }
+
   /* fromLogin : connexion explicite (on part de l'accueil) ; sinon rechargement de page (on reprend l'écran). */
   function enter(fromLogin) {
     return api('GET', '/api/auth/me').then(function (m) {
+      if (m.user.mdpAChanger) return changementObligatoire(m.user, fromLogin);
       ME = m.user;
       return api('GET', '/api/espace').then(function (e) { ESPACE = e || {}; }, function () { ESPACE = {}; }).then(loadProcs).then(function () {
         $('login').hidden = true;
@@ -148,7 +184,7 @@
         .catch(function (err) { var er = $('pw-err'); er.hidden = false; er.textContent = err.message; });
     };
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('dlg').hidden = true; });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !MDP_OBLIGE) $('dlg').hidden = true; });
 
   /* Vérification du courriel d'un partenaire inscrit sur le portail (/portail-partenaires), par le lien reçu (/?verifier=…). */
   var jeton = (location.search.match(/[?&]verifier=([0-9a-f]{64})/) || [])[1];

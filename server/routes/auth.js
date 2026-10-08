@@ -1,14 +1,14 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { db, auditAppend, jetonUtiliser, jetonCreer } = require('../db');
-const { sign, setCookie, clearCookie, requireAuth, bcrypt, whoLabel, needPerm, roleDef } = require('../auth');
+const { sign, setCookie, clearCookie, requireAuth, bcrypt, whoLabel, needPerm, roleDef, etatMotDePasse } = require('../auth');
 const { slug } = require('../db');
 const cfg = require('../config');
 
 const r = express.Router();
 const limiter = rateLimit({ windowMs: 60_000, limit: Number(process.env.LOGIN_RATE_LIMIT) || 10, standardHeaders: true, legacyHeaders: false, message: { error: 'Trop de tentatives. Réessayez dans une minute.' } });
 
-const pub = (u) => ({ id: u.id, nom: u.nom, email: u.email, role: u.role, roleLab: u.roleLab });
+const pub = (u) => ({ id: u.id, nom: u.nom, email: u.email, role: u.role, roleLab: u.roleLab, mdpAChanger: !!u.mdpAChanger, mdpMotif: u.mdpMotif || null });
 
 r.post('/login', limiter, (req, res) => {
   const { email, password } = req.body || {};
@@ -19,7 +19,8 @@ r.post('/login', limiter, (req, res) => {
   if (u && ok && !u.active && u.a_verifier) return res.status(403).json({ error: 'Adresse courriel non vérifiée : ouvrez le lien reçu par courriel pour activer votre compte.', code: 'EMAIL_NOT_VERIFIED' });
   if (!u || !u.active || !ok) return res.status(401).json({ error: 'Identifiants incorrects.' });
   db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
-  const user = { ...u, roleLab: roleDef(u.role).lab };
+  const mp = etatMotDePasse(u);
+  const user = { ...u, roleLab: roleDef(u.role).lab, mdpAChanger: mp.aChanger, mdpMotif: mp.motif };
   setCookie(res, sign(u));
   auditAppend(u.id, whoLabel(user), 'Connexion');
   res.json({ user: pub(user) });
@@ -68,7 +69,7 @@ r.post('/reinit', limiter, (req, res) => {
   const uid = jetonUtiliser((req.body || {}).jeton, 'reinit');
   const u = uid && db.prepare('SELECT id, nom, role FROM users WHERE id=? AND active=1').get(uid);
   if (!u) return res.status(410).json({ error: 'Lien invalide, déjà utilisé ou expiré : refaites une demande.', code: 'TOKEN_INVALID' });
-  db.prepare('UPDATE users SET pass_hash=?, session_v=session_v+1 WHERE id=?').run(bcrypt.hashSync(n, 10), u.id);
+  db.prepare("UPDATE users SET pass_hash=?, session_v=session_v+1, mdp_a_changer=0, mdp_change_le=datetime('now') WHERE id=?").run(bcrypt.hashSync(n, 10), u.id);
   auditAppend(u.id, whoLabel({ ...u, roleLab: roleDef(u.role).lab }), 'Mot de passe réinitialisé par le lien reçu par courriel');
   res.json({ ok: true, message: 'Mot de passe modifié : connectez-vous avec le nouveau.' });
 });
@@ -81,8 +82,9 @@ r.post('/password', requireAuth, limiter, (req, res) => {
   if (!bcrypt.compareSync(String(current || ''), u.pass_hash)) return res.status(403).json({ error: 'Mot de passe actuel incorrect.' });
   const n = String(next || '');
   if (n.length < 10 || !/[a-z]/.test(n) || !/[A-Z]/.test(n) || !/\d/.test(n)) return res.status(422).json({ error: '10 caractères minimum, avec majuscule, minuscule et chiffre.' });
+  if (bcrypt.compareSync(n, u.pass_hash)) return res.status(422).json({ error: 'Choisissez un mot de passe différent de l’actuel.' });
   // les autres sessions du compte sont fermées ; celle-ci reçoit un jeton à jour
-  db.prepare('UPDATE users SET pass_hash=?, session_v=session_v+1 WHERE id=?').run(bcrypt.hashSync(n, 10), req.user.id);
+  db.prepare("UPDATE users SET pass_hash=?, session_v=session_v+1, mdp_a_changer=0, mdp_change_le=datetime('now') WHERE id=?").run(bcrypt.hashSync(n, 10), req.user.id);
   setCookie(res, sign(db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id)));
   auditAppend(req.user.id, whoLabel(req.user), 'Mot de passe modifié');
   res.json({ ok: true });
@@ -101,7 +103,8 @@ r.post('/users', requireAuth, needPerm('roles.edit'), (req, res) => {
   const pw = String(password || '');
   if (pw.length < 10) return res.status(422).json({ error: 'Mot de passe initial : 10 caractères minimum.' });
   const id = 'u' + Date.now().toString(36);
-  try { db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)').run(id, nom.trim(), em, role, bcrypt.hashSync(pw, 10)); }
+  // mot de passe provisoire : la personne le change à sa première connexion, avant toute autre action
+  try { db.prepare("INSERT INTO users(id,nom,email,role,pass_hash,mdp_a_changer,mdp_change_le) VALUES(?,?,?,?,?,1,datetime('now'))").run(id, nom.trim(), em, role, bcrypt.hashSync(pw, 10)); }
   catch (e) { return res.status(409).json({ error: 'Ce courriel existe déjà.' }); }
   require('../db').bumpRev();
   auditAppend(req.user.id, whoLabel(req.user), `Compte créé — ${nom.trim()} (${roles[role].lab})`);
@@ -134,7 +137,12 @@ r.patch('/users/:id', requireAuth, needPerm('roles.edit'), (req, res) => {
     if (nouveauMail !== u.email) { db.prepare('UPDATE users SET email=? WHERE id=?').run(nouveauMail, u.id); changes.push(`courriel : ${u.email} → ${nouveauMail}`); }
     if (role !== undefined && role !== u.role) { db.prepare('UPDATE users SET role=? WHERE id=?').run(role, u.id); changes.push(`rôle : ${(roles[u.role] || {}).lab || u.role} → ${roles[role].lab}`); }
     if (typeof active === 'boolean' && (active ? 1 : 0) !== u.active) { db.prepare('UPDATE users SET active=? WHERE id=?').run(active ? 1 : 0, u.id); changes.push(active ? 'activé' : 'désactivé'); }
-    if (password) { db.prepare('UPDATE users SET pass_hash=?, session_v=session_v+1 WHERE id=?').run(bcrypt.hashSync(String(password), 10), u.id); changes.push('mot de passe réinitialisé'); }
+    if (password) {
+      // réinitialisé par un administrateur : provisoire, à changer à la prochaine connexion (sauf pour son propre compte)
+      const provisoire = u.id === req.user.id ? 0 : 1;
+      db.prepare("UPDATE users SET pass_hash=?, session_v=session_v+1, mdp_a_changer=?, mdp_change_le=datetime('now') WHERE id=?").run(bcrypt.hashSync(String(password), 10), provisoire, u.id);
+      changes.push(provisoire ? 'mot de passe réinitialisé (provisoire, à changer à la première connexion)' : 'mot de passe modifié');
+    }
   })();
   if (changes.length) {
     require('../db').bumpRev();

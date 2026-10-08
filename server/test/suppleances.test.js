@@ -22,7 +22,10 @@ test('mise en place : niveau réservé au rôle « approb », second valideur d�
   ok(await patch(admin, { circuitBesoin }));
   const c = await call('POST', '/api/auth/users', { nom: 'C. Contrôle', email: 'c.controle@bal.ci', role: 'controle', password: 'Marche+2026!' }, admin);
   ok(c, 201); ctrlId = c.json.id;
+  // compte créé par un administrateur : mot de passe provisoire, à changer avant toute autre action
   ctrl = await login('c.controle@bal.ci');
+  ok(await call('POST', '/api/auth/password', { current: 'Marche+2026!', next: 'Controle2026ok' }, ctrl));
+  ctrl = await call('POST', '/api/auth/login', { email: 'c.controle@bal.ci', password: 'Controle2026ok' }).then((r) => r.cookie);
   approbId = st.users.find((u) => u.role === 'approb').id;
   for (const k of [1, 2, 3]) {
     const b = (await call('POST', '/api/besoins', { ...BESOIN, objet: BESOIN.objet + ' ' + k }, demandeur)).json.besoin;

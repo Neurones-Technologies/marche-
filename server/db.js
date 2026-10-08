@@ -109,6 +109,10 @@ addColumn('users', 'a_verifier', 'INTEGER NOT NULL DEFAULT 0');
 // 06/10/2026 : version des sessions d'un compte, portée par le jeton ; un nouveau mot de passe l'incrémente et ferme
 // ainsi les sessions ouvertes ailleurs.
 addColumn('users', 'session_v', 'INTEGER NOT NULL DEFAULT 0');
+// 08/10/2026 : mot de passe provisoire (compte créé ou réinitialisé par un administrateur : à changer à la première
+// connexion) et date du dernier changement (expiration réglée dans les paramètres de l'organisation).
+addColumn('users', 'mdp_a_changer', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('users', 'mdp_change_le', 'TEXT');
 addColumn('files', 'partenaire_id', 'TEXT');
 }
 
@@ -450,6 +454,8 @@ function adminInitial() {
   let mdp = process.env.ADMIN_PASSWORD, tire = false;
   if (!mdp) { mdp = crypto.randomBytes(12).toString('base64').replace(/[+/=]/g, '') + 'Aa1'; tire = true; }
   db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)').run('u0', String(process.env.ADMIN_NOM || 'Administrateur').trim(), email, 'admin', bcrypt.hashSync(mdp, 10));
+  // mot de passe tiré au hasard et affiché dans le journal : il est à changer dès la première connexion
+  if (tire) db.prepare("UPDATE users SET mdp_a_changer=1 WHERE id='u0'").run();
   if (tire) console.log(`Compte administrateur initial : ${email} — mot de passe : ${mdp} (à changer dès la première connexion).`);
 }
 
@@ -609,6 +615,9 @@ db.transaction(function migrate() {
       if (v !== c.value) pkvSet(p.id, 'cdc', v, 'migration');
     }
   }
+  // 08/10/2026 : date du dernier changement de mot de passe ; pour les comptes existants, celle de la mise à jour (le
+  // délai d'expiration, s'il est réglé, court à partir d'elle).
+  db.prepare("UPDATE users SET mdp_change_le=datetime('now') WHERE mdp_change_le IS NULL").run();
   // 07/10/2026 : budget et engagement. Sans ligne budgétaire, le contrôle des crédits reste inactif.
   if (kvGet('org') && !kvGet('budget')) kvSet('budget', { lignes: [] }, 'migration');
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.

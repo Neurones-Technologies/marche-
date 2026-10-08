@@ -29,6 +29,9 @@ function vParams(m){
   champ(f1,"Couleur d'accent",o.accent,function(v){ o.accent=v; logit('Couleur d\u2019accent modifiée'); },'color');
   champ(f1,'Verrouillage après inactivité',String(o.verrouillageMinutes||15),function(v){ o.verrouillageMinutes=Number(v); logit('Verrouillage après '+v+' minutes d\u2019inactivité'); },'select',
     [['5','5 minutes'],['10','10 minutes'],['15','15 minutes'],['30','30 minutes'],['60','1 heure']]);
+  champ(f1,'Expiration du mot de passe',String(o.mdpExpirationJours||0),function(v){ o.mdpExpirationJours=Number(v); logit(Number(v) ? 'Expiration du mot de passe : '+v+' jours' : 'Expiration du mot de passe désactivée'); },'select',
+    [['0','Jamais'],['30','30 jours'],['60','60 jours'],['90','90 jours'],['180','180 jours'],['365','1 an']]);
+  add(f1.parentNode,'p','muted','Passé ce délai, l’utilisateur choisit un nouveau mot de passe à sa prochaine connexion, avant de continuer. Un compte créé ou réinitialisé par un administrateur change toujours son mot de passe provisoire à la première connexion.').style.marginTop='10px';
 
   var k2=add(m,'div','card'); k2.style.marginTop='18px';
   var ph2=add(k2,'div','panel-head'); add(ph2,'span',null,'2 · Taux de conversion');
