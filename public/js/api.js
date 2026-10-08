@@ -23,8 +23,21 @@
   document.addEventListener('visibilitychange', function () { if (!document.hidden && pollTimer) sonder(); });
   window.addEventListener('focus', function () { if (pollTimer) sonder(); });
 
+  /* Identifiant de ce navigateur, tiré au hasard à la première visite et conservé : il distingue les postes qui sortent
+     par la même adresse publique (consigné à l'audit, à titre indicatif). */
+  var POSTE = (function () {
+    try {
+      var p = localStorage.getItem('marcheplus.poste');
+      if (!/^[0-9a-f]{12}$/.test(p || '')) {
+        var b = new Uint8Array(6); (window.crypto || window.msCrypto).getRandomValues(b);
+        p = Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+        localStorage.setItem('marcheplus.poste', p);
+      }
+      return p;
+    } catch (e) { return null; }
+  })();
   function api(method, url, body) {
-    var opt = { method: method, credentials: 'same-origin', headers: {} };
+    var opt = { method: method, credentials: 'same-origin', headers: POSTE ? { 'X-Poste': POSTE } : {} };
     if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
     return fetch(url, opt).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
@@ -39,7 +52,7 @@
   }
   function upload(url, file) {
     return fetch(url, { method: 'POST', credentials: 'same-origin', body: file,
-      headers: { 'Content-Type': 'application/octet-stream', 'x-filename': encodeURIComponent(file.name) } })
+      headers: Object.assign({ 'Content-Type': 'application/octet-stream', 'x-filename': encodeURIComponent(file.name) }, POSTE ? { 'X-Poste': POSTE } : {}) })
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (r.status === 401) showLogin('Session expirée, reconnectez-vous.');

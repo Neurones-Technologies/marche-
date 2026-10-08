@@ -98,6 +98,10 @@ function addColumn(table, col, def) {
 ['offers', 'receipts', 'files', 'audit'].forEach((t) => addColumn(t, 'procedure_id', 'TEXT'));
 // 05/10/2026 : l'adresse IP de l'auteur est consignée avec chaque entrée du journal.
 addColumn('audit', 'ip', 'TEXT');
+// 08/10/2026 : poste de travail de l'auteur (navigateur, système, identifiant du navigateur) et adresses relayées par les
+// proxys (X-Forwarded-For à plusieurs maillons : l'adresse interne du poste, si un proxy d'entreprise la transmet).
+addColumn('audit', 'poste', 'TEXT');
+addColumn('audit', 'relais', 'TEXT');
 addColumn('files', 'commande_id', 'TEXT'); // pièce d'exécution d'une commande (bon de livraison, facture)
 // 06/10/2026 : l'accusé de dépôt porte son déposant ; un soumissionnaire ne reçoit que les siens (jamais ceux des
 // concurrents : raison sociale et montant). Un accusé antérieur, sans déposant, ne va plus qu'aux lecteurs des offres.
@@ -187,15 +191,16 @@ function store(pid) {
    d'une procédure à l'autre sans casser la chaîne. L'adresse IP de l'auteur, quand la requête la fournit, entre
    aussi dans l'empreinte. Les entrées antérieures (sans procédure ni adresse) gardent la formule d'origine. */
 const GENESIS = '0'.repeat(64);
-const auditHash = (prev, t, uid, who, action, pid, ip) =>
-  crypto.createHash('sha256').update([prev, t, uid || '', who, action].concat(pid ? [pid] : []).concat(ip ? ['ip:' + ip] : []).join('|')).digest('hex');
+const auditHash = (prev, t, uid, who, action, pid, ip, poste, relais) =>
+  crypto.createHash('sha256').update([prev, t, uid || '', who, action].concat(pid ? [pid] : []).concat(ip ? ['ip:' + ip] : [])
+    .concat(poste ? ['poste:' + poste] : []).concat(relais ? ['relais:' + relais] : []).join('|')).digest('hex');
 function auditAppend(uid, who, action, pid = null) {
   const last = db.prepare('SELECT hash FROM audit ORDER BY seq DESC LIMIT 1').get();
   const prev = last ? last.hash : GENESIS;
   const t = frDate();
-  const ip = contexte.ip();
-  const hash = auditHash(prev, t, uid, who, action, pid, ip);
-  db.prepare('INSERT INTO audit(t,uid,who,action,prev,hash,procedure_id,ip) VALUES(?,?,?,?,?,?,?,?)').run(t, uid || null, who, action, prev, hash, pid, ip);
+  const ip = contexte.ip(), poste = contexte.poste(), relais = contexte.relais();
+  const hash = auditHash(prev, t, uid, who, action, pid, ip, poste, relais);
+  db.prepare('INSERT INTO audit(t,uid,who,action,prev,hash,procedure_id,ip,poste,relais) VALUES(?,?,?,?,?,?,?,?,?,?)').run(t, uid || null, who, action, prev, hash, pid, ip, poste, relais);
   bumpRev();
   return { t, who, a: action };
 }
@@ -206,12 +211,12 @@ function auditList(limit = 200, pid = null) {
 }
 /** Journal complet de l'instance, le plus récent d'abord : date, auteur, action, procédure, adresse IP. */
 function auditJournal(limit = 2000) {
-  return db.prepare('SELECT seq, t, who, action AS a, procedure_id AS pid, ip, hash FROM audit ORDER BY seq DESC LIMIT ?').all(limit);
+  return db.prepare('SELECT seq, t, who, action AS a, procedure_id AS pid, ip, poste, relais, hash FROM audit ORDER BY seq DESC LIMIT ?').all(limit);
 }
 function auditVerify() {
   let prev = GENESIS, n = 0;
   for (const r of db.prepare('SELECT * FROM audit ORDER BY seq').iterate()) {
-    if (r.prev !== prev || r.hash !== auditHash(prev, r.t, r.uid, r.who, r.action, r.procedure_id, r.ip)) return { ok: false, brokenAt: r.seq, entries: n };
+    if (r.prev !== prev || r.hash !== auditHash(prev, r.t, r.uid, r.who, r.action, r.procedure_id, r.ip, r.poste, r.relais)) return { ok: false, brokenAt: r.seq, entries: n };
     prev = r.hash; n++;
   }
   return { ok: true, entries: n, head: prev };

@@ -34,3 +34,25 @@ test('audit : l’écran peut vérifier ce que le serveur voit de la connexion',
   assert.equal(sans.chaine, null); // aucun proxy : l'adresse du pair
   assert.ok(sans.ip && sans.pair);
 });
+
+test('audit : le poste (navigateur, système, identifiant) et les adresses relayées sont consignés et couverts par la chaîne', async () => {
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
+  const r = await fetch(base() + '/api/auth/login', { method: 'POST', body: JSON.stringify({ email: 'a.diomande@bal.ci', password: 'Marche+2026!' }),
+    headers: { 'content-type': 'application/json', 'user-agent': UA, 'x-poste': 'a1b2c3d4e5f6', 'x-forwarded-for': '10.20.30.40, 203.0.113.7' } });
+  assert.equal(r.status, 200);
+  const admin = await login('administrateur@bal.ci');
+  const j = (await call('GET', '/api/audit', null, admin)).json;
+  const e = j.entrees.find((x) => x.a === 'Connexion' && x.who.startsWith('A. Diomandé'));
+  assert.equal(e.ip, '203.0.113.7');
+  assert.equal(e.poste, 'Chrome 129 · Windows 10/11 · poste a1b2c3');
+  assert.equal(e.relais, '10.20.30.40, 203.0.113.7'); // l'adresse interne relayée par le proxy d'entreprise
+  // sans en-tête de poste, rien d'inventé ; un identifiant mal formé est ignoré
+  const sans = j.entrees.find((x) => x.a === 'Connexion' && x.who.startsWith('Y. Koffi'));
+  assert.equal(sans.relais, null);
+  const mal = await fetch(base() + '/api/auth/login', { method: 'POST', body: JSON.stringify({ email: 's.bamba@bal.ci', password: 'Marche+2026!' }),
+    headers: { 'content-type': 'application/json', 'user-agent': UA, 'x-poste': '<script>' } });
+  assert.equal(mal.status, 200);
+  const j2 = (await call('GET', '/api/audit', null, admin)).json;
+  assert.equal(j2.entrees.find((x) => x.a === 'Connexion' && x.who.startsWith('S. Bamba')).poste, 'Chrome 129 · Windows 10/11');
+  assert.equal(j2.verification.ok, true); // les entrées avec et sans poste se vérifient ensemble
+});
