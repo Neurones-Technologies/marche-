@@ -166,17 +166,18 @@ function telechargerDossierPdf(){
 /* Écran du dossier publié : la page de garde en vignette, le document entier à la demande. */
 function vDossierPublie(m){
   var c=state.cdc, org=state.org||{}, illu=imageDossier(c);
+  lancerImageAuto(); // dossier publié sans image : une photo est cherchée (rédacteur)
   if(fournisseurSeul() && viewAllowed('portail')) retourListe(m,'Retour à l’appel d’offres',function(){ go('portail'); },'retour-portail');
   var carte=add(m,'section','card doc-carte'); carte.setAttribute('aria-label','Dossier d’appel d’offres');
   var barre=add(carte,'div','doc-barre');
   add(barre,'span','doc-barre-lab','Dossier d’appel d’offres — '+REF());
   chipCellule(barre,'Publié','c-green');
-  boutonIcone(barre,'download','Télécharger le PDF',telechargerDossierPdf,'dossier-telecharger').setAttribute('data-consult','');
-  var voir=boutonIcone(barre,'agrandir','Ouvrir le document',ouvrirDossierPdf,'dossier-voir'); voir.setAttribute('data-consult','');
+  boutonIcone(barre,'download','Télécharger le PDF',function(){ assurerImageDossier().then(telechargerDossierPdf); },'dossier-telecharger').setAttribute('data-consult','');
+  var voir=boutonIcone(barre,'agrandir','Ouvrir le document',function(){ assurerImageDossier().then(ouvrirDossierPdf); },'dossier-voir'); voir.setAttribute('data-consult','');
 
   var scene=add(carte,'div','doc-scene dossier-scene');
   var garde=add(scene,'button','dossier-garde'); garde.type='button'; garde.setAttribute('data-consult',''); garde.setAttribute('aria-label','Ouvrir le dossier d’appel d’offres');
-  garde.addEventListener('click',ouvrirDossierPdf);
+  garde.addEventListener('click',function(){ assurerImageDossier().then(ouvrirDossierPdf); });
   var et=add(garde,'div','dg-entete'); var eg=add(et,'div'); add(eg,'strong',null,c.autorite||org.nom||''); add(eg,'span',null,[org.ville,org.pays].filter(Boolean).join(' · '));
   add(et,'span','dg-ref','Réf. '+REF());
   add(garde,'div','dg-titre','Dossier d’appel d’offres');
@@ -187,6 +188,6 @@ function vDossierPublie(m){
     var d=add(info,'div'); add(d,'span',null,x[0]); add(d,'strong',null,x[1]||'—'); });
   var cote=add(scene,'div','dossier-cote');
   add(cote,'p',null,'Le dossier tient en quelques pages : informations clés, modalités de la consultation, contenu de l’offre et évaluation, besoin et exigences techniques, conditions contractuelles essentielles, cadre de réponse.');
-  var b1=add(cote,'button','btn btn-primary','Ouvrir le document'); fk(b1,'dossier-ouvrir'); b1.setAttribute('data-consult',''); b1.addEventListener('click',ouvrirDossierPdf);
-  var b2=add(cote,'button','btn btn-ghost','Télécharger le PDF'); fk(b2,'dossier-pdf'); b2.setAttribute('data-consult',''); b2.addEventListener('click',telechargerDossierPdf);
+  var b1=add(cote,'button','btn btn-primary','Ouvrir le document'); fk(b1,'dossier-ouvrir'); b1.setAttribute('data-consult',''); b1.addEventListener('click',function(){ assurerImageDossier().then(ouvrirDossierPdf); });
+  var b2=add(cote,'button','btn btn-ghost','Télécharger le PDF'); fk(b2,'dossier-pdf'); b2.setAttribute('data-consult',''); b2.addEventListener('click',function(){ assurerImageDossier().then(telechargerDossierPdf); });
 }

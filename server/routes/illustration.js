@@ -116,8 +116,8 @@ r.post('/commons', limite, avantPublication, async (req, res) => {
 });
 
 /** Choix automatique : la première photo libre qui répond à l'objet (ou aux mots-clés tirés de l'objet par l'IA), sauf si le
-    dossier a déjà une image. Le rédacteur la change ensuite à sa guise. */
-r.post('/auto', limite, avantPublication, async (req, res) => {
+    dossier a déjà une image (permis même publié : le dossier n'en avait pas). Le rédacteur la change ensuite avant publication. */
+r.post('/auto', limite, async (req, res) => { // aussi après publication, tant que le dossier n'a aucune image
   const cdc = req.store.get('cdc') || {}, objet = String(cdc.objet || '').trim();
   if (cdc.illustrationImage) return res.json({ illustrationImage: cdc.illustrationImage, deja: true });
   if (!objet) return err(res, 422, 'CDC_EMPTY', 'Renseignez d’abord l’objet du marché.');

@@ -10,6 +10,17 @@ function imageDossier(c){
   return i && i.fichier ? { src:'/api/files/'+encodeURIComponent(i.fichier), credit:i.credit||'' } : null;
 }
 
+/* Pas d'image : une photo qui répond à l'objet est cherchée toute seule, une fois par objet (formulaire, dossier publié) ;
+   le rédacteur la change ensuite. Retourne une promesse (vide si rien à faire). */
+function lancerImageAuto(){
+  var c=state.cdc, cle=state.procedure+'|'+String(c.objet||'').trim();
+  UI.imgAuto=UI.imgAuto||{};
+  if(imageDossier(c) || String(c.objet||'').trim().length<8 || !can('cdc.edit') || UI.imgAuto[cle]) return Promise.resolve();
+  UI.imgAuto[cle]='en cours';
+  return Promise.resolve(typeof flush==='function' ? flush() : null).then(function(){ return MP.api('POST',MP.url('/illustration/auto'),{}); })
+    .then(function(){ UI.imgAuto[cle]='fait'; return relireEtat(); })
+    .catch(function(){ UI.imgAuto[cle]='fait'; render(); });
+}
 /* Avant l'aperçu du dossier : si l'achat n'a pas d'image, une photo qui répond à l'objet est cherchée (sans bloquer si la banque ne répond pas). */
 function assurerImageDossier(){
   if(imageDossier(state.cdc) || !can('cdc.edit') || String(state.cdc.objet||'').trim().length<8) return Promise.resolve();
@@ -22,15 +33,8 @@ function blocImageDossier(parent){
   var c=state.cdc, img=imageDossier(c);
   var w=add(parent,'div','img-dossier'); w.style.gridColumn='1/-1';
   add(w,'label',null,'Image de la page de garde');
-  // pas d'image : une photo qui répond à l'objet est cherchée toute seule, une fois par objet ; le rédacteur la change ensuite
-  UI.imgAuto=UI.imgAuto||{};
   var cle=state.procedure+'|'+String(c.objet||'').trim();
-  if(!img && String(c.objet||'').trim().length>=8 && can('cdc.edit') && !UI.imgAuto[cle]){
-    UI.imgAuto[cle]='en cours';
-    Promise.resolve(typeof flush==='function' ? flush() : null).then(function(){ return MP.api('POST',MP.url('/illustration/auto'),{}); })
-      .then(function(){ UI.imgAuto[cle]='fait'; return relireEtat(); })
-      .catch(function(){ UI.imgAuto[cle]='fait'; render(); });
-  }
+  lancerImageAuto();
   var ligne=add(w,'div','img-dossier-ligne');
   if(img){
     var im=add(ligne,'img','img-dossier-apercu'); im.src=img.src; im.alt='Image de la page de garde';
