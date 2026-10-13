@@ -113,7 +113,7 @@ function initiales(nom){ return String(nom).replace(/[^A-Za-zÀ-ÿ ]/g,' ').spli
 /* Le déroulé d'une procédure, en six étapes. Une étape regroupe un ou plusieurs écrans (sous-onglets). */
 var ETAPES = [
   {id:'prep',    lab:'Préparer',              vues:['cdc','prestataires','criteres']},
-  {id:'publi',   lab:'Publication et offres', vues:['qa','reception']},
+  {id:'publi',   lab:'Publication et offres', vues:['reception','qa']},
   {id:'depouil', lab:'Dépouiller',            vues:['depouille','conformite','clarifs']},
   {id:'eval',    lab:'Évaluer',               vues:['evaluation']},
   {id:'decide',  lab:'Décider',               vues:['decision']},
@@ -121,7 +121,7 @@ var ETAPES = [
 ];
 var FLOW_LAB = { done:'terminée', now:'en cours', blocked:'bloquée', todo:'à venir' };
 function etapesStatut(){
-  var s=lifeStatus(), recu=state.depClosed || (state.cdc.cdcPublie && SEED_OFFERS.length);
+  var s=lifeStatus(), recu=state.depClosed || (state.cdc.cdcPublie && depouillementOuvert());
   return { prep:s.prep, publi: state.depClosed ? 'done' : (state.cdc.cdcPublie ? 'now' : 'todo'),
     depouil: s.clarif==='blocked' ? 'blocked' : (state.depClosed ? 'done' : (recu ? 'now' : 'todo')),
     eval:s.eval, decide:s.appro,
@@ -456,6 +456,37 @@ function fermerFenetre(){
   document.body.classList.remove('fen-ouverte');
   if(f.prev && f.prev.focus && document.body.contains(f.prev)) try{ f.prev.focus(); }catch(e){}
   if(f.fermer) f.fermer();
+}
+/* Documents d'une offre, à consulter dans l'outil : l'offre technique et financière d'abord, puis les pièces administratives,
+   chacune avec son intitulé, son fichier, « Consulter » (aperçu) et « Télécharger ». o.pieces : { id, doc, name, size, sha256, offre, referencement }. */
+var LIBELLES_OFFRE = { memoire:'Offre technique', bordereau:'Offre financière', 'offre-recue':'Offre reçue' };
+function libellePieceOffre(f){
+  if(LIBELLES_OFFRE[f.doc]) return LIBELLES_OFFRE[f.doc];
+  var d=DOCS().filter(function(x){ return x.id===f.doc; })[0];
+  return d ? d.label : f.doc;
+}
+function ligneDocument(parent, f){
+  var row=add(parent,'div','docline');
+  var lf=add(row,'div'); lf.style.flex='1 1 260px';
+  var t=add(lf,'div'); t.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+  add(t,'strong',null,libellePieceOffre(f));
+  if(f.referencement) add(t,'span','chip c-teal','Reprise du référencement');
+  add(lf,'div','muted',f.name+' · '+taille(f.size));
+  var act=add(row,'div'); act.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+  var v=add(act,'button','btn btn-ghost btn-sm','Consulter'); v.type='button'; v.setAttribute('data-consult',''); fk(v,'doc-voir-'+f.id);
+  v.addEventListener('click',function(){ apercuPiece(f.name,f.id); });
+  var a=add(act,'a','btn btn-ghost btn-sm','Télécharger'); a.href='/api/files/'+f.id; a.setAttribute('download',f.name); a.title='SHA-256 '+(f.sha256||''); a.setAttribute('data-consult','');
+  return row;
+}
+function documentsOffre(parent, o, offreSeule){
+  var pieces=o.pieces||[], vide=o.externe||o.submitted ? 'Aucun document joint.' : 'Offre de démonstration : aucun document réel.';
+  [[o.externe?'Document reçu':'Offre technique et financière', pieces.filter(function(f){ return f.offre; }), vide],
+   [offreSeule?null:'Pièces administratives', pieces.filter(function(f){ return !f.offre; }), 'Aucune pièce jointe enregistrée.']].forEach(function(g){
+    if(!g[0]) return;
+    var sec=add(parent,'div','fen-section'); add(sec,'h3',null,g[0]);
+    if(!g[1].length){ add(sec,'p','muted',g[2]); return; }
+    g[1].forEach(function(f){ ligneDocument(sec,f); });
+  });
 }
 /* Aperçu d'une pièce déposée, sans la télécharger : PDF et images tels quels, document Word converti en texte mis en page ;
    les autres formats (tableur) se téléchargent. Se superpose à la fenêtre ouverte. */

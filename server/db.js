@@ -626,6 +626,15 @@ db.transaction(function migrate() {
   // 13/10/2026 : règles de notification ajoutées depuis la création de l'espace (ex. demande de référencement) : valeur par défaut.
   { const r = kvGet('notifRules'), manquantes = r && Object.keys(seed.NOTIF_RULES).filter((k) => !r.value[k]);
     if (manquantes && manquantes.length) kvSet('notifRules', { ...r.value, ...Object.fromEntries(manquantes.map((k) => [k, clone(seed.NOTIF_RULES[k])])) }, 'migration'); }
+  // 13/10/2026 : date de dépôt des offres déposées en ligne (jusque-là non renseignée) : celle de l'accusé de dépôt.
+  {
+    const accuses = new Map(db.prepare('SELECT data FROM receipts').all().map((x) => JSON.parse(x.data)).filter((x) => x.offre).map((x) => [x.offre, x.t]));
+    const sans = db.prepare('SELECT data FROM offers WHERE submitted=1').all().map((x) => JSON.parse(x.data)).filter((o) => !o.depot);
+    for (const o of sans) {
+      const t = accuses.get(o.id);
+      if (t) { o.depot = String(t).replace(/:\d{2}$/, ''); offersReplace([o]); }
+    }
+  }
   // 07/10/2026 : budget et engagement. Sans ligne budgétaire, le contrôle des crédits reste inactif.
   if (kvGet('org') && !kvGet('budget')) kvSet('budget', { lignes: [] }, 'migration');
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.

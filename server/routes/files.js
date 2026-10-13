@@ -45,13 +45,21 @@ function lireFichier(req, doc = String(req.query.doc || '')) {
 }
 const corpsBrut = express.raw({ type: () => true, limit: MAX });
 
+/** Intitulé d'une pièce de l'offre (documents de l'offre, ou pièce du dossier). */
+const libellePiece = (req, doc) => ({ memoire: 'Offre technique', bordereau: 'Offre financière' }[doc]
+  || ((req.store.get('docDefs') || []).find((d) => d.id === doc) || {}).label || doc);
+
 /** Dépôt d'une pièce (soumissionnaire) pour une offre de la procédure req.pid. */
 r.post('/', needPerm('portail.use'), corpsBrut, (req, res) => {
-  const echeance = require('../../public/js/regles.js').echeanceDepot(req.store.get('cdc'));
-  if (echeance && Date.now() > echeance)
-    return res.status(409).json({ error: 'La date limite de dépôt est dépassée : aucune pièce ne peut plus être jointe.', code: 'DEADLINE_PASSED' });
+  const Rg = require('../../public/js/regles.js');
+  if (Rg.depouillementOuvert({ cdc: req.store.get('cdc'), depClosed: req.store.get('depClosed'), jalons: req.store.get('jalons') }))
+    return res.status(409).json({ error: 'Le dépôt des offres est clos : aucune pièce ne peut plus être jointe.', code: 'DEADLINE_PASSED' });
   const fx = lireFichier(req);
   if (fx.erreur) return res.status(fx.status).json({ error: fx.erreur });
+  // un même document ne peut pas tenir lieu de plusieurs pièces de l'offre
+  const eqd = equipeDe(req.user.id);
+  const doublon = db.prepare(`SELECT doc_id FROM files WHERE owner IN (${marques(eqd)}) AND procedure_id=? AND offer_id IS NULL AND sha256=? AND doc_id<>?`).get(...eqd, req.pid, fx.sha, fx.doc);
+  if (doublon) return res.status(422).json({ error: `Ce fichier est déjà joint pour « ${libellePiece(req, doublon.doc_id)} » : chaque pièce doit être un document distinct.`, code: 'DUPLICATE_FILE' });
   const { doc, name, body, sha } = fx, t = { mime: fx.mime };
   // le brouillon de dépôt est celui de l'entreprise : un nouveau fichier remplace celui d'un collègue pour la même pièce
   const eq = equipeDe(req.user.id);

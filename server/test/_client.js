@@ -23,12 +23,17 @@ async function login(email) {
   return r.cookie;
 }
 const getState = async (cookie, pid = 'p1') => (await call('GET', `/api/procedures/${pid}/state`, null, cookie)).json.state;
-const patch = (cookie, changes, pid = 'p1') => call('PATCH', `/api/procedures/${pid}/state`, { changes }, cookie);
+/** Les tests clôturent le dépouillement sans attendre la date limite : le responsable l'ouvre d'abord à la main. */
+const ouvrir = (cookie, pid = 'p1') => call('POST', `/api/procedures/${pid}/depouillement/ouvrir`, {}, cookie);
+const patch = async (cookie, changes, pid = 'p1') => {
+  if (changes.depClosed === true) await ouvrir(cookie, pid);
+  return call('PATCH', `/api/procedures/${pid}/state`, { changes }, cookie);
+};
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-module.exports = { call, login, getState, patch, clone, upload: (...a) => uploadImpl(...a), base: () => base };
+module.exports = { call, login, getState, patch, ouvrir, clone, upload: (...a) => uploadImpl(...a), base: () => base };
 async function uploadImpl(doc, name, buf, cookie, pid = 'p1') {
-  const res = await fetch(base + `/api/procedures/${pid}/files?doc=` + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: buf });
+  const res = await fetch(base + `/api/procedures/${pid}/files?doc=` + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: Buffer.concat([buf, Buffer.from(' ' + doc)]) }); // un document distinct par pièce
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
 
@@ -38,7 +43,7 @@ async function inscrire(corps) {
   const b = (await call('POST', '/api/inscription/brouillon', {})).json.brouillon;
   for (const [doc, expire] of [['registre'], ['fiscal', '2099-12-31'], ['cnps', '2099-12-31']]) {
     await fetch(base + '/api/inscription/brouillon/pieces?doc=' + doc + (expire ? '&expire=' + expire : ''),
-      { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': doc + '.pdf', 'x-brouillon': b }, body: Buffer.from('%PDF-1.4 test') });
+      { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': doc + '.pdf', 'x-brouillon': b }, body: Buffer.from('%PDF-1.4 test ' + doc) }); // un document distinct par pièce
   }
   return call('POST', '/api/inscription', { immatriculation: 'CI-ABJ-2026-B-9', reponses: { activite: 'Fournitures' }, ...corps, brouillon: b });
 }

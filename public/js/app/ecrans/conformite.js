@@ -7,6 +7,7 @@
 var NIVEAUX_SIGNAL = { red:['Critique','c-red'], amber:['À examiner','c-amber'], info:['Information','c-violet'] };
 
 function vConformite(m){
+  if(!depouillementOuvert()) return locked(m,"Le contrôle de conformité s'ouvre avec le dépouillement, à la date limite de dépôt"+(can('depouille.open')?' ou à la main depuis la réception des offres.':'.'),'reception','Aller à la réception des offres');
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Conformité & anomalies');
 
@@ -76,10 +77,19 @@ function ouvrirConformite(id){
     var manq=missingDocs(o).map(function(d){ return d.label; });
     add(c,'h3','fen-sous-titre','Pièces exigées');
     var ul=add(c,'ul','fen-liste');
+    var pieces=o.pieces||[];
     requiredDocs(o).forEach(function(d){
       var li=add(ul,'li'); add(li,'span',null,d.label);
       var ko=manq.indexOf(d.label)>=0; chipCellule(li, ko?'Manquante':'Fournie', ko?'c-red':'c-green');
+      // la pièce fournie se contrôle sur le document lui-même
+      var f=pieces.filter(function(x){ return x.doc===d.id; })[0];
+      if(f){
+        var v=add(li,'button','btn btn-ghost btn-sm','Consulter'); v.type='button'; v.setAttribute('data-consult',''); fk(v,'conf-voir-'+o.id+'-'+d.id);
+        v.addEventListener('click',function(){ apercuPiece(f.name,f.id); });
+        if(f.referencement) chipCellule(li,'Reprise du référencement','c-teal');
+      }
     });
+    documentsOffre(c, o, true); // l'offre technique et financière ; les pièces administratives sont ci-dessus, une à une
     var sec=add(c,'div','fen-section'); add(sec,'h3',null,'Signaux détectés');
     var sig=signauxDe(o);
     if(!sig.length) add(sec,'p','muted','Aucun signal sur cette offre.');

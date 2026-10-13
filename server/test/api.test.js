@@ -15,7 +15,7 @@ async function call(method, url, body, cookie) {
   return { status: res.status, json: await res.json().catch(() => ({})), cookie: (res.headers.get('set-cookie') || '').split(';')[0] };
 }
 async function upload(doc, name, buf, cookie) {
-  const res = await fetch(base + '/api/procedures/p1/files?doc=' + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: buf });
+  const res = await fetch(base + '/api/procedures/p1/files?doc=' + doc, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(name), cookie }, body: Buffer.concat([buf, Buffer.from(' ' + doc)]) });
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');

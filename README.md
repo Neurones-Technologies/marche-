@@ -112,6 +112,16 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
   non référencé ne peut pas être sélectionné ; un partenaire qui a déposé une offre ne peut plus être retiré, et une fois
   le dossier publié on peut ajouter des partenaires mais plus en retirer. Un prestataire ne voit (liste, registre de
   l'accueil, notifications) que les appels d'offres où il est consulté.
+- **Dépôt et dépouillement** : une offre déposée est ferme (ni modification ni retrait) ; son accusé porte la date de dépôt.
+  Chaque pièce doit être un document distinct (un même fichier ne peut pas tenir lieu de plusieurs pièces). Le
+  dépouillement ne s'ouvre qu'à la date limite de dépôt, ou à la main avec l'habilitation « Ouvrir le dépouillement »
+  (matrice des droits) : le dépôt des offres est alors clos, même avant la date limite. Les documents d'une offre (offre
+  technique, offre financière, pièces) se consultent dans l'outil à la réception, au dépouillement et à la conformité. La
+  grille de critères est figée dès la publication du dossier.
+- **Dossier d'appel d'offres (PDF)** : cinq pièces (objet et modalités, contenu de l'offre et évaluation, besoin et exigences
+  techniques, conditions contractuelles essentielles, cadre de réponse). La page de garde porte une vraie photo libre de
+  droits du thème de l'achat (déduit de l'objet, ou choisi au cahier des charges), crédits dans `docs/CREDITS-IMAGES.md`
+  et sous la photo ; plusieurs photos par thème, l'achat en retient une d'après sa référence.
 - **Besoins** : un service exprime un besoin, qui suit le circuit de validation de l'organisation (niveaux selon le
   budget, le demandeur ne valide jamais son propre besoin, rejet motivé) ; validé, il devient une procédure pré-remplie
   (objet, budget, type de procédure pressenti selon des seuils provisoires du profil), que le demandeur suit en lecture.

@@ -52,6 +52,10 @@ const stored = (k) => ST.get(k);
 /** Valeur après application du lot de changements : celle envoyée si la clé est modifiée, sinon celle en base. */
 function nextOf(changes) { return (k) => (k in changes ? changes[k] : stored(k)); }
 
+/** Dépouillement ouvert (date limite passée, ouverture manuelle ou clôture) : sans quoi rien ne s'y écrit. */
+const depouillementOuvert = (next) => R.depouillementOuvert({ cdc: next('cdc'), depClosed: stored('depClosed'), jalons: stored('jalons') });
+const DEPOUILLEMENT_FERME = () => refus(409, 'GATE_DEPOUILLEMENT_NOT_OPEN', 'Le dépouillement n’est pas ouvert : il s’ouvre à la date limite de dépôt, ou à la main par un responsable habilité.');
+
 function ctxOf(get) {
   return {
     offers: ST.offers(), org: get('org'), fxFrozen: stored('fxFrozen'), cadre: stored('cadre'), cdc: get('cdc'), criteria: get('criteria'),
@@ -130,17 +134,22 @@ function validateChange(key, value, req, changes = { [key]: value }) {
     case 'criteria': {
       if (!Array.isArray(value)) return 'Grille invalide.';
       if (value.some((c) => !c || !c.id || !(Number(c.weight) >= 0))) return 'Critère invalide.';
+      // la grille fait partie du dossier publié : opposable aux candidats, elle ne change plus (ni critère retiré, ni poids modifié)
+      if ((stored('cdc') || {}).cdcPublie && !same(value, cur))
+        return refus(409, 'CRITERIA_LOCKED', 'Le dossier est publié : la grille de critères est opposable aux candidats et ne peut plus être modifiée.');
       if (stored('depClosed') && !same(value, cur))
         return refus(409, 'CRITERIA_LOCKED', 'Le dépouillement est clôturé : la grille de critères publiée ne peut plus être modifiée.');
       break;
     }
     case 'confirmed':
       if (!isObj(value)) return 'Confirmations invalides.';
+      if (!same(value, cur) && !depouillementOuvert(next)) return DEPOUILLEMENT_FERME();
       if (stored('depClosed') && !same(value, cur))
         return refus(409, 'SCREENING_CLOSED', 'Le dépouillement est clôturé : les données extraites sont figées.');
       break;
     case 'excluded':
       if (!isObj(value)) return 'Décisions de conformité invalides.';
+      if (!same(value, cur) && !depouillementOuvert(next)) return DEPOUILLEMENT_FERME();
       if (stored('evalDone') && !same(value, cur))
         return refus(409, 'EVALUATION_VALIDATED', 'L’évaluation est validée : la liste des offres conformes ne peut plus changer.');
       break;
@@ -167,6 +176,7 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       if (typeof value !== 'boolean') return 'Booléen attendu.';
       if (value === !!cur) break;
       if (!value) return refus(409, 'SCREENING_CLOSED', 'Un dépouillement clôturé ne peut pas être rouvert.');
+      if (!depouillementOuvert(next)) return DEPOUILLEMENT_FERME();
       if (!(next('cdc') || {}).cdcPublie) return refus(409, 'GATE_CDC_NOT_PUBLISHED', 'Le dépouillement ne peut pas être clôturé avant la publication du cahier des charges.');
       const ctx = ctxOf(next);
       if (!(ctx.offers || []).length) return refus(409, 'NO_OFFERS', 'Aucune offre reçue : le dépouillement ne peut pas être clôturé.');

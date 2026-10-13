@@ -1,7 +1,7 @@
 /* Écritures ciblées : une note, une confirmation, une décision de conformité, une approbation.
    Elles passent par les mêmes règles que l'écriture en bloc, sans conflit entre utilisateurs simultanés.
    Les tests s'enchaînent : chacun part de l'état laissé par le précédent. */
-const { call, login, getState, patch } = require('./_client');
+const { call, login, getState, patch, ouvrir } = require('./_client');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -32,6 +32,17 @@ test('confirmations champ par champ, puis clôture', async () => {
   refusé(await call('PUT', U('/confirmations/inconnue/0'), { confirme: true }, achats), 404);
   refusé(await call('PUT', U('/confirmations/sotrap/0'), { confirme: 'oui' }, achats), 422);
   refusé(await call('PUT', U('/confirmations/sotrap/0'), { confirme: true }, soum), 403);
+  // le dépouillement ne s'ouvre qu'à la date limite, ou à la main par un profil habilité
+  const i0 = s.offers[0].fields.findIndex((f) => f.flag);
+  refusé(await call('PUT', U(`/confirmations/${s.offers[0].id}/${i0}`), { confirme: true }, achats), 409, 'GATE_DEPOUILLEMENT_NOT_OPEN');
+  refusé(await ouvrir(evaltech), 403);
+  ok(await ouvrir(achats));
+  refusé(await ouvrir(achats), 409, 'ALREADY_OPEN');
+  const ouvert = (await getState(achats)).jalons;
+  assert.ok(ouvert.ouvert && ouvert.ouvertureManuelle && ouvert.ouvertPar === 'u1', 'ouverture datée et nominative');
+  assert.ok((await getState(admin)).audit.some((e) => /Dépouillement ouvert à la main/.test(e.a)));
+  // le dépôt des offres est clos dès l'ouverture
+  refusé(await call('POST', '/api/procedures/p1/offers', { name: 'Retardataire SA', iso: 'CI', devise: 'XOF', montant: 1, delai: 1, lots: ['l1'] }, soum), 409, 'DEPOUILLEMENT_OPEN');
   for (const o of s.offers) for (const [i, f] of o.fields.entries()) if (f.flag) ok(await call('PUT', U(`/confirmations/${o.id}/${i}`), { confirme: true }, achats));
   ok(await patch(achats, { depClosed: true }));
   refusé(await call('PUT', U('/confirmations/sotrap/0'), { confirme: false }, achats), 409, 'SCREENING_CLOSED');

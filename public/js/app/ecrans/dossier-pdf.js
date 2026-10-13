@@ -22,8 +22,8 @@ function dateLongue(iso){
 }
 var PORTEE_PIECE = { tous:'Tous les soumissionnaires', local:'Établis en Côte d’Ivoire', etranger:'Établis hors UEMOA' };
 
-/* Définition pdfmake du dossier. */
-function definitionDossier(){
+/* Définition pdfmake du dossier. photo : { data (URL de données), credit } de la page de garde, ou null (dessin de repli). */
+function definitionDossier(photo){
   var c=state.cdc, org=state.org||{}, P=buildDAO(), illu=illustrationDossier(c);
   var lieu=[org.ville,org.pays].filter(Boolean).join(' · '), auj=new Date().toLocaleDateString('fr-FR',{ day:'numeric', month:'long', year:'numeric' });
   var contenu=[];
@@ -37,7 +37,8 @@ function definitionDossier(){
     { canvas:[{ type:'line', x1:0, y1:8, x2:495, y2:8, lineWidth:2, lineColor:COUL_PDF.accent }], margin:[0,0,0,34] },
     { text:'DOSSIER D’APPEL D’OFFRES', style:'garTitre' },
     { text:c.objet||'', style:'garObjet' },
-    { svg:illu.svg, width:400, alignment:'center', margin:[0,22,0,8] },
+    photo ? { image:photo.data, fit:[495,250], alignment:'center', margin:[0,22,0,3] } : { svg:illu.svg, width:400, alignment:'center', margin:[0,22,0,8] },
+    photo ? { text:'Photo : '+photo.credit, fontSize:6.5, color:COUL_PDF.gris, alignment:'center', margin:[0,0,0,5] } : { text:'', fontSize:1 },
     { text:illu.lab, style:'garTheme' },
     { table:{ widths:['*','*'], body:[
       [cleValeur('Autorité contractante',c.autorite),cleValeur('Type de procédure',c.procedure)],
@@ -129,9 +130,17 @@ function tableauPdf(entetes, largeurs, lignes){
       paddingTop:function(){ return 5; }, paddingBottom:function(){ return 5; } }, fontSize:9.5, margin:[0,0,0,6] };
 }
 
+/* Photo de la page de garde en URL de données (pdfmake l'embarque) ; null si elle ne se charge pas : le dessin la remplace. */
+function chargerPhotoDossier(){
+  var ill=illustrationDossier(state.cdc);
+  if(!ill.photo) return Promise.resolve(null);
+  return fetch(ill.photo.src,{ credentials:'same-origin' }).then(function(r){ if(!r.ok) throw new Error('photo'); return r.blob(); })
+    .then(function(b){ return new Promise(function(ok,ko){ var fr=new FileReader(); fr.onload=function(){ ok({ data:fr.result, credit:ill.photo.credit }); }; fr.onerror=ko; fr.readAsDataURL(b); }); })
+    .catch(function(){ return null; });
+}
 /* Génère le PDF ; retourne une promesse de Blob. */
 function genererPdfDossier(){
-  return chargerPdfmake().then(function(){ return window.pdfMake.createPdf(definitionDossier()).getBlob(); });
+  return Promise.all([chargerPdfmake(), chargerPhotoDossier()]).then(function(r){ return window.pdfMake.createPdf(definitionDossier(r[1])).getBlob(); });
 }
 function nomFichierDossier(){ return REF().replace(/[^\w.-]+/g,'-')+'-dossier-appel-offres.pdf'; }
 
@@ -173,7 +182,9 @@ function vDossierPublie(m){
   add(et,'span','dg-ref','Réf. '+REF());
   add(garde,'div','dg-titre','Dossier d’appel d’offres');
   add(garde,'div','dg-objet',c.objet||'');
-  var im=add(garde,'div','dg-illu'); im.innerHTML=illu.svg; // illustration du thème (dessin fixe de l'application)
+  var im=add(garde,'div','dg-illu');
+  if(illu.photo){ var ph=add(im,'img'); ph.src=illu.photo.src; ph.alt=illu.lab; ph.setAttribute('loading','lazy'); ph.onerror=function(){ im.textContent=''; im.innerHTML=illu.svg; }; }
+  else im.innerHTML=illu.svg; // à défaut de photo, le dessin du thème (fixe, de l'application)
   add(garde,'div','dg-theme',illu.lab);
   var info=add(garde,'div','dg-infos');
   [['Procédure',c.procedure],['Date limite de dépôt',dateLongue(c.ouverture)],['Lots',(c.lots||[]).length+' lot(s)']].forEach(function(x){

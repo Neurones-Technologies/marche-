@@ -198,7 +198,7 @@ function appliquerIA(p, choix){
       });
     }
     else if(s.id==='criteres'){
-      if(state.depClosed) return; // grille figée à la clôture du dépouillement
+      if(state.depClosed || c.cdcPublie) return; // grille figée à la publication du dossier
       var avant=state.criteria||[], idx=function(id){ return avant.filter(function(x){ return x.id===id; })[0]; };
       state.criteria=p.criteres.map(function(x,i){
         if(x.nature==='prix' || x.nature==='delai'){ var ex=idx(x.nature); return { id:x.nature, label:x.label, weight:x.poids, kind:'auto', hint:ex?ex.hint:'' }; }

@@ -14,7 +14,7 @@ let admin, achats, mobilia, autre, pid, lien;
 /** Téléversement d'une pièce de référencement (corps brut). */
 async function piece(cookie, id, doc, expire) {
   const url = `/api/partenaires/${id}/fichiers?doc=${doc}` + (expire ? `&expire=${expire}` : '');
-  return uploadBrut(url, doc + '.pdf', PDF, cookie);
+  return uploadBrut(url, doc + '.pdf', Buffer.concat([PDF, Buffer.from(' ' + doc)]), cookie); // un document distinct par pièce
 }
 let BASE;
 /** Connexion avec le mot de passe choisi à l'inscription (login() utilise celui des comptes de démonstration). */
@@ -32,7 +32,7 @@ async function uploadBrut(url, name, buf, cookie) {
 async function brouillon() { const r = await call('POST', '/api/inscription/brouillon', {}); ok(r, 201); return r.json.brouillon; }
 async function pieceBrouillon(jeton, doc, expire) {
   const res = await fetch(BASE + '/api/inscription/brouillon/pieces?doc=' + doc + (expire ? '&expire=' + expire : ''),
-    { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(doc + '.pdf'), 'x-brouillon': jeton }, body: PDF });
+    { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(doc + '.pdf'), 'x-brouillon': jeton }, body: Buffer.concat([PDF, Buffer.from(' ' + doc)]) });
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
 const REPONSES = { activite: 'Mobilier de bureau', effectif: '42', inconnue: 'x' };
@@ -169,7 +169,7 @@ test('consultation : seuls les partenaires référencés et sélectionnés voien
   refusé(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid), 409, 'CDC_INCOMPLETE');
   ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, pid));
   ok(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid));
-  refusé(await patch(achats, { depClosed: true }, pid), 409, 'NO_OFFERS'); // rien à dépouiller
+  refusé(await call('PATCH', `/api/procedures/${pid}/state`, { changes: { depClosed: true } }, achats), 409, 'GATE_DEPOUILLEMENT_NOT_OPEN'); // le dépouillement n'est pas ouvert avant la date limite
   const lot = s.cdc.lots[0].id;
   // un second prestataire, inscrit et vérifié, mais pas référencé
   const r = await require('./_client').inscrire({ ...INSCRIPTION, raisonSociale: 'Autre SA', email: 'contact@autre.ci' });

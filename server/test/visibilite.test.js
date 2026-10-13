@@ -18,6 +18,11 @@ test('registre de l’accueil : un prestataire ne voit que les appels d’offres
   const s = await getState(achats, pid);
   ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: [idDelta] } }, pid));
   ok(await patch(achats, { cdc: { ...s.cdc, cdcPublie: true } }, pid));
+  // la grille de critères fait partie du dossier publié : plus de critère retiré ni de poids modifié
+  const grille = (await getState(achats, pid)).criteria;
+  const g = await patch(achats, { criteria: grille.slice(1) }, pid);
+  assert.equal(g.status, 409); assert.equal(g.json.code, 'CRITERIA_LOCKED');
+  ok(await patch(achats, { criteria: grille }, pid)); // inchangée : acceptée
   const registre = async (cookie) => (await call('GET', '/api/registre', null, cookie)).json.procedures.map((l) => l.ref);
   assert.equal((await registre(delta)).includes('AO-2026-077'), true, 'le partenaire consulté le voit');
   assert.equal((await registre(sotrap)).includes('AO-2026-077'), false, 'un partenaire non consulté ne le voit pas');

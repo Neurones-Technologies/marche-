@@ -15,6 +15,7 @@ var PERMS = [
   {id:'portail.use',     lab:"Déposer une offre (soumissionnaire)", grp:'Soumission'},
   {id:'offres.read',     lab:"Consulter les offres reçues",         grp:'Traitement'},
   {id:'depouille.confirm',lab:"Confirmer les données extraites",    grp:'Traitement'},
+  {id:'depouille.open',  lab:"Ouvrir le dépouillement avant la date limite", grp:'Traitement'},
   {id:'depouille.close', lab:"Clôturer le dépouillement",           grp:'Traitement'},
   {id:'conformite.decide',lab:"Écarter ou réintégrer une offre",    grp:'Traitement'},
   {id:'eval.score',      lab:"Noter les offres",                    grp:'Décision'},
@@ -52,7 +53,7 @@ function permsDef(list){ var o={}; PERMS.forEach(function(p){ o[p.id]= list.inde
 function ROLES_DEF(){
   return {
     admin:    { lab:'Administrateur fonctionnel', perms:permsDef(PERMS.map(function(p){return p.id;})) },
-    achats:   { lab:'Responsable des achats',     perms:permsDef(['cdc.edit','cdc.publish','criteres.edit','offres.read','depouille.confirm','depouille.close','conformite.decide','pv.read','audit.read','qa.answer','clarif.send','recours.handle']) },
+    achats:   { lab:'Responsable des achats',     perms:permsDef(['cdc.edit','cdc.publish','criteres.edit','offres.read','depouille.confirm','depouille.open','depouille.close','conformite.decide','pv.read','audit.read','qa.answer','clarif.send','recours.handle']) },
     evaltech: { lab:'Évaluateur technique',       perms:permsDef(['offres.read','eval.score','pv.read']) },
     evalfin:  { lab:'Évaluateur financier',       perms:permsDef(['offres.read','depouille.confirm','eval.score','eval.validate','pv.read']) },
     approb:   { lab:"Membre du comité d'engagement", perms:permsDef(['offres.read','decision.approve','pv.read','audit.read','recours.handle','contract.sign']) },
@@ -304,12 +305,14 @@ function xof(n){ return sep(n)+' XOF'; }
 var R = window.MPRegles;
 function RCTX(){
   return { offers:SEED_OFFERS, org:state.org, fxFrozen:state.fxFrozen, cadre:state.cadre, cdc:state.cdc, criteria:state.criteria,
-    quality:state.quality, justif:state.justif, excluded:state.excluded, confirmed:state.confirmed, docDefs:DOCS() };
+    quality:state.quality, justif:state.justif, excluded:state.excluded, confirmed:state.confirmed, docDefs:DOCS(), depClosed:state.depClosed, jalons:state.jalons };
 }
 /* Référence de la procédure : une donnée du cahier des charges, jamais une valeur écrite dans le code. */
 function REF(){ return (state && state.cdc && state.cdc.ref) || '—'; }
 /* Règles du profil réglementaire de la procédure (figées à la publication du dossier). */
 function CADRE(){ return R.cadre(RCTX()); }
+/* Dépouillement ouvert : date limite de dépôt passée, ouverture à la main (habilitation « Ouvrir le dépouillement ») ou clôture. */
+function depouillementOuvert(){ return R.depouillementOuvert(RCTX()); }
 function isUemoa(o){ return R.isUemoa(RCTX(),o); }
 function isLocal(o){ return R.isLocal(RCTX(),o); }
 function montantXOF(o){ return R.montantXOF(RCTX(),o); }
@@ -452,8 +455,8 @@ function lifeStatus(){
   var c=state.cdc;
   st.prep   = c.cdcPublie ? 'done':'now';
   st.pub    = c.cdcPublie ? (state.depClosed?'done':'now') : 'todo';
-  st.depot  = c.cdcPublie ? (state.depClosed?'done':'now') : 'todo';
-  st.depouil= state.depClosed ? 'done' : (c.cdcPublie?'now':'todo');
+  st.depot  = c.cdcPublie ? (depouillementOuvert()?'done':'now') : 'todo'; // le dépôt se ferme à l'ouverture du dépouillement
+  st.depouil= state.depClosed ? 'done' : (c.cdcPublie && depouillementOuvert()?'now':'todo');
   var clOuv = state.clarifs.filter(function(x){return x.statut==='envoyee';}).length;
   st.clarif = clOuv? 'blocked' : (state.depClosed?'done':'todo');
   st.eval   = state.evalDone ? 'done' : (state.depClosed?'now':'todo');
@@ -544,6 +547,7 @@ function lockReason(id){
   if(id==='echanges' && !state.cdc.cdcPublie) return "Les échanges s'ouvrent une fois le dossier publié.";
   if(id==='soumission' && !state.cdc.cdcPublie) return "Publiez le cahier des charges pour ouvrir le dépôt.";
   if(id==='depouille' && !state.cdc.cdcPublie) return "Publiez le cahier des charges pour ouvrir le dépouillement.";
+  if((id==='depouille' || id==='conformite') && state.cdc.cdcPublie && !depouillementOuvert()) return "Le dépouillement s'ouvre à la date limite de dépôt"+(state.cdc.ouverture?' ('+String(state.cdc.ouverture).split('-').reverse().join('/')+')':'')+(can('depouille.open')?', ou à la main depuis « Réception des offres ».':'.');
   if(id==='evaluation' && !state.depClosed) return "Clôturez le dépouillement pour ouvrir l'évaluation.";
   if(id==='decision' && !state.evalDone) return "Validez l'évaluation pour ouvrir le circuit d'approbation.";
   if(id==='pv' && !allApproved()) return "Recueillez les approbations pour générer le procès-verbal.";

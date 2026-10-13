@@ -168,6 +168,8 @@ r.post('/:id/fichiers', limiteDepots, corpsBrut, (req, res) => {
   if (fx.erreur) return err(res, fx.status, 'FILE_INVALID', fx.erreur);
   const def = piecesExigees(p).find((d) => d.id === fx.doc);
   if (!def) return err(res, 422, 'PIECE_NOT_REQUIRED', 'Cette pièce ne fait pas partie du dossier de référencement.');
+  const meme = Object.entries(p.pieces).find(([k, x]) => k !== fx.doc && x.sha256 === fx.sha);
+  if (meme) return err(res, 422, 'DUPLICATE_FILE', `Ce fichier est déjà déposé pour « ${(piecesExigees(p).find((d) => d.id === meme[0]) || { label: meme[0] }).label} » : chaque pièce doit être un document distinct.`);
   const expire = String(req.query.expire || '');
   if (def.expiration && !expire) return err(res, 422, 'PIECE_EXPIRY_REQUIRED', '« ' + def.label + ' » : indiquez sa date de fin de validité.');
   if (expire && !/^\d{4}-\d{2}-\d{2}$/.test(expire)) return err(res, 422, 'FILE_INVALID', 'Date de validité invalide (AAAA-MM-JJ).');

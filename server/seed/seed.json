@@ -48,6 +48,11 @@
    "grp": "Traitement"
   },
   {
+   "id": "depouille.open",
+   "lab": "Ouvrir le dépouillement avant la date limite",
+   "grp": "Traitement"
+  },
+  {
    "id": "depouille.close",
    "lab": "Clôturer le dépouillement",
    "grp": "Traitement"
@@ -194,7 +199,8 @@
     "besoin.manage": true,
     "partenaires.manage": true,
     "commande.manage": true,
-    "commande.approve": true
+    "commande.approve": true,
+    "depouille.open": true
    }
   },
   "achats": {
@@ -225,7 +231,8 @@
     "besoin.manage": true,
     "partenaires.manage": true,
     "commande.manage": true,
-    "commande.approve": false
+    "commande.approve": false,
+    "depouille.open": true
    }
   },
   "evaltech": {
@@ -256,7 +263,8 @@
     "besoin.manage": false,
     "partenaires.manage": false,
     "commande.manage": false,
-    "commande.approve": false
+    "commande.approve": false,
+    "depouille.open": false
    }
   },
   "evalfin": {
@@ -287,7 +295,8 @@
     "besoin.manage": false,
     "partenaires.manage": false,
     "commande.manage": false,
-    "commande.approve": false
+    "commande.approve": false,
+    "depouille.open": false
    }
   },
   "approb": {
@@ -318,7 +327,8 @@
     "besoin.manage": false,
     "partenaires.manage": false,
     "commande.manage": false,
-    "commande.approve": true
+    "commande.approve": true,
+    "depouille.open": false
    }
   },
   "audit": {
@@ -349,7 +359,8 @@
     "besoin.manage": false,
     "partenaires.manage": false,
     "commande.manage": false,
-    "commande.approve": false
+    "commande.approve": false,
+    "depouille.open": false
    }
   },
   "soum": {
@@ -380,7 +391,8 @@
     "besoin.manage": false,
     "partenaires.manage": false,
     "commande.manage": false,
-    "commande.approve": false
+    "commande.approve": false,
+    "depouille.open": false
    }
   },
   "demandeur": {
@@ -411,7 +423,8 @@
     "besoin.manage": false,
     "partenaires.manage": false,
     "commande.manage": false,
-    "commande.approve": false
+    "commande.approve": false,
+    "depouille.open": false
    }
   }
  },

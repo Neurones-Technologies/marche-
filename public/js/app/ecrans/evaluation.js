@@ -130,6 +130,7 @@ function ouvrirNotation(id){
       ['Montant de l’offre', sep(o.montant)+' '+o.devise], ['Délai', o.delai+' jours'],
       ['Contre-valeur', xof(montantXOF(o))], ['Prix comparé', Math.abs(corr-montantXOF(o))>1 ? xof(corr) : null]
     ]);
+    if((o.pieces||[]).some(function(f){ return f.offre; })) documentsOffre(card,o,true); // l'offre technique et financière, pour noter sur pièces
     if(coiBloque){ var wc=add(card,'div','warn'); wc.style.margin='0 0 12px'; wc.textContent='Déclaration de conflit d’intérêts requise avant toute notation : faites-la depuis l’écran d’évaluation.'; }
 
     state.criteria.forEach(function(cr){

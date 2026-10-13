@@ -82,6 +82,8 @@ r.post('/brouillon/pieces', limitePieces, corpsBrut, (req, res) => {
   if (fx.erreur) return err(res, fx.status, 'FILE_INVALID', fx.erreur);
   const def = F.formulaire().pieces.find((d) => d.id === fx.doc);
   if (!def) return err(res, 422, 'PIECE_NOT_REQUIRED', 'Ce document ne fait pas partie du dossier de référencement.');
+  const meme = Object.entries(b.pieces).find(([k, x]) => k !== fx.doc && x.sha256 === fx.sha);
+  if (meme) return err(res, 422, 'DUPLICATE_FILE', `Ce fichier est déjà déposé pour « ${(F.formulaire().pieces.find((d) => d.id === meme[0]) || { label: meme[0] }).label} » : chaque document doit être distinct.`);
   const expire = String(req.query.expire || '');
   if (expire && !/^\d{4}-\d{2}-\d{2}$/.test(expire)) return err(res, 422, 'FILE_INVALID', 'Date de validité invalide (AAAA-MM-JJ).');
   if (def.expiration && !expire) return err(res, 422, 'PIECE_EXPIRY_REQUIRED', '« ' + def.label + ' » : indiquez sa date de fin de validité.');

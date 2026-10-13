@@ -12,6 +12,25 @@ function vReception(m){
     var ext=add(h,'button','btn btn-ghost','Enregistrer une offre reçue hors plateforme'); fk(ext,'offre-externe');
     ext.addEventListener('click',ouvrirOffreExterne);
   }
+  // avant la date limite : le dépouillement s'ouvre à la main (habilitation dédiée), ce qui clôt le dépôt des offres
+  if(state.cdc.cdcPublie && !depouillementOuvert() && can('depouille.open')){
+    var op=add(h,'button','btn btn-primary','Ouvrir le dépouillement'); fk(op,'depouillement-ouvrir');
+    op.addEventListener('click',function(){
+      ask('Le dépôt des offres est clos immédiatement : aucun soumissionnaire ne pourra plus déposer ni joindre de pièce, même avant la date limite ('
+        +(state.cdc.ouverture?String(state.cdc.ouverture).split('-').reverse().join('/'):'non fixée')+'). L’ouverture est consignée à la piste d’audit et ne se défait pas.',
+      function(){
+        op.disabled=true;
+        MP.api('POST',MP.url('/depouillement/ouvrir'),{}).then(function(){ toast('Dépouillement ouvert : le dépôt des offres est clos.'); return relireEtat(); })
+          .then(function(){ if(viewAllowed('depouille')) go('depouille'); })
+          .catch(function(e){ op.disabled=false; toast(e.message||'Ouverture impossible.'); });
+      },'Ouvrir le dépouillement maintenant ?','Ouvrir le dépouillement');
+    });
+  }
+  if(state.cdc.cdcPublie && !depouillementOuvert()){
+    var ns=add(m,'div','note'); ns.style.marginBottom='18px';
+    add(ns,'strong',null,'Dépôt des offres ouvert. ');
+    ns.appendChild(document.createTextNode('Les offres se dépouillent à la date limite ('+(state.cdc.ouverture?dateLongue(state.cdc.ouverture)+' à 10 h 00':'non fixée')+')'+(can('depouille.open')?', ou dès que vous ouvrez le dépouillement : le dépôt est alors clos.':'.')));
+  }
 
   var seuilC=Number(state.seuils.confianceMin);
   var t=tableau(m,{ cle:'plis', titre:'Plis reçus', lignes:SEED_OFFERS,
@@ -56,20 +75,7 @@ function ouvrirPli(id){
     bar.setAttribute('role','img'); bar.setAttribute('aria-label','Confiance de lecture : '+avg+' %');
     var pieces=o.pieces||[];
     if(o.externe) champLecture(c,'Reçue hors plateforme', 'le '+o.depot+(o.externe.lecture==='ia'?' — lue par l’IA puis relue':' — saisie à la main'));
-    listeFichiersPli(c, o.externe ? 'Document reçu' : 'Offre technique et financière', pieces.filter(function(f){ return f.offre; }), o.externe || o.submitted ? 'Ni offre technique ni offre financière jointe.' : 'Offre de démonstration : aucun document réel.');
-    listeFichiersPli(c,'Pièces administratives', pieces.filter(function(f){ return !f.offre; }),'Aucune pièce jointe enregistrée.');
+    documentsOffre(c, o);
   }, { large:true });
-}
-/* Fichiers d'un pli, téléchargeables ; l'empreinte SHA-256 en infobulle. */
-var LIB_DOCS_OFFRE = { memoire:'Offre technique', bordereau:'Offre financière', 'offre-recue':'Offre reçue' };
-function listeFichiersPli(c, titre, liste, vide){
-  var sec=add(c,'div','fen-section'); add(sec,'h3',null,titre);
-  if(!liste.length){ add(sec,'p','muted',vide); return; }
-  var pc=add(sec,'div'); pc.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
-  liste.forEach(function(f){
-    var a=add(pc,'a','pill',(LIB_DOCS_OFFRE[f.doc] ? LIB_DOCS_OFFRE[f.doc]+' — ' : '')+f.name+' · '+taille(f.size));
-    a.href='/api/files/'+f.id; a.setAttribute('download',f.name); a.title='SHA-256 '+f.sha256;
-    a.setAttribute('aria-label','Télécharger '+f.name);
-  });
 }
 function offreParId(id){ for(var i=0;i<SEED_OFFERS.length;i++) if(SEED_OFFERS[i].id===id) return SEED_OFFERS[i]; return null; }

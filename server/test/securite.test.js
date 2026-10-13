@@ -96,7 +96,7 @@ test('SEC-04 : pièces déposées sans compte plafonnées, par brouillon et pour
   const gros = Buffer.concat([Buffer.from('%PDF-1.4 '), Buffer.alloc(700 * 1024)]);
   const brouillon = async () => (await call('POST', '/api/inscription/brouillon', {})).json.brouillon;
   const deposer = (jeton, doc, expire) => fetch(base + '/api/inscription/brouillon/pieces?doc=' + doc + (expire ? '&expire=' + expire : ''),
-    { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': doc + '.pdf', 'x-brouillon': jeton }, body: gros }).then((r) => r.status);
+    { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-filename': doc + '.pdf', 'x-brouillon': jeton }, body: Buffer.concat([gros, Buffer.from(doc)]) }).then((r) => r.status); // un document distinct par pièce
   const a = await brouillon();
   assert.equal(await deposer(a, 'registre'), 201);
   assert.equal(await deposer(a, 'registre'), 201); // remplacement : l'ancienne version ne compte plus

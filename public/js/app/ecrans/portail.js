@@ -112,19 +112,19 @@ function vPortail(m, etape){
   if(mp && !String(d.name||'').trim()){ d.name=mp.raisonSociale||''; if(mp.pays && /^[A-Z]{2}$/.test(mp.pays)) d.iso=mp.pays; uem=isUemoa(d); loc=isLocal(d); }
 
   var h=add(m,'div','head'); add(add(h,'div'),'h1',null, etape==='soumission' ? 'Soumission de l’offre' : 'Monter mon offre');
-  var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=reste!=null && reste<=0;
+  var ech=R.echeanceDepot(c), reste=ech ? ech-Date.now() : null, clos=(reste!=null && reste<=0) || depouillementOuvert(); // clos à la date limite, ou dès l'ouverture du dépouillement
   if(viewAllowed('procedures')) retourListe(m,'Appels d’offres',function(){ go('procedures'); },'retour-registre');
   var noteEtape=etapesFournisseur(m, etape==='soumission' ? 'soumission' : 'portail');
   var nc=clarifsEnAttente();
   if(nc){ var wc=add(m,'div','warn'); wc.style.marginBottom='18px'; add(wc,'strong',null,'L’acheteur attend votre réponse. ');
     wc.appendChild(document.createTextNode(nc+' demande(s) de clarification sur votre offre : répondez à l’étape 1, « Cahier des charges & échanges ».')); }
-  if(clos){ var fin=add(m,'div','warn'); fin.style.margin='18px 0'; add(fin,'strong',null,'Date limite dépassée. '); fin.appendChild(document.createTextNode('Les dépôts sont clos : aucune offre ni pièce ne peut plus être transmise.')); }
+  if(clos && !state.monOffre){ var fin=add(m,'div','warn'); fin.style.margin='18px 0'; add(fin,'strong',null,reste!=null && reste>0 ? 'Dépôt clos. ' : 'Date limite dépassée. '); fin.appendChild(document.createTextNode(reste!=null && reste>0 ? 'Le dépouillement est ouvert avant la date limite : le dépôt des offres est clos, aucune offre ni pièce ne peut plus être transmise.' : 'Les dépôts sont clos : aucune offre ni pièce ne peut plus être transmise.')); }
 
   // offre déposée : récapitulatif, modification ou retrait à l'étape 3 ; le formulaire ne revient qu'après retrait
   if(state.monOffre){
     if(etape==='soumission'){ vPortailResultat(m); vPortailMonOffre(m,clos); vPortailAccuses(m); return; }
     var nd=add(m,'div','note'); add(nd,'strong',null,'Votre offre est déposée. ');
-    nd.appendChild(document.createTextNode('Pour la relire, la modifier ou la retirer, passez à l’étape « Soumission ».'));
+    nd.appendChild(document.createTextNode('Elle est ferme : pour la relire et consulter l’accusé de dépôt, passez à l’étape « Soumission ».'));
     return;
   }
   if(etape==='soumission') vPortailResultat(m);
@@ -297,16 +297,16 @@ function vPortailAccuses(m){
   });
 }
 
-/* Offre en cours du fournisseur : récapitulatif ; modification ou retrait jusqu'à la date limite de dépôt. */
+/* Offre déposée du fournisseur : récapitulatif en lecture. Une offre déposée est ferme : ni modification ni retrait. */
 function vPortailMonOffre(m, clos){
   var o=state.monOffre, c=state.cdc;
   var k=add(m,'div','card'); k.style.marginTop='18px';
   var ph=add(k,'div','panel-head'); add(ph,'span',null,'Votre offre');
-  chipCellule(ph, clos?'Offre ferme':'Offre déposée', clos?'c-grey':'c-green');
+  chipCellule(ph, 'Offre déposée — ferme', 'c-green');
   var b=add(k,'div','pad');
   var nomLot=function(id){ var l=(c.lots||[]).filter(function(x){ return x.id===id; })[0]; return l ? l.nom : id; };
   grilleLecture(b,[
-    ['Soumissionnaire',o.name], ['Montant total HT',sep(o.montant)+' '+o.devise],
+    ['Soumissionnaire',o.name], ['Déposée le',o.depot], ['Montant total HT',sep(o.montant)+' '+o.devise],
     ['Délai d’exécution', o.delai ? o.delai+' jours' : null], ['Garantie', o.garantie ? o.garantie+' mois' : null],
     ['Références similaires', o.refsCount ? String(o.refsCount) : null]
   ]);
@@ -315,35 +315,7 @@ function vPortailMonOffre(m, clos){
     var r=add(lots,'div','docline'); add(r,'span',null,nomLot(id));
     if(o.prixLots && o.prixLots[id]!=null) add(r,'strong',null,sep(o.prixLots[id])+' '+o.devise);
   });
-  var docs=add(b,'div','fen-section'); add(docs,'h3',null,'Documents transmis');
-  if(!o.pieces.length) add(docs,'p','muted','Aucun document.');
-  var pc=add(docs,'div'); pc.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
-  o.pieces.forEach(function(f){ add(pc,'span','pill',(f.referencement?'Référencement — ':'')+f.name); });
-
+  documentsOffre(b, o); // offre technique et financière, puis pièces : à consulter ou télécharger
   var pied=add(k,'div','panel-foot');
-  if(clos){ add(pied,'span','muted','La date limite est passée : votre offre est ferme et ne peut plus être modifiée ni retirée.'); return; }
-  add(pied,'span','muted','Vous pouvez la modifier ou la retirer jusqu’au '+dateLongue(c.ouverture)+' à 10 h 00.');
-  var act=add(pied,'div'); act.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
-  var mod=add(act,'button','btn btn-ghost','Modifier mon offre'); fk(mod,'offre-modifier');
-  var ret=add(act,'button','btn btn-ghost','Retirer mon offre'); fk(ret,'offre-retirer');
-  function retirer(bouton, ensuite, message){
-    bouton.disabled=true;
-    MP.api('DELETE',MP.url('/offers/mienne'),{}).then(function(){
-      ensuite(); PIECES_OK=false; save(); toast(message); return relireEtat();
-    }).catch(function(e){ bouton.disabled=false; toast(e.message||'Retrait impossible.'); });
-  }
-  mod.addEventListener('click',function(){
-    ask('Votre offre est retirée et ses éléments (montants, lots, fichiers) sont repris dans le formulaire. Tant que vous n’avez pas déposé la version modifiée, vous n’avez plus d’offre en cours.',
-      function(){
-        retirer(mod,function(){
-          var pl={}; Object.keys(o.prixLots||{}).forEach(function(id){ pl[id]=String(o.prixLots[id]); });
-          state.draft={ name:o.name, iso:o.iso, devise:o.devise, montant:'', prixLots:pl, delai:o.delai?String(o.delai):'', garantie:o.garantie?String(o.garantie):'',
-            refsCount:o.refsCount?String(o.refsCount):'', lots:o.lots.slice(), docs:{}, files:{} };
-        },'Offre retirée : modifiez-la puis déposez-la à nouveau.');
-      },'Modifier mon offre','Retirer et modifier');
-  });
-  ret.addEventListener('click',function(){
-    ask('Votre offre est retirée de la consultation. Vous pourrez en déposer une nouvelle jusqu’à la date limite.',
-      function(){ retirer(ret,function(){},'Offre retirée.'); },'Retirer mon offre','Retirer l’offre');
-  });
+  add(pied,'span','muted','Votre offre est ferme : elle ne peut plus être modifiée ni retirée. Son accusé de dépôt est ci-dessous.');
 }

@@ -6,6 +6,7 @@
 
 function vDepouille(m){
   if (!state.cdc.cdcPublie) return locked(m,"Le dépouillement s'ouvre une fois le cahier des charges publié.",'cdc','Ouvrir le cahier des charges');
+  if (!depouillementOuvert()) return locked(m,"Le dépouillement s'ouvre à la date limite de dépôt"+(state.cdc.ouverture?' ('+dateLongue(state.cdc.ouverture)+')':'')+(can('depouille.open')?', ou à la main depuis la réception des offres.':'.'),'reception','Aller à la réception des offres');
   var nb=SEED_OFFERS.length;
   var reste=flagsRemaining();
   var total=0; SEED_OFFERS.forEach(function(x){ total+=x.fields.filter(function(f){return f.flag;}).length; });
@@ -92,13 +93,12 @@ function ouvrirOffreDepouillement(id){
     var dh=add(dc,'div','panel-head'); var dht=add(dh,'span','h'); icon(dht,'file'); dht.appendChild(document.createTextNode('Document reçu')); add(dh,'small',null,o.doc);
     if(o.submitted){
       var hs=add(dc,'p','hint top'); icon(hs,'info');
-      hs.appendChild(document.createTextNode('Offre saisie en ligne par le soumissionnaire : aucune lecture automatique, rien à vérifier.'));
+      hs.appendChild(document.createTextNode('Offre saisie en ligne par le soumissionnaire : aucune lecture automatique, rien à vérifier. Ses documents sont à consulter ci-dessous.'));
+      documentsOffre(dc,o);
     } else if(o.externe){
       var he=add(dc,'p','hint top'); icon(he,'info');
       he.appendChild(document.createTextNode('Offre reçue hors plateforme le '+o.depot+(o.externe.lecture==='ia' ? ', lue par l’IA puis relue' : ', saisie à la main')+'. Vérifiez sur le document les valeurs signalées et les pièces administratives.'));
-      (o.pieces||[]).forEach(function(f){
-        var a=add(add(dc,'p'),'a','pill',f.name+' · '+taille(f.size)); a.href='/api/files/'+f.id; a.setAttribute('download',f.name); a.title='SHA-256 '+f.sha256;
-      });
+      documentsOffre(dc,o);
       if((o.externe.remarques||[]).length){ var nr=add(dc,'div','note'); add(nr,'strong',null,'Remarques de la lecture : '); var ur=add(nr,'ul'); ur.style.margin='6px 0 0 18px'; o.externe.remarques.forEach(function(r){ add(ur,'li',null,r); }); }
     } else {
       var en=o.devise!=='XOF';

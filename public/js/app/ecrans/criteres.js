@@ -11,7 +11,7 @@ function teinteCritere(i){ return i < CRIT_TEINTES ? 'var(--crit-'+(i+1)+')' : '
 function vCriteres(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Grille de critères');
-  var fige=!!state.depClosed, crit=state.criteria, wt=weightTotal();
+  var fige=!!state.depClosed || !!state.cdc.cdcPublie, crit=state.criteria, wt=weightTotal(); // publiée au dossier : opposable aux candidats
 
   /* Critères, regroupés par type */
   var k2=add(m,'div','card');
@@ -37,7 +37,9 @@ function vCriteres(m){
   if(fige){
     var lk=add(m,'div','warn'); lk.style.marginTop='18px';
     add(lk,'strong',null,'Grille figée. ');
-    lk.appendChild(document.createTextNode("Le dépouillement est clôturé : la grille publiée au dossier ne peut plus être modifiée. La changer après l'ouverture des plis serait un motif d'annulation."));
+    lk.appendChild(document.createTextNode(state.depClosed
+      ? "Le dépouillement est clôturé : la grille publiée au dossier ne peut plus être modifiée. La changer après l'ouverture des plis serait un motif d'annulation."
+      : "Le dossier est publié : la grille est opposable aux candidats, aucun critère ne peut plus être retiré ni repondéré. Pour la changer, il faudrait un nouveau dossier."));
   }
 }
 

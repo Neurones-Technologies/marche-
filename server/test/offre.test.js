@@ -19,6 +19,13 @@ test('prix par lot : un montant par lot soumissionné, le total en est la somme'
   // offre technique jointe : elle suit le pli, marquée comme document de l'offre
   ok(await upload('memoire', 'memoire.pdf', PDF, sotrap), 201);
   ok(await upload('bordereau', 'bordereau.xlsx', Buffer.from('PK\x03\x04 xlsx'), sotrap), 201);
+  // un même fichier ne peut pas tenir lieu de deux pièces
+  const brut = (doc, octets) => fetch(require('./_client').base() + '/api/procedures/p1/files?doc=' + doc, { method: 'POST', body: octets,
+    headers: { 'content-type': 'application/octet-stream', 'x-filename': 'copie.pdf', cookie: sotrap } }).then(async (x) => ({ status: x.status, json: await x.json() }));
+  const copie = await brut('fiscal', Buffer.concat([PDF, Buffer.from(' registre')])); // octets identiques à ceux de « registre »
+  assert.equal(copie.status, 422); assert.equal(copie.json.code, 'DUPLICATE_FILE');
+  assert.match(copie.json.error, /Registre du commerce/);
+  assert.equal((await brut('memoire', Buffer.concat([PDF, Buffer.from(' registre')]))).json.code, 'DUPLICATE_FILE');
   const base = { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', delai: 90, lots: ['l1', 'l2'] };
   const manque = await call('POST', '/api/procedures/p1/offers', { ...base, prixLots: { l1: 30000000 } }, sotrap);
   assert.equal(manque.status, 422);
@@ -38,32 +45,25 @@ test('prix par lot : un montant par lot soumissionné, le total en est la somme'
   assert.equal(dl.status, 200);
 });
 
-test('une seule offre en cours ; retrait avant l’échéance, fichiers rendus, accusé marqué retiré', async () => {
+test('une seule offre en cours, ferme après le dépôt : ni modification ni retrait, date de dépôt renseignée', async () => {
   const s = await getState(sotrap);
   assert.equal(s.monOffre.montant, 50000000);
   assert.deepEqual(s.monOffre.prixLots, { l1: 30000000, l2: 20000000 });
   assert.equal(s.offers.length, 0); // le fournisseur ne voit pas les offres, seulement la sienne
+  assert.match(s.monOffre.depot, /^\d{2}\/\d{2}\/\d{4}/, 'date de dépôt renseignée automatiquement');
+  assert.ok(s.monOffre.pieces.every((p) => p.id && p.sha256), 'documents transmis consultables par leur auteur');
+  assert.equal((await getState(achats)).offers.find((o) => o.name === 'SOTRAP SARL').depot, s.monOffre.depot);
   const base = { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', delai: 90, lots: ['l1'], prixLots: { l1: 1000 } };
   const double = await call('POST', '/api/procedures/p1/offers', base, sotrap);
   assert.equal(double.status, 409);
   assert.equal(double.json.code, 'OFFER_EXISTS');
-
-  ok(await call('DELETE', '/api/procedures/p1/offers/mienne', {}, sotrap));
-  const apres = await getState(sotrap);
-  assert.equal(apres.monOffre, null);
-  assert.ok(apres.receipts.length && apres.receipts.every((x) => x.retire));
-  assert.ok(!(await getState(achats)).offers.some((o) => o.depotPar && o.name === 'SOTRAP SARL'));
-  // fichiers rendus : la nouvelle offre se dépose sans rien rejoindre, mémoire technique compris
-  const mine = await call('GET', '/api/procedures/p1/files/mine', null, sotrap);
-  assert.ok(['memoire', 'registre'].every((d) => mine.json.some((f) => f.doc === d)));
-  const r = await call('POST', '/api/procedures/p1/offers', base, sotrap);
-  ok(r, 201);
-  assert.equal(r.json.offer.montant, 1000);
-  assert.ok(r.json.offer.pieces.some((p) => p.doc === 'memoire' && p.offre));
-  assert.equal(r.json.receipt.offre, r.json.offer.id);
-  const fin = await getState(sotrap);
-  assert.equal(fin.receipts.filter((x) => !x.retire).length, 1);
+  // offre ferme : le retrait (et donc la modification) est refusé, avant comme après l'échéance
+  const r = await call('DELETE', '/api/procedures/p1/offers/mienne', {}, sotrap);
+  assert.equal(r.status, 409); assert.equal(r.json.code, 'OFFER_LOCKED');
   assert.equal((await call('DELETE', '/api/procedures/p1/offers/mienne', {}, achats)).status, 403); // l'acheteur n'est pas soumissionnaire
+  const apres = await getState(sotrap);
+  assert.equal(apres.monOffre.montant, 50000000);
+  assert.equal(apres.receipts.filter((x) => !x.retire).length, 1);
 });
 
 test('collaborateurs : un collègue invité partage l’offre de l’entreprise, puis perd son accès', async () => {
@@ -78,34 +78,30 @@ test('collaborateurs : un collègue invité partage l’offre de l’entreprise,
   ok(await call('POST', '/api/auth/reinit', { jeton, motDePasse: 'Collegue2026x' }));
   const awa = (await call('POST', '/api/auth/login', { email: 'a.traore@sotrap.ci', password: 'Collegue2026x' })).cookie;
   const s = await getState(awa);
-  assert.equal(s.monOffre.montant, 1000); // l'offre déposée par son collègue
+  assert.equal(s.monOffre.montant, 50000000); // l'offre déposée par son collègue
   assert.equal(s.receipts.filter((x) => !x.retire).length, 1);
   const comptes = (await call('GET', `/api/partenaires/${fiche.id}/comptes`, null, awa)).json.comptes;
   assert.deepEqual(comptes.map((c) => c.email).sort(), ['a.traore@sotrap.ci', 'contact.sotrap@bal.ci']);
-  // une seule offre pour l'entreprise ; le collègue peut la retirer, les fichiers restent ceux de l'entreprise
+  // une seule offre pour l'entreprise, ferme : le collègue ne peut ni la retirer ni en déposer une autre
   assert.equal((await call('POST', '/api/procedures/p1/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', delai: 90, lots: ['l1'], prixLots: { l1: 5 } }, awa)).status, 409);
-  ok(await call('DELETE', '/api/procedures/p1/offers/mienne', {}, awa));
-  const fichiers = (await call('GET', '/api/procedures/p1/files/mine', null, sotrap)).json;
-  assert.ok(fichiers.some((f) => f.doc === 'memoire'));
-  // chacun dépose pour l'entreprise : le collègue redépose avec les fichiers préparés par le titulaire
-  ok(await call('POST', '/api/procedures/p1/offers', { name: 'SOTRAP SARL', iso: 'CI', devise: 'XOF', delai: 90, lots: ['l1'], prixLots: { l1: 2000 } }, awa), 201);
-  assert.equal((await getState(sotrap)).monOffre.montant, 2000);
+  assert.equal((await call('DELETE', '/api/procedures/p1/offers/mienne', {}, awa)).json.code, 'OFFER_LOCKED');
   // retrait de l'accès : plus de connexion, l'offre déposée reste à l'entreprise
   assert.equal((await call('DELETE', `/api/partenaires/${fiche.id}/comptes/${(comptes.find((c) => c.moi)).id}`, {}, awa)).status, 422); // pas soi-même
   ok(await call('DELETE', `/api/partenaires/${fiche.id}/comptes/${comptes.find((c) => c.moi).id}`, {}, sotrap));
   assert.equal((await call('POST', '/api/auth/login', { email: 'a.traore@sotrap.ci', password: 'Collegue2026x' })).status, 401);
   assert.equal((await call('GET', '/api/procedures/p1/state', null, awa)).status, 401);
-  assert.equal((await getState(sotrap)).monOffre.montant, 2000);
+  assert.equal((await getState(sotrap)).monOffre.montant, 50000000);
 });
 
-test('retrait refusé après la date limite', async () => {
+test('après la date limite : l’offre reste ferme, le dépôt et les pièces sont clos', async () => {
   const s = await getState(achats);
   const hier = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   ok(await patch(achats, { cdc: { ...s.cdc, ouverture: hier } }));
   const r = await call('DELETE', '/api/procedures/p1/offers/mienne', {}, sotrap);
   assert.equal(r.status, 409);
-  assert.equal(r.json.code, 'DEADLINE_PASSED');
+  assert.equal(r.json.code, 'OFFER_LOCKED');
   assert.ok((await getState(sotrap)).monOffre);
+  assert.equal((await upload('caution', 'caution.pdf', PDF, sotrap)).json.code, 'DEADLINE_PASSED');
 });
 
 test('notation proposée par l’IA d’après le mémoire technique joint ; les notes de l’évaluateur ne changent pas', async () => {

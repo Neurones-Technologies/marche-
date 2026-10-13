@@ -159,6 +159,15 @@
     return /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(d + 'T' + HEURE_LIMITE + ':00Z') : null;
   }
 
+  /* Dépouillement ouvert : la date limite de dépôt est passée, ou il a été ouvert à la main (jalon « ouvert » posé par le
+     serveur), ou il est clôturé. Dès lors le dépôt des offres est fermé. ctx : { cdc, depClosed, jalons }. */
+  function depouillementOuvert(ctx, maintenant) {
+    if (!ctx || !(ctx.cdc || {}).cdcPublie) return false;
+    if (ctx.depClosed || (ctx.jalons && ctx.jalons.ouvert)) return true;
+    var e = echeanceDepot(ctx.cdc);
+    return !!e && (maintenant || Date.now()) > e;
+  }
+
   /* Résultat d'une offre pour son auteur, une fois l'attribution prononcée (évaluation validée, circuit approuvé) :
      { statut: retenue | non_retenue | ecartee, rang, total, nb, motif, attributaire }. null tant que rien n'est décidé. */
   function resultatOffre(ctx, offerId) {
@@ -202,7 +211,7 @@
 
   return {
     cdcManquants: cdcManquants, resultatOffre: resultatOffre, pieceReferencement: pieceReferencement, piecesOffre: piecesOffre, echeanceDepot: echeanceDepot,
-    profilId: profilId, cadre: cadre, prefTaux: prefTaux,
+    profilId: profilId, cadre: cadre, prefTaux: prefTaux, depouillementOuvert: depouillementOuvert,
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,
     aiScore: aiScore, curScore: curScore, flagsRemaining: flagsRemaining, weightTotal: weightTotal,

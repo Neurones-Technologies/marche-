@@ -78,8 +78,8 @@ function buildState(req) {
     // son offre en cours : ce qu'il a déposé, pour la relire, la modifier ou la retirer avant l'échéance
     const o = req.pid ? req.store.offers().find((x) => equipe.includes(x.depotPar)) : null;
     st.monOffre = o ? { id: o.id, name: o.name, iso: o.iso, devise: o.devise, montant: o.montant, prixLots: o.prixLots, lots: o.lots || [],
-      delai: o.delai, garantie: o.garantie, refsCount: o.refsCount, depot: o.depot,
-      pieces: (o.pieces || []).map((p) => ({ doc: p.doc, name: p.name, size: p.size, offre: !!p.offre, referencement: !!p.referencement })) } : null;
+      delai: o.delai, garantie: o.garantie, refsCount: o.refsCount, depot: o.depot || null,
+      pieces: (o.pieces || []).map((p) => ({ id: p.id, doc: p.doc, name: p.name, size: p.size, sha256: p.sha256, offre: !!p.offre, referencement: !!p.referencement })) } : null;
     // résultat de ses offres, une fois l'attribution prononcée
     const ctxR = { offers: req.pid ? req.store.offers() : [], org: values.org, fxFrozen: values.fxFrozen, cadre: values.cadre, cdc: values.cdc, criteria: values.criteria,
       quality: values.quality, justif: values.justif, excluded: values.excluded, confirmed: values.confirmed, docDefs: values.docDefs, evalDone: values.evalDone, approvals: values.approvals };
@@ -459,6 +459,22 @@ r.post('/audit', (req, res) => {
   res.json(auditAppend(req.user.id, whoLabel(req.user), a, req.pid));
 });
 
+/** Ouverture manuelle du dépouillement, avant la date limite de dépôt : habilitation « Ouvrir le dépouillement ». Elle ferme
+    aussitôt le dépôt des offres des soumissionnaires ; elle est datée, nominative, et journalisée. */
+r.post('/depouillement/ouvrir', (req, res) => {
+  if (!req.can('depouille.open')) return res.status(403).json({ error: 'Habilitation « Ouvrir le dépouillement » requise.', needs: ['depouille.open'] });
+  const cdc = req.store.get('cdc') || {}, ctx = { cdc, depClosed: req.store.get('depClosed'), jalons: req.store.get('jalons') };
+  if (!cdc.cdcPublie) return res.status(409).json({ error: 'Le dossier n’est pas publié : aucune offre à dépouiller.', code: 'CDC_NOT_PUBLISHED' });
+  if (R.depouillementOuvert(ctx)) return res.status(409).json({ error: 'Le dépouillement est déjà ouvert.', code: 'ALREADY_OPEN' });
+  const j = { ...(req.store.get('jalons') || {}), ouvert: new Date().toISOString(), ouvertPar: req.user.id, ouvertureManuelle: true };
+  db.transaction(() => {
+    req.store.set('jalons', j, req.user.id);
+    auditAppend(req.user.id, whoLabel(req.user), `Dépouillement ouvert à la main avant la date limite (${cdc.ouverture || 'non fixée'}) — le dépôt des offres est clos, ${req.store.offers().length} offre(s) reçue(s)`, req.pid);
+  })();
+  require('../db').bumpRev();
+  res.json({ ok: true, jalons: j, rev: getRev() });
+});
+
 /** Dépôt d'une offre (soumissionnaire). Le serveur construit l'offre et l'accusé de réception. */
 r.post('/offers', (req, res) => {
   if (!req.can('portail.use')) return res.status(403).json({ error: 'Habilitation insuffisante.', needs: ['portail.use'] });
@@ -474,7 +490,8 @@ r.post('/offers', (req, res) => {
   const echeance = R.echeanceDepot(cdc);
   if (echeance && Date.now() > echeance)
     return res.status(409).json({ error: 'La date limite de dépôt est dépassée : aucune offre ne peut plus être déposée.', code: 'DEADLINE_PASSED' });
-  if (req.store.get('depClosed')) errs.push('Le dépouillement est clôturé : aucune offre ne peut plus être déposée.');
+  if (R.depouillementOuvert({ cdc, depClosed: req.store.get('depClosed'), jalons: req.store.get('jalons') }))
+    return res.status(409).json({ error: 'Le dépouillement est ouvert : le dépôt des offres est clos.', code: 'DEPOUILLEMENT_OPEN' });
   if (name.length < 2 || name.length > 200) errs.push('Raison sociale invalide.');
   if (!/^[A-Z]{2}$/.test(String(d.iso || ''))) errs.push('Pays invalide.');
   if (!org.rates[d.devise]) errs.push('Devise non admise.');
@@ -506,6 +523,12 @@ r.post('/offers', (req, res) => {
   // fichiers préparés par l'entreprise : tout collaborateur joint des pièces au même dépôt
   const pending = db.prepare(`SELECT * FROM files WHERE owner IN (${marques(equipe)}) AND procedure_id=? AND offer_id IS NULL`).all(...equipe, req.pid);
   const byDoc = new Map(pending.map((f) => [f.doc_id, f]));
+  // un même document ne peut pas tenir lieu de plusieurs pièces (offre technique, offre financière, pièces administratives)
+  const vus = new Map();
+  for (const f of pending) {
+    if (vus.has(f.sha256)) return res.status(422).json({ error: `Le même fichier est joint à deux emplacements (« ${f.name} ») : chaque pièce doit être un document distinct.`, code: 'DUPLICATE_FILE' });
+    vus.set(f.sha256, f.doc_id);
+  }
   // pièces exigées selon le pays du soumissionnaire et le profil réglementaire (zone de préférence, pays local) : celles
   // de l'appel d'offres, pas celles du référencement (sauf imposées par le profil)
   const piecesRef = require('../formulaire').formulaire().pieces, refDe = (x) => R.pieceReferencement(x, piecesRef);
@@ -525,6 +548,7 @@ r.post('/offers', (req, res) => {
   const id = 'sub' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const offer = {
     id, name, pays: paysList[d.iso] || d.iso, iso: d.iso, doc: 'dépôt dématérialisé — saisie structurée', devise: d.devise, montant,
+    depot: new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abidjan', dateStyle: 'short', timeStyle: 'short' }),
     delai, garantie, refsCount: refs, aiMetho: 70, aiRefs: Math.min(100, refs * 20),
     aiWhy: 'Offre déposée par saisie structurée : le mémoire technique n’a pas encore été analysé, le score méthodologie est provisoire et doit être arrêté par l’évaluateur.',
     docs, submitted: true, depotPar: req.user.id,
@@ -628,31 +652,11 @@ r.post('/offers/externe', (req, res) => {
   res.status(201).json({ offer, rev: getRev() });
 });
 
-/* Retrait de son offre par le fournisseur, jusqu'à la date limite de dépôt. L'offre quitte la consultation, son accusé
-   est marqué retiré, et ses fichiers lui sont rendus : il peut déposer une offre modifiée sans tout rejoindre. */
+/* Une offre déposée est ferme : le soumissionnaire ne la modifie ni ne la retire (ce qui suppose un accusé de dépôt
+   horodaté, opposable aux deux parties). Seule la route est conservée, pour répondre clairement. */
 r.delete('/offers/mienne', (req, res) => {
   if (!req.can('portail.use')) return res.status(403).json({ error: 'Habilitation insuffisante.', needs: ['portail.use'] });
-  const equipe = equipeDe(req.user.id);
-  const o = req.store.offers().find((x) => equipe.includes(x.depotPar));
-  if (!o) return res.status(404).json({ error: 'Aucune offre en cours à retirer.', code: 'OFFER_UNKNOWN' });
-  const echeance = R.echeanceDepot(req.store.get('cdc'));
-  if ((echeance && Date.now() > echeance) || req.store.get('depClosed'))
-    return res.status(409).json({ error: 'La date limite de dépôt est dépassée : l’offre ne peut plus être retirée.', code: 'DEADLINE_PASSED' });
-  const t = frDate();
-  db.transaction(() => {
-    offerDelete(o.id);
-    db.prepare('UPDATE files SET offer_id=NULL WHERE offer_id=?').run(o.id);
-    const q = req.store.get('quality'); delete q[o.id]; req.store.set('quality', q, req.user.id);
-    for (const x of db.prepare(`SELECT num,data FROM receipts WHERE procedure_id=? AND owner IN (${marques(equipe)})`).all(req.pid, ...equipe)) {
-      const rc = JSON.parse(x.data);
-      if (rc.retire || (rc.offre && rc.offre !== o.id)) continue;
-      db.prepare('UPDATE receipts SET data=? WHERE num=?').run(JSON.stringify({ ...rc, retire: t }), x.num);
-    }
-    auditAppend(req.user.id, whoLabel(req.user), `Offre retirée par le soumissionnaire — ${o.name}`, req.pid);
-    annoncer('depot.recu', 'Offre retirée', 'Offre retirée — ' + o.name,
-      `${o.name} a retiré son offre avant la date limite de dépôt. Il peut en déposer une nouvelle jusqu'à l'échéance.`, req.store.get('cdc').ref);
-  })();
-  res.json({ ok: true, rev: getRev() });
+  res.status(409).json({ error: 'Une offre déposée est ferme : elle ne peut plus être modifiée ni retirée.', code: 'OFFER_LOCKED' });
 });
 
 // partagés avec les rappels avant échéance (server/rappels.js)
