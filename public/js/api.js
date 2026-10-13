@@ -61,6 +61,13 @@
         });
       });
   }
+  /* Contenu d'un fichier du serveur (aperçu d'une pièce) : { blob, type } */
+  function blob(url) {
+    return fetch(url, { credentials: 'same-origin', headers: POSTE ? { 'X-Poste': POSTE } : {} }).then(function (r) {
+      if (!r.ok) throw new Error('Pièce introuvable (erreur ' + r.status + ').');
+      return r.blob();
+    });
+  }
   /* Procédure courante. La liste vient du serveur (un soumissionnaire n'y voit que les procédures publiées) ;
      le choix est mémorisé par utilisateur dans ce navigateur. */
   var PID = null, PROCS = [], ME = null, ESPACE = {};
@@ -87,7 +94,7 @@
     return api('GET', url('/state')).then(function (p) { window.MarchePlus.start(p, opts || {}); });
   }
   window.MP = {
-    api: api, upload: upload, url: url, switchTo: switchTo,
+    api: api, upload: upload, blob: blob, url: url, switchTo: switchTo,
     pid: function () { return PID; },
     procs: function () { return PROCS; },
     current: function () { return PROCS.filter(function (p) { return p.id === PID; })[0] || null; },

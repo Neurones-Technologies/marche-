@@ -82,25 +82,44 @@ r.delete('/:id', needPerm('portail.use'), (req, res) => {
   res.json({ ok: true });
 });
 
-/** Téléchargement : propriétaire (brouillon) ou lecteur des offres (pièces déposées) */
-g.get('/:id', (req, res) => {
+/** Fichier demandé par son identifiant, s'il est accessible à l'appelant (sinon la réponse 404 est envoyée et null retourné) ;
+    la consultation d'une pièce qui n'est pas la sienne est consignée à la piste d'audit. */
+function accesFichier(req, res) {
   const f = db.prepare('SELECT * FROM files WHERE id=?').get(req.params.id);
   const eq = equipeDe(req.user.id), lui = f && eq.includes(f.owner); // un fichier de son entreprise
-  // pièce de référencement : son déposant, les acheteurs qui référencent, et les lecteurs des offres (elle tient lieu
-  // de pièce du dossier de candidature lors d'un dépôt)
+  const introuvable = () => { res.status(404).json({ error: 'Pièce introuvable.' }); return null; };
   // pièce d'exécution d'une commande : qui voit la commande (achats, valideurs, réceptionnaire, titulaire)
   if (f && f.commande_id) {
-    if (!require('./commandes').voitCommande(req, f.commande_id)) return res.status(404).json({ error: 'Pièce introuvable.' });
+    if (!require('./commandes').voitCommande(req, f.commande_id)) return introuvable();
     auditAppend(req.user.id, whoLabel(req.user), `Pièce d'exécution consultée — ${f.name} (commande ${f.commande_id})`, f.procedure_id);
-    res.set({ 'Content-Type': f.mime, 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'Cache-Control': 'private, no-store' });
-    return res.sendFile(path.resolve(diskPath(f.id)));
+    return f;
   }
+  // pièce de référencement : son déposant, les acheteurs qui référencent, et les lecteurs des offres (elle tient lieu
+  // de pièce du dossier de candidature lors d'un dépôt)
   const ok = f && (f.partenaire_id != null
     ? (lui || req.can('partenaires.manage') || req.can('offres.read'))
     : (lui || (f.offer_id != null && req.can('offres.read'))));
-  if (!ok) return res.status(404).json({ error: 'Pièce introuvable.' });
+  if (!ok) return introuvable();
   if (f.partenaire_id != null && !lui) auditAppend(req.user.id, whoLabel(req.user), `Pièce de référencement consultée — ${f.name} (partenaire ${f.partenaire_id})`);
   else if (f.offer_id != null) auditAppend(req.user.id, whoLabel(req.user), `Pièce consultée — ${f.name} (offre ${f.offer_id})`, f.procedure_id);
+  return f;
+}
+
+/** Aperçu lisible d'un document Word (HTML sans script, affiché dans un cadre isolé) : les PDF et images s'affichent tels quels. */
+g.get('/:id/apercu', async (req, res) => {
+  const f = accesFichier(req, res);
+  if (!f) return;
+  if (!/\.docx$/i.test(f.name)) return res.status(422).json({ error: 'Aperçu indisponible pour ce format.', code: 'PREVIEW_UNAVAILABLE' });
+  try {
+    const { value } = await require('mammoth').convertToHtml({ path: path.resolve(diskPath(f.id)) });
+    res.set('Cache-Control', 'private, no-store').json({ html: String(value).slice(0, 2000000) });
+  } catch (e) { res.status(422).json({ error: 'Ce document ne peut pas être affiché : téléchargez-le.', code: 'PREVIEW_UNAVAILABLE' }); }
+});
+
+/** Téléchargement : propriétaire (brouillon) ou lecteur des offres (pièces déposées) */
+g.get('/:id', (req, res) => {
+  const f = accesFichier(req, res);
+  if (!f) return;
   res.set({ 'Content-Type': f.mime, 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'Cache-Control': 'private, no-store' });
   res.sendFile(path.resolve(diskPath(f.id)));
 });

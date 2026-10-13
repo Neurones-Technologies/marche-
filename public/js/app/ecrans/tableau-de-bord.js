@@ -7,8 +7,11 @@
 function vDashboard(m){
   var h=add(m,'div','head'); var l=add(h,'div');
   add(l,'h1',null,'Vue d’ensemble — '+REF());
-  var b=add(h,'button','btn btn-primary', state.cdc.cdcPublie?'Reprendre le dépouillement':'Préparer le cahier des charges');
-  b.addEventListener('click',function(){ go(state.cdc.cdcPublie?'depouille':'cdc'); });
+  // le bouton ne sert qu'à ceux qui conduisent la procédure : un demandeur ou un prestataire la consulte seulement
+  if(state.cdc.cdcPublie ? can('offres.read') : can('cdc.edit')){
+    var b=add(h,'button','btn btn-primary', state.cdc.cdcPublie?'Reprendre le dépouillement':'Préparer le cahier des charges');
+    b.addEventListener('click',function(){ go(state.cdc.cdcPublie?'depouille':'cdc'); });
+  }
   if(!avecCadreProcedure()) frise(m); // sinon, la frise des étapes du cadre suffit
 
   var st=add(m,'div','stats');

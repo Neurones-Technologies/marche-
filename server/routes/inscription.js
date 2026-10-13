@@ -162,7 +162,7 @@ r.post('/', limite, (req, res) => {
     auditAppend(null, 'Inscription en ligne', `Inscription d’un prestataire — ${raisonSociale} (${pays}), fiche ${p.id}, dossier déposé, en attente de vérification du courriel`);
   })();
   if (courriel && mail.actif()) {
-    mail.envoyer({ a: courriel.a, objet: courriel.objet, corps: courriel.corps }).then((x) => {
+    mail.envoyer({ a: courriel.a, objet: courriel.objet, corps: courriel.corps, action: { libelle: 'Vérifier mon adresse', url: require('../espaces').adresseCourante() + lien } }).then((x) => {
       const cur = (kvGet('emails') || { value: [] }).value, m = cur.find((y) => y.id === courriel.id);
       if (m) { m.statut = x.statut; if (x.erreur) m.erreur = x.erreur; m.expedie = frDate(); kvSet('emails', cur, 'courriel'); }
     }).catch((e) => console.error('Courriel d’inscription', e));

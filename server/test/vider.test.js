@@ -43,7 +43,10 @@ test('données fictives par zones : ajoutées sans rien effacer, références et
   assert.equal((await call('POST', '/api/admin/fictives', { zones: ['budget'] }, achats)).status, 403);
   const r = await call('POST', '/api/admin/fictives', { zones: ['budget', 'partenaires', 'appels', 'besoins'] }, admin);
   ok(r, 201);
-  assert.deepEqual(r.json.ajout, { budget: 3, partenaires: 4, appels: 'AO-2026-014', besoins: 2 });
+  // chaque fiche fictive reçoit son compte fournisseur (celui de SOTRAP existe déjà), au mot de passe de démonstration
+  assert.deepEqual(r.json.ajout, { budget: 3, partenaires: 4, comptes: 3, motDePasse: 'Marche+2026!', appels: 'AO-2026-014', besoins: 2 });
+  const delta = await login('contact@delta-batiment.example');
+  assert.equal((await call('GET', '/api/partenaires/moi', null, delta)).json.partenaire.raisonSociale, 'Delta Bâtiment SA');
   const parts = (await call('GET', '/api/partenaires', null, achats)).json.partenaires;
   assert.equal(parts.length, 4);
   assert.equal(parts.filter((p) => p.statut === 'reference').length, 2);

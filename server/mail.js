@@ -68,11 +68,11 @@ async function hoteAutorise(hote) {
   const r = await require('dns').promises.lookup(hote, { all: true }).catch(() => []);
   return r.length > 0 && !r.some((x) => adresseInterne(x.address));
 }
-async function envoyerSmtp(s, dest, objet, corps) {
+async function envoyerSmtp(s, dest, objet, corps, html) {
   try {
     if (!await hoteAutorise(s.hote)) return { statut: 'échec', erreur: 'SMTP : serveur introuvable ou situé sur un réseau interne.' };
     await transportSmtp(s).sendMail({ from: s.nomExpediteur ? { name: s.nomExpediteur, address: s.expediteur } : s.expediteur, to: dest,
-      subject: String(objet || '').slice(0, 250), text: String(corps || '').slice(0, 20000) });
+      subject: String(objet || '').slice(0, 250), text: String(corps || '').slice(0, 20000), ...(html ? { html: String(html).slice(0, 200000) } : {}) });
     return { statut: 'envoyé' };
   } catch (e) {
     return { statut: 'échec', erreur: ('SMTP : ' + String(e.message || e)).slice(0, 200) };
@@ -105,21 +105,24 @@ async function demanderJeton() {
 const adresseValide = (a) => /^[^@\s<>"]{1,64}@[^@\s<>"]{1,190}\.[^@\s<>"]{2,}$/.test(String(a || ''));
 
 /**
- * Envoie un courriel texte. a : liste d'adresses (déjà contrôlées par l'appelant). Retourne
+ * Envoie un courriel (HTML habillé, avec son texte brut pour SMTP). a : liste d'adresses (déjà contrôlées par l'appelant). Retourne
  * { statut: 'envoyé' | 'simulé' | 'échec', erreur? }. Ne lève jamais : un échec d'envoi ne casse pas l'action métier.
  */
-async function envoyer({ a, objet, corps }) {
+async function envoyer({ a, objet, corps, action }) {
   const dest = [...new Set((a || []).filter(adresseValide))].slice(0, 50);
   if (!dest.length) return { statut: 'échec', erreur: 'Aucun destinataire valide.' };
+  // mise en page à l'image de l'organisation (bandeau, titre, bouton d'action, pied de page) et équivalent en texte brut
+  const org = (() => { try { return ((require('./db').kvGet('org') || {}).value) || {}; } catch (e) { return {}; } })();
+  const m = require('./mail-modele').habiller({ objet, corps, action, org });
   const s = smtp();
-  if (s) return envoyerSmtp(s, dest, objet, corps);
+  if (s) return envoyerSmtp(s, dest, objet, m.texte, m.html);
   if (!actif()) return { statut: 'simulé' };
   if (manque().length) return { statut: 'échec', erreur: 'Configuration Microsoft 365 incomplète.' };
   const cfg = conf();
   try {
     const message = {
       subject: String(objet || '').slice(0, 250),
-      body: { contentType: 'Text', content: String(corps || '').slice(0, 20000) },
+      body: { contentType: 'HTML', content: m.html.slice(0, 200000) },
       toRecipients: dest.map((x) => ({ emailAddress: { address: x } })),
     };
     const r = await fetch(`${cfg.graph}/v1.0/users/${encodeURIComponent(cfg.expediteur)}/sendMail`, {

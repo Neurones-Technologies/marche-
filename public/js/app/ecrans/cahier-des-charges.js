@@ -40,7 +40,7 @@ function vCDC(m){
     var w=add(parent,'div'); var id='f'+Math.random().toString(36).slice(2,8);
     var lb=add(w,'label',null,lab); lb.setAttribute('for',id);
     var i=add(w,type==='textarea'?'textarea':'input'); i.id=id;
-    if(type==='number'){ i.type='number'; } else if(type!=='textarea'){ i.type='text'; }
+    if(type==='number' || type==='date'){ i.type=type; } else if(type!=='textarea'){ i.type='text'; }
     if(type==='textarea'){ i.rows=2; }
     i.value=val; fk(i,'cdc-'+lab.slice(0,16));
     i.addEventListener('change',function(){ cb(i.value); save(); render(); });
@@ -71,7 +71,15 @@ function vCDC(m){
   })();
   txt(f1,"Langue de soumission",c.langue,function(v){ c.langue=v; });
   txt(f1,"Devise de soumission",c.deviseSoumission,function(v){ c.deviseSoumission=v; });
-  txt(f1,"Date d'ouverture des plis",c.ouverture,function(v){ c.ouverture=v; });
+  (function(){
+    var w=add(f1,'div'); add(w,'label',null,'Illustration de la page de garde').setAttribute('for','cdc-illustration');
+    var sel=add(w,'select'); sel.id='cdc-illustration'; fk(sel,'cdc-illustration');
+    add(sel,'option',null,'Automatique — '+(ILLUSTRATIONS[themeDossier(c)]||ILLUSTRATIONS.generique).lab).value='';
+    Object.keys(ILLUSTRATIONS).forEach(function(k){ add(sel,'option',null,ILLUSTRATIONS[k].lab).value=k; });
+    sel.value=c.illustration||'';
+    sel.addEventListener('change',function(){ if(sel.value) c.illustration=sel.value; else delete c.illustration; logit('Illustration de la page de garde : '+(sel.value?ILLUSTRATIONS[sel.value].lab:'automatique')); save(); render(); });
+  })();
+  txt(f1,"Date limite de dépôt et ouverture des plis",/^\d{4}-\d{2}-\d{2}$/.test(String(c.ouverture||''))?c.ouverture:'',function(v){ c.ouverture=v; logit('Date limite de dépôt : '+v); },'date');
 
   /* Allotissement */
   var k2=add(m,'div','card'); k2.style.marginTop='18px';
@@ -226,7 +234,7 @@ UI.references = null;
 function vCdcConsultation(m){
   var co=state.consultes||{}, pub=!!MPProfils.profil(R.profilId(RCTX())).public;
   var mode = pub && co.mode!=='restreint' ? 'ouvert' : 'restreint', ids=co.partenaires||[];
-  var peut=can('cdc.edit')||can('cdc.publish');
+  var peut=can('cdc.edit')||can('cdc.publish'), publie=!!state.cdc.cdcPublie; // publié : on ajoute des partenaires, on n'en retire plus
   var ecrire=function(v, message){ state.consultes=v; logit(message); save(); render(); };
   var k=add(m,'div','card');
   var ph=add(k,'div','panel-head'); add(ph,'span',null,'Mode de consultation');
@@ -237,11 +245,12 @@ function vCdcConsultation(m){
     [['ouvert','Appel d’offres ouvert','Toute entreprise inscrite sur le portail, référencée ou non, voit le dossier publié et peut déposer une offre.'],
      ['restreint','Consultation restreinte','Seuls les partenaires référencés que vous sélectionnez voient le dossier et déposent une offre.']].forEach(function(x){
       var o=add(seg,'button','consult-mode'+(mode===x[0]?' on':'')); o.type='button'; fk(o,'consult-'+x[0]);
-      o.setAttribute('aria-pressed',mode===x[0]?'true':'false'); o.disabled=!peut;
+      o.setAttribute('aria-pressed',mode===x[0]?'true':'false'); o.disabled=!peut || publie;
       add(o,'strong',null,x[1]); add(o,'span',null,x[2]);
       o.addEventListener('click',function(){ if(mode!==x[0]) ecrire({ mode:x[0], partenaires:ids }, 'Consultation : '+x[1].toLowerCase()); });
     });
   }
+  if(publie) add(b,'p','muted','Le dossier est publié : les partenaires consultés ont été prévenus. Vous pouvez en ajouter, plus en retirer.');
   if(mode==='ouvert') return;
   if(!UI.references){
     add(b,'p','muted','Chargement des partenaires référencés…');
@@ -265,7 +274,7 @@ function vCdcConsultation(m){
     recherche:function(p){ return [p.raisonSociale,p.id,p.pays,p.activite,(p.domaines||[]).join(' ')].join(' '); },
     nouveau: peut ? { lab:'Partenaires', action:function(){ choisirPartenaires(ids, function(ajout){
       ecrire({ mode:'restreint', partenaires:ids.concat(ajout) }, 'Partenaires consultés ajoutés : '+ajout.length); }); } } : null,
-    actions: peut ? function(p,td){
+    actions: peut && !publie ? function(p,td){
       boutonIcone(td,'x','Retirer '+p.raisonSociale,function(){
         ask('Le partenaire ne verra plus le dossier. Un partenaire qui a déjà déposé une offre ne peut pas être retiré.',function(){
           ecrire({ mode:'restreint', partenaires:ids.filter(function(x){ return x!==p.id; }) }, 'Partenaire retiré de la consultation : '+p.raisonSociale);

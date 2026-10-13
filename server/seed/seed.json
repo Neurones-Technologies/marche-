@@ -665,6 +665,18 @@
      "audit"
     ]
    }
+  },
+  {
+   "id": "partenaire.demande",
+   "lab": "Nouvelle demande de référencement",
+   "def": {
+    "inapp": true,
+    "email": true,
+    "roles": [
+     "achats",
+     "admin"
+    ]
+   }
   }
  ],
  "NOTIF_RULES": {
@@ -806,6 +818,14 @@
     "achats",
     "soum",
     "audit"
+   ]
+  },
+  "partenaire.demande": {
+   "inapp": true,
+   "email": true,
+   "roles": [
+    "achats",
+    "admin"
    ]
   }
  },

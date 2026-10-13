@@ -78,7 +78,8 @@ var EVENTS = [
   {id:'coi.declare',   lab:"Déclaration de conflit d'intérêts",    def:{inapp:true, email:false, roles:['achats','audit']}},
   {id:'standstill',    lab:"Ouverture du délai de recours",        def:{inapp:true, email:true,  roles:['achats','soum','audit']}},
   {id:'recours.depose',lab:"Recours déposé — signature suspendue", def:{inapp:true, email:true,  roles:['achats','approb','audit']}},
-  {id:'infructueux',   lab:"Procédure déclarée infructueuse",      def:{inapp:true, email:true,  roles:['achats','soum','audit']}}
+  {id:'infructueux',   lab:"Procédure déclarée infructueuse",      def:{inapp:true, email:true,  roles:['achats','soum','audit']}},
+  {id:'partenaire.demande', lab:"Nouvelle demande de référencement", def:{inapp:true, email:true,  roles:['achats','admin']}}
 ];
 function notifRulesDef(){ var o={}; EVENTS.forEach(function(e){ o[e.id]=JSON.parse(JSON.stringify(e.def)); }); return o; }
 

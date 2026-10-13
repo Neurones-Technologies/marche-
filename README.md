@@ -101,12 +101,17 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
   portail des partenaires (`/portail-partenaires`, hors de la page de connexion), en quatre étapes : entreprise,
   questionnaire, documents (déposés dans un brouillon anonyme), compte. À la vérification de son courriel, son compte
   s'active et son dossier part en instruction (parcours de référencement). Protections : limitation par adresse IP,
-  champ piège, pas d'énumération des comptes. Suspension et exclusion motivées. Une pièce validée et en cours de
-  validité tient lieu de pièce du dossier à chaque dépôt d'offre.
+  champ piège, pas d'énumération des comptes. Les achats sont prévenus de chaque demande (alerte « Nouvelle demande de
+  référencement »). Ils lisent chaque pièce dans l'outil (PDF, images, Word ; le tableur se télécharge) et la valident ou
+  la refusent une à une ; le parcours de référencement ne s'ouvre qu'une fois toutes les pièces obligatoires validées
+  (sinon le dossier est renvoyé au partenaire, avec motif). Suspension et exclusion motivées. Une pièce validée et en
+  cours de validité tient lieu de pièce du dossier à chaque dépôt d'offre.
 - **Partenaires consultés** (cahier des charges → 8) : en achats privés, seuls les partenaires référencés que l'acheteur
   sélectionne voient le dossier publié et déposent une offre ; ils sont prévenus dans leur espace. Un acheteur public
   choisit l'appel d'offres ouvert (toute entreprise, obligation légale) ou la consultation restreinte. Un partenaire
-  non référencé ne peut pas être sélectionné ; un partenaire qui a déposé une offre ne peut plus être retiré.
+  non référencé ne peut pas être sélectionné ; un partenaire qui a déposé une offre ne peut plus être retiré, et une fois
+  le dossier publié on peut ajouter des partenaires mais plus en retirer. Un prestataire ne voit (liste, registre de
+  l'accueil, notifications) que les appels d'offres où il est consulté.
 - **Besoins** : un service exprime un besoin, qui suit le circuit de validation de l'organisation (niveaux selon le
   budget, le demandeur ne valide jamais son propre besoin, rejet motivé) ; validé, il devient une procédure pré-remplie
   (objet, budget, type de procédure pressenti selon des seuils provisoires du profil), que le demandeur suit en lecture.
@@ -178,6 +183,8 @@ En production : `SEED_DEMO=0` (pas de comptes de démo), `ALLOW_RESET=0`, HTTPS 
 Les courriels partent d'une boîte Microsoft 365 par l'API Microsoft Graph (`sendMail`), avec une application
 enregistrée dans Entra ID (identifiants client, aucune dépendance ajoutée). Les notifications partent vers l'adresse
 réelle des comptes destinataires, désignés par leur identifiant : une adresse fournie par le navigateur est ignorée.
+Chaque courriel part habillé (bandeau à la couleur et aux initiales de l'organisation, titre, texte, bouton d'action, pied
+de page Marché+), avec son équivalent en texte brut (`server/mail-modele.js`) ; la couleur se règle dans Paramètres.
 Chaque message garde son statut (envoyé, ou échec avec sa cause) dans la boîte d'envoi de l'écran Notifications ;
 chacun n'y voit que les courriels qui lui sont adressés (l'administration des notifications et l'audit voient tout).
 

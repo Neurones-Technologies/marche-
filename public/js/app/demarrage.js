@@ -101,9 +101,9 @@ function render(){
     organiserSections(corps, state.view);
     // étape terminée ou procédure archivée : l'écran se consulte, il ne se modifie plus
     var etp=etapeDe(state.view), arch=!!(MP.current() && MP.current().archive);
-    UI.lectureSeule = arch || !!(etp && etapesStatut()[etp.id]==='done');
+    UI.lectureSeule = arch || !!(etp && etapesStatut()[etp.id]==='done') || suiviSeul();
     if(UI.lectureSeule){
-      if(!arch){ var nf=el('div','fige-note'); icon(nf,'lock'); nf.appendChild(document.createTextNode('Étape terminée : les informations se consultent mais ne se modifient plus.')); corps.insertBefore(nf,corps.firstChild); }
+      if(!arch && !suiviSeul()){ var nf=el('div','fige-note'); icon(nf,'lock'); nf.appendChild(document.createTextNode('Étape terminée : les informations se consultent mais ne se modifient plus.')); corps.insertBefore(nf,corps.firstChild); }
       figer(corps);
     }
     cadreProcedureBas(m);
@@ -117,6 +117,7 @@ function render(){
     ongletsFamille(m);
     (ROUTER[state.view]||vDashboard)(m);
     organiserSections(m, state.view);
+    if(vueDeProcedure(state.view) && suiviSeul()) figer(m);
   }
 
   placerTitre(m);

@@ -55,7 +55,7 @@ r.post('/oubli', limiteOubli, (req, res) => {
     // une nouvelle demande annule les liens précédents encore valables
     db.prepare("UPDATE jetons SET used=1 WHERE user_id=? AND type='reinit' AND used=0").run(u.id);
     lien = require('../espaces').adresseCourante() + '/?reinit=' + jetonCreer(u.id, 'reinit', 1);
-    mail.envoyer({ a: [u.email], objet: 'Réinitialisation de votre mot de passe Marché+',
+    mail.envoyer({ a: [u.email], objet: 'Réinitialisation de votre mot de passe Marché+', action: { libelle: 'Choisir un nouveau mot de passe', url: lien },
       corps: `Bonjour ${u.nom},\n\nPour choisir un nouveau mot de passe, ouvrez ce lien dans l’heure :\n${lien}\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.` })
       .catch((e) => console.error('Courriel de réinitialisation', e));
     auditAppend(u.id, u.nom + ' — mot de passe oublié', 'Lien de réinitialisation du mot de passe demandé');

@@ -30,6 +30,7 @@ test.before(() => {
   kv.run('cdc', JSON.stringify({ ref: 'AO-2025-001', objet: 'Ancienne procédure', cdcPublie: true }), 7);
   kv.run('approvals', JSON.stringify([{ role: 'Direction', who: 'D. Kone', done: true, by: 'u4' }]), 8);
   kv.run('roles', JSON.stringify({}), 2);
+  kv.run('notifRules', JSON.stringify({ 'cdc.publie': { inapp: true, email: false, roles: ['achats'] } }), 2); // espace antérieur à l'événement « demande de référencement »
   old.prepare('INSERT INTO offers(id,ord,data) VALUES(?,?,?)').run('o1', 1, JSON.stringify({ id: 'o1', name: 'Ancienne SA' }));
   old.prepare('INSERT INTO receipts(num,data) VALUES(?,?)').run('DEP-0001', JSON.stringify({ num: 'DEP-0001' }));
   let prev = '0'.repeat(64);
@@ -54,6 +55,9 @@ test('la procédure unique devient p1, avec ses données, offres et accusés', (
   assert.equal(D.store('p1').get('cadre').profil, 'uemoa-ci', 'cadre figé pour une procédure déjà publiée');
   assert.ok(D.kvGet('roles').value.demandeur, 'rôle « Demandeur » ajouté');
   assert.ok(D.kvGet('circuitBesoin').value.length, 'circuit de validation des besoins par défaut');
+  // règles de notification ajoutées depuis : valeur par défaut, sans toucher à celles que l'organisation a réglées
+  assert.deepEqual(D.kvGet('notifRules').value['partenaire.demande'], { inapp: true, email: true, roles: ['achats', 'admin'] });
+  assert.equal(D.kvGet('notifRules').value['cdc.publie'].email, false);
 });
 
 test('la chaîne d’audit d’origine reste vérifiable, et se poursuit', () => {

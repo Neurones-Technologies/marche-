@@ -40,7 +40,9 @@ function vue(p) {
   // évaluations reçues (module 5) : une par commande clôturée
   const evaluations = commandesAll().filter((c) => c.evaluation && c.evaluation.partenaire === p.id)
     .map((c) => ({ commande: c.numero, procedure: c.procedure.ref, date: c.receptionDefinitive && c.receptionDefinitive.date, ...c.evaluation }));
-  return { ...p, reponses: p.reponses || {}, exigees, evaluations, questions: F.formulaire().champs };
+  // le parcours de référencement ne s'ouvre que lorsque toutes les pièces obligatoires sont validées et en cours de validité
+  const piecesConformes = exigees.every((e) => !e.obligatoire || e.etat === 'valide');
+  return { ...p, reponses: p.reponses || {}, exigees, evaluations, piecesConformes, questions: F.formulaire().champs };
 }
 
 r.get('/', (req, res) => {
@@ -135,7 +137,7 @@ r.post('/:id/comptes', (req, res) => {
     lien = require('../espaces').adresseCourante() + '/?reinit=' + jetonCreer(uid, 'reinit', 72);
   })();
   const org = (kvGet('org') || { value: {} }).value;
-  require('../mail').envoyer({ a: [email], objet: 'Invitation à rejoindre l’espace de ' + p.raisonSociale + ' sur Marché+',
+  require('../mail').envoyer({ a: [email], objet: 'Invitation à rejoindre l’espace de ' + p.raisonSociale + ' sur Marché+', action: { libelle: 'Choisir mon mot de passe', url: lien },
     corps: `Bonjour ${nom},\n\n${req.user.nom} vous ouvre un accès à l’espace fournisseur de ${p.raisonSociale} auprès de ${org.nom || 'l’organisation'}.\n` +
       `Pour choisir votre mot de passe, ouvrez ce lien dans les 72 heures :\n${lien}\n\nVotre identifiant est cette adresse de courriel.` })
     .catch((e) => console.error('Courriel d’invitation', e));
@@ -186,11 +188,12 @@ r.post('/:id/fichiers', limiteDepots, corpsBrut, (req, res) => {
   res.status(201).json({ partenaire: vue(p) });
 });
 
-/** Décision sur une pièce (achats), en dehors de l'instruction initiale : validée ou refusée avec motif. */
+/** Décision sur une pièce (achats), pendant l'instruction comme en dehors : validée ou refusée avec motif. */
 r.put('/:id/pieces/:doc', (req, res) => {
   const p = req.partenaire, x = p.pieces[req.params.doc], { statut, motif } = req.body || {};
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Référencer les partenaires » requise.');
   if (!x) return err(res, 404, 'PIECE_UNKNOWN', 'Pièce non déposée.');
+  if (p.statut === 'exclu') return err(res, 409, 'PARTNER_EXCLUDED', 'Partenaire exclu : ses pièces ne se décident plus.');
   if (!['valide', 'refuse'].includes(statut)) return err(res, 422, 'PIECE_INVALID', 'Décision attendue : valide ou refuse.');
   if (statut === 'refuse' && !String(motif || '').trim()) return err(res, 422, 'REJECTION_REASON_REQUIRED', 'Le refus d’une pièce doit être motivé.');
   db.transaction(() => {
@@ -225,6 +228,10 @@ function soumettreDossier(p, qui) {
     auditAppend(qui.uid, qui.who, `Partenaire ${p.id} (${p.raisonSociale}) — dossier soumis au référencement`);
     partenaireSave(p);
   })();
+  try {
+    require('./state').annoncer('partenaire.demande', 'Référencement', 'Nouvelle demande de référencement — ' + p.raisonSociale,
+      `${p.raisonSociale} (${p.pays || '—'}) a transmis son dossier de référencement : ${p.id}. Les pièces sont à examiner une à une, puis le parcours de référencement s'ouvre.`, 'Partenaires');
+  } catch (e) { console.error('Annonce de la demande de référencement', e); }
   return null;
 }
 
@@ -241,6 +248,8 @@ r.post('/:id/approbations/:niveau', (req, res) => {
   const p = req.partenaire, i = Number(req.params.niveau);
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Référencer les partenaires » requise.');
   if (p.statut !== 'verification') return err(res, 409, 'PARTNER_NOT_SUBMITTED', 'Ce dossier n’est pas en cours d’instruction.');
+  const aValider = vue(p).exigees.filter((e) => e.obligatoire && e.etat !== 'valide');
+  if (aValider.length) return err(res, 409, 'PIECES_NOT_VALIDATED', 'Le parcours de référencement s’ouvre une fois toutes les pièces obligatoires validées. À examiner : ' + aValider.map((e) => e.label).join(' ; ') + '.');
   const sup = SU.sup(req.user, 'referencement', p.id);
   const e = C.controle(p.circuit, i, req.user, p.comptes || [], sup);
   if (e) return err(res, e.status, e.code, e.error);
@@ -252,6 +261,7 @@ r.post('/:id/approbations/:niveau', (req, res) => {
       p.statut = 'reference'; p.referenceLe = frDate();
       Object.values(p.pieces).forEach((x) => { if (x.statut === 'a_verifier') Object.assign(x, { statut: 'valide', decidePar: req.user.id, decideLe: frDate() }); });
       journal(req, p, 'référencé');
+      SU.notifier(p.comptes || [], 'Votre entreprise est référencée', `${p.raisonSociale} est référencée. Vous pouvez désormais répondre aux consultations qui vous sont adressées.`, { ev: 'referencement', lab: 'Référencement' });
     }
     partenaireSave(p);
   })();
@@ -264,15 +274,18 @@ r.post('/:id/rejet', (req, res) => {
   if (!gere(req)) return err(res, 403, 'FORBIDDEN', 'Habilitation « Référencer les partenaires » requise.');
   if (p.statut !== 'verification') return err(res, 409, 'PARTNER_NOT_SUBMITTED', 'Ce dossier n’est pas en cours d’instruction.');
   if (!motif || motif.length > 1000) return err(res, 422, 'REJECTION_REASON_REQUIRED', 'Le rejet doit être motivé (1 000 caractères au plus).');
-  const i = C.prochaine(p.circuit), sup = SU.sup(req.user, 'referencement', p.id), e = C.controle(p.circuit, i, req.user, p.comptes || [], sup);
+  // tant que les pièces ne sont pas toutes conformes, l'examen des pièces n'appartient à aucun niveau du parcours : tout instructeur renvoie le dossier
+  const stadePieces = !vue(p).piecesConformes;
+  const i = C.prochaine(p.circuit), sup = stadePieces ? null : SU.sup(req.user, 'referencement', p.id), e = stadePieces ? null : C.controle(p.circuit, i, req.user, p.comptes || [], sup);
   if (e) return err(res, e.status, e.code, e.error);
-  const pour = C.pour(p.circuit, i, req.user, sup);
+  const pour = stadePieces ? null : C.pour(p.circuit, i, req.user, sup);
   db.transaction(() => {
     p.statut = 'rejete';
-    p.rejet = Object.assign({ niveau: i, role: p.circuit[i].role, motif, by: req.user.id, at: frDate() }, pour ? { pour } : {});
-    journal(req, p, `dossier rejeté (${p.circuit[i].role})${SU.mention(pour)} — motif : ${motif}`);
+    p.rejet = Object.assign({ niveau: stadePieces ? null : i, role: stadePieces ? 'Examen des pièces' : p.circuit[i].role, motif, by: req.user.id, at: frDate() }, pour ? { pour } : {});
+    journal(req, p, `dossier rejeté (${p.rejet.role})${SU.mention(pour)} — motif : ${motif}`);
     partenaireSave(p);
   })();
+  SU.notifier(p.comptes || [], 'Votre dossier de référencement est à corriger', `Motif : ${motif}`, { ev: 'referencement', lab: 'Référencement' });
   res.json({ partenaire: vue(p) });
 });
 

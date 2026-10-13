@@ -56,7 +56,7 @@ test('notification : envoyée aux seules adresses réelles des comptes désigné
   assert.equal((await C.patch(achats, { emails: emails.concat(st.emails) })).status, 200);
   await attendre(300);
   // les deux envois partent en parallèle : l'ordre d'arrivée n'est pas garanti
-  assert.deepEqual(recus.envois.map((e) => [e.a, e.objet, e.type]).sort((x, y) => x[1].localeCompare(y[1])), [[['m.traore@bal.ci'], 'Deuxième message', 'Text'], [['f.assamoi@bal.ci'], 'Dossier publié', 'Text']]);
+  assert.deepEqual(recus.envois.map((e) => [e.a, e.objet, e.type]).sort((x, y) => x[1].localeCompare(y[1])), [[['m.traore@bal.ci'], 'Deuxième message', 'HTML'], [['f.assamoi@bal.ci'], 'Dossier publié', 'HTML']]);
   assert.equal(recus.jetons, 1, 'un seul jeton pour deux envois');
   const b = await boite(admin);
   const m1 = b.find((m) => m.id === 'm-test-1');
@@ -100,4 +100,24 @@ test('inscription : courriel de vérification envoyé au déclarant, avec un lie
   const m = recus.envois.find((e) => e.a[0] === 'contact@mobilia.example');
   assert.ok(m, 'courriel de vérification envoyé');
   assert.match(m.corps, /https:\/\/marches\.example\.org\/\?verifier=[0-9a-f]{64}/);
+  // courriel habillé : bandeau de l'organisation, titre, bouton d'action vers le lien, pied de page de la plateforme
+  assert.equal(m.type, 'HTML');
+  assert.match(m.corps, /<h1[^>]*>Vérifiez votre adresse/);
+  assert.match(m.corps, /<a href="https:\/\/marches\.example\.org\/\?verifier=[0-9a-f]{64}"[^>]*>Vérifier mon adresse<\/a>/);
+  assert.match(m.corps, /MARCHÉ\+/);
+  assert.match(m.corps, /Merci de ne pas y répondre/);
+  assert.doesNotMatch(m.corps, /<script/i);
+});
+
+test('modèle de courriel : étiquette de référence, échappement du contenu, texte brut équivalent', () => {
+  const { habiller } = require('../mail-modele');
+  const r = habiller({ objet: '[AO-2026-014] Offre <b>reçue</b>', corps: ['Bonjour "Awa" & cie.', 'Voir https://x.example/?a=1&b=2 pour le détail.', '—\nBAL — plateforme Marché+\nCe message est généré automatiquement ; ne pas y répondre.'].join('\n\n'), org: { nom: 'Banque <Test>', initiales: 'BT', accent: '#1F6F6B' } });
+  assert.match(r.html, />AO-2026-014</); // étiquette au-dessus du titre
+  assert.match(r.html, /Offre &lt;b&gt;reçue&lt;\/b&gt;/); // le titre est échappé
+  assert.match(r.html, /Banque &lt;Test&gt;/);
+  assert.match(r.html, /bgcolor="#1F6F6B"/);
+  assert.match(r.html, /href="https:\/\/x\.example\/\?a=1&amp;b=2"/); // la première adresse devient le bouton
+  assert.doesNotMatch(r.html, /ne pas y répondre\.\s*<\/p>/); // le pied de page d'origine est remplacé par celui du modèle
+  assert.match(r.texte, /Bonjour "Awa" & cie\./);
+  assert.doesNotMatch(r.texte, /généré automatiquement/);
 });

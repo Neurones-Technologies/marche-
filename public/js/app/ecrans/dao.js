@@ -29,152 +29,96 @@ function cctpGenerique(c){
 }
 
 function buildDAO(){
-  var c=state.cdc;
+  var c=state.cdc, lots=c.lots||[], specs=c.specs||[], crit=state.criteria||[], K=CADRE();
   var P=[];
-  var lots=c.lots, specs=c.specs;
+  var txt=function(x){ return String(x==null?'':x); };
+  var heure=function(){ return (c.ouverture ? c.ouverture : '—')+' à 10 h 00'; };
+  var jours=function(n){ return n ? n+' jours' : 'le délai indiqué dans l’offre'; };
 
-  /* ---------- PIÈCE 1 : AVIS ---------- */
-  P.push({ id:'p1', titre:"Pièce 1 — Avis d'appel d'offres", cat:'admin', arts:[
-    A('1.1',"Objet et identification",'admin',[
-      c.autorite+" lance un "+c.procedure.toLowerCase()+" sous la référence "+REF()+" ayant pour objet : "+c.objet+".",
-      "Le marché est passé en "+lots.length+" lot(s) distinct(s), pouvant être attribués séparément. Un même soumissionnaire peut présenter une offre pour un seul lot, pour plusieurs lots ou pour l'ensemble des lots ; il précise dans son acte d'engagement les lots pour lesquels il soumissionne et, le cas échéant, les remises consenties en cas d'attribution multiple.",
-      "La procédure est ouverte aux entreprises établies dans l'espace UEMOA comme aux entreprises établies hors de cet espace, sous réserve de la production des pièces exigées à l'article 2.4 du règlement de la consultation."
+  /* ---------- PIÈCE 1 : OBJET ET MODALITÉS ---------- */
+  P.push({ id:'p1', titre:"Pièce 1 — Objet et modalités de la consultation", cat:'admin', arts:[
+    A('1.1',"Objet et lots",'admin',[
+      txt(c.autorite)+" lance une consultation ("+txt(c.procedure).toLowerCase()+"), référence "+REF()+", pour : "+txt(c.objet)+".",
+      lots.length>1
+        ? "Le marché comprend "+lots.length+" lots ; un soumissionnaire peut répondre à un seul lot, à plusieurs ou à tous, en précisant dans son offre les lots visés et les remises éventuelles en cas d'attribution multiple."
+        : "Le marché comprend un lot unique."
     ]),
-    A('1.2',"Conditions de participation et retrait du dossier",'admin',[
-      "Le dossier d'appel d'offres est retiré au siège de l'autorité contractante ou téléchargé sur la plateforme de dématérialisation. Le retrait est gratuit et n'emporte aucune obligation de soumissionner ; il donne lieu à inscription au registre des retraits, qui sert de base à la diffusion des additifs et réponses aux questions.",
-      "Les offres sont rédigées en "+c.langue.toLowerCase()+". Les documents établis dans une autre langue sont accompagnés d'une traduction française certifiée conforme, seule la version française faisant foi en cas de divergence.",
-      "Les plis sont déposés au plus tard le "+c.ouverture+" à 10 h 00, heure locale d'Abidjan, sous double enveloppe cachetée ou par dépôt dématérialisé sur le portail. Tout pli parvenu après l'heure limite est écarté sans être ouvert et retourné au soumissionnaire à ses frais."
+    A('1.2',"Dépôt des offres et questions",'admin',[
+      "Les offres sont rédigées en "+txt(c.langue||'français').toLowerCase()+" et déposées sur le portail de la plateforme au plus tard le "+heure()+" (heure d'Abidjan). Une offre déposée après cette heure est écartée.",
+      "Les offres restent valables 90 jours à compter de cette date."+(c.caution ? " Chaque offre est accompagnée d'une caution de soumission de "+c.caution+" % du montant de l'offre hors taxes." : ""),
+      "Les questions s'adressent par écrit depuis le portail, au plus tard 7 jours avant la date limite. Les réponses et les éventuels additifs sont communiqués à tous les candidats consultés et font partie du dossier ; un additif tardif reporte la date limite."
     ])
   ]});
 
-  /* ---------- PIÈCE 2 : RÈGLEMENT DE LA CONSULTATION ---------- */
-  P.push({ id:'p2', titre:"Pièce 2 — Règlement de la consultation", cat:'admin', arts:[
-    A('2.1',"Forme et contenu des offres",'admin',[
-      "L'offre comprend deux enveloppes intérieures distinctes et séparément cachetées : l'enveloppe « A — offre technique et pièces administratives » et l'enveloppe « B — offre financière ». Aucune indication de prix ne doit figurer dans l'enveloppe A ; la présence d'un élément de prix dans l'offre technique entraîne le rejet de l'offre.",
-      "L'offre technique comprend le mémoire technique renseigné selon le cadre imposé en pièce 6, les fiches techniques des matériels proposés, le planning d'exécution, l'organigramme de l'équipe affectée et les curriculums des intervenants clés.",
-      "L'offre financière comprend l'acte d'engagement signé, le bordereau des prix unitaires et le détail quantitatif estimatif, complétés sans rature ni surcharge. En cas de discordance entre le prix unitaire et le prix total d'une ligne, le prix unitaire fait foi et le total est rectifié en conséquence ; la correction est notifiée au soumissionnaire, qui peut la refuser, son offre étant alors écartée."
+  /* ---------- PIÈCE 2 : CONTENU DE L'OFFRE ET ÉVALUATION ---------- */
+  var pr=(state.formulaireReferencement||{}).pieces||[], couv=DOCS().filter(function(d){ return !!R.pieceReferencement(d,pr); });
+  var parPortee=function(portee){ return DOCS().filter(function(d){ return (d.scope||'tous')===portee && !R.pieceReferencement(d,pr); }).map(function(d){ return d.label; }); };
+  var pieces=[];
+  if(couv.length) pieces.push("Un soumissionnaire référencé est dispensé des pièces déjà validées à son référencement et en cours de validité : "+couv.map(function(d){ return d.label.toLowerCase(); }).join(' ; ')+".");
+  [['tous','Tous les soumissionnaires joignent à leur offre : '],['local','Les soumissionnaires établis dans le pays de l\u2019acheteur joignent en outre : '],['etranger','Les soumissionnaires établis hors de l\u2019espace UEMOA joignent en outre : ']].forEach(function(g){
+    var l=parPortee(g[0]); if(l.length) pieces.push(g[1]+l.join(' ; ')+'.');
+  });
+  if(!pieces.length) pieces.push("Aucune pièce n'est exigée en dehors de l'offre technique et de l'offre financière.");
+  pieces.push("L'absence d'une pièce essentielle entraîne le rejet de l'offre ; une pièce purement formelle peut être régularisée dans le délai fixé par l'acheteur.");
+
+  var evaluation=[
+    "L'évaluation se fait en trois temps : conformité administrative, conformité technique aux spécifications minimales du CCTP, puis notation des offres conformes selon la grille : "+crit.map(function(x){ return x.label+" ("+x.weight+" %)"; }).join(" ; ")+".",
+    "Une offre qui ne satisfait pas une spécification minimale est écartée sans être notée. Le marché est attribué à l'offre conforme qui obtient la meilleure note pondérée.",
+    c.prefActive && preferencePossible()
+      ? "Une marge de préférence de "+c.prefTaux+" % est appliquée, pour la seule comparaison, aux offres de soumissionnaires établis hors de l'espace UEMOA ; elle ne modifie ni leur prix ni le prix du marché. Les offres en devise étrangère sont converties en francs CFA au taux en vigueur à la date d'ouverture des plis."
+      : "Les offres en devise étrangère sont converties en francs CFA au taux en vigueur à la date d'ouverture des plis, figé pour toute l'évaluation."
+  ];
+  if(K && K.recoursActif) evaluation.push("L'attribution est notifiée à tous les soumissionnaires avec les motifs du rejet de leur offre. Un recours est possible pendant "+(K.delaiRecoursJours ? K.delaiRecoursJours+' jours' : 'le délai prévu')+" ; il suspend la signature du marché jusqu'à décision.");
+  else evaluation.push("L'attribution est notifiée à tous les soumissionnaires. L'acheteur peut déclarer la consultation infructueuse ou l'abandonner, sans indemnité, par décision motivée.");
+
+  P.push({ id:'p2', titre:"Pièce 2 — Contenu de l'offre et évaluation", cat:'admin', arts:[
+    A('2.1',"Contenu de l'offre",'admin',[
+      "L'offre technique comprend le mémoire technique, structuré selon le cadre de la pièce 5, les fiches techniques des fournitures proposées et le planning d'exécution. Elle ne contient aucun prix.",
+      "L'offre financière comprend l'acte d'engagement signé et le bordereau des prix de la pièce 5, complétés sans rature. En cas d'écart entre prix unitaire et prix total d'une ligne, le prix unitaire fait foi."
     ]),
-    A('2.2',"Durée de validité et caution de soumission",'admin',[
-      "Les offres demeurent valables pendant quatre-vingt-dix (90) jours calendaires à compter de la date limite de dépôt. L'autorité contractante peut solliciter une prorogation de ce délai ; le soumissionnaire qui refuse la prorogation voit son offre écartée sans que sa caution soit saisie.",
-      "Chaque offre est accompagnée d'une caution de soumission d'un montant égal à "+c.caution+" % du montant de l'offre hors taxes, émise par un établissement bancaire agréé dans l'espace UEMOA ou, pour les soumissionnaires établis hors de cet espace, contre-garantie par un tel établissement.",
-      "La caution de soumission est libérée dans les trente (30) jours suivant la notification d'attribution pour les soumissionnaires non retenus, et après constitution de la garantie de bonne exécution pour l'attributaire. Elle est acquise à l'autorité contractante en cas de retrait de l'offre pendant sa durée de validité ou de refus de signer le marché."
-    ]),
-    A('2.3',"Questions, additifs et visite de site",'admin',[
-      "Les candidats adressent leurs demandes d'éclaircissement par écrit au plus tard sept (7) jours avant la date limite de dépôt. Les réponses, rendues anonymes, sont communiquées simultanément à tous les candidats ayant retiré le dossier et font partie intégrante du dossier d'appel d'offres.",
-      "Lorsque l'autorité contractante organise une visite de site, sa date et ses modalités sont communiquées à tous les candidats consultés ; l'attestation de visite délivrée à cette occasion est alors jointe à l'offre.",
-      "L'autorité contractante peut publier des additifs modifiant le dossier jusqu'à cinq (5) jours avant la date limite. Si un additif est de nature à modifier substantiellement la préparation des offres, la date limite de dépôt est reportée d'une durée au moins égale au délai restant à courir."
-    ]),
-    A('2.4',"Pièces du dossier de candidature",'admin',(function(){
-      var pr=(state.formulaireReferencement||{}).pieces||[], couv=DOCS().filter(function(d){ return !!R.pieceReferencement(d,pr); });
-      return couv.length ? ["Un soumissionnaire référencé auprès de l'autorité contractante est dispensé de produire les pièces déjà validées lors de son référencement et en cours de validité : "+couv.map(function(d){ return d.label.toLowerCase(); }).join(' ; ')+"."] : [];
-    })().concat([
-      "Tout soumissionnaire produit : le registre du commerce ou un document équivalent du pays d'établissement ; une attestation de régularité fiscale de moins de trois mois ; la caution de soumission ; les états financiers certifiés des trois derniers exercices ; la liste des marchés similaires exécutés au cours des cinq dernières années, appuyée d'attestations de bonne exécution.",
-      "Les soumissionnaires établis en Côte d'Ivoire produisent en outre une attestation de l'organisme de prévoyance sociale de moins de trois mois.",
-      "Les soumissionnaires établis hors de l'espace UEMOA produisent en outre : la traduction française certifiée de leurs pièces, la légalisation consulaire ou l'apostille de leurs documents officiels, la contre-garantie bancaire mentionnée à l'article 2.2, et un engagement de représentation locale précisant l'identité du représentant, l'adresse du domicile élu en Côte d'Ivoire et l'étendue de son mandat pendant la durée du marché et de la garantie.",
-      "L'absence d'une pièce essentielle entraîne le rejet de l'offre. L'autorité contractante peut toutefois inviter un soumissionnaire à compléter une pièce purement formelle, dans un délai qu'elle fixe, dès lors que cette régularisation n'a pas pour effet de modifier le contenu de l'offre ni d'avantager son auteur."
-    ])),
-    A('2.5',"Évaluation des offres",'admin',[
-      "L'évaluation se déroule en trois temps : examen de la conformité administrative, examen de la conformité technique au regard des spécifications minimales du CCTP, puis notation des offres techniquement conformes selon la grille pondérée annexée.",
-      "La grille de notation en vigueur pour la présente consultation est la suivante : "+state.criteria.map(function(x){return x.label+" ("+x.weight+" %)";}).join(" ; ")+".",
-      "Une offre qui ne satisfait pas une spécification minimale du CCTP est écartée sans être notée, quelle que soit la qualité du reste de la proposition. Les spécifications minimales sont celles expressément désignées comme telles au CCTP."
-    ]),
-    A('2.6', preferencePossible() ? "Préférence communautaire et comparaison des offres" : "Comparaison des offres",'admin', c.prefActive ? [
-      "Une marge de préférence de "+c.prefTaux+" % est appliquée en faveur des soumissionnaires établis dans l'espace UEMOA. Pour les seuls besoins de la comparaison, le montant des offres présentées par des soumissionnaires établis hors de cet espace est majoré de ce taux.",
-      "Cette majoration est une opération de comparaison et non de négociation : elle ne modifie ni le montant de l'offre, ni le prix du marché en cas d'attribution. Le montant contractuel demeure celui figurant à l'acte d'engagement de l'attributaire.",
-      "Les offres libellées en devises étrangères sont converties en francs CFA au taux de change en vigueur à la date d'ouverture des plis, taux qui demeure figé pour toute la durée de l'évaluation. Cette règle vaut quelle que soit l'évolution ultérieure des cours."
-    ] : [
-      preferencePossible() ? "Aucune marge de préférence communautaire n'est appliquée dans le cadre de la présente consultation. Les offres sont comparées à leur contre-valeur en francs CFA, sans correction tenant au lieu d'établissement du soumissionnaire." : "Les offres sont comparées à leur contre-valeur en francs CFA.",
-      "Les offres libellées en devises étrangères sont converties en francs CFA au taux de change en vigueur à la date d'ouverture des plis, taux qui demeure figé pour toute la durée de l'évaluation."
-    ]),
-    A('2.7',"Attribution, recours et abandon de la procédure",'admin',[
-      "Le marché est attribué au soumissionnaire dont l'offre, techniquement conforme, obtient la note pondérée la plus élevée. L'attribution est notifiée à l'attributaire et l'information est communiquée aux soumissionnaires non retenus, avec indication des motifs du rejet de leur offre.",
-      "Les soumissionnaires disposent d'un délai de recours auprès de l'autorité contractante puis, le cas échéant, de l'organe de régulation compétent. L'exercice d'un recours dans les délais suspend la signature du marché jusqu'à décision.",
-      "L'autorité contractante peut déclarer la procédure infructueuse ou l'abandonner pour motif d'intérêt général, sans que les soumissionnaires puissent prétendre à indemnité. Cette décision est motivée et portée à la connaissance de tous les soumissionnaires."
-    ])
+    A('2.2',"Pièces à joindre",'admin',pieces),
+    A('2.3',"Évaluation et attribution",'admin',evaluation)
   ]});
 
-  /* ---------- PIÈCE 3 : CCAP ---------- */
-  P.push({ id:'p3', titre:"Pièce 3 — Cahier des clauses administratives particulières", cat:'admin', arts:[
-    A('3.1',"Pièces constitutives et ordre de priorité",'admin',[
-      "Le marché est constitué, par ordre de priorité décroissant, de : l'acte d'engagement et ses annexes ; le présent CCAP ; le CCTP ; le bordereau des prix unitaires et le détail quantitatif estimatif ; le mémoire technique de l'attributaire ; les additifs publiés au cours de la consultation.",
-      "En cas de contradiction entre deux pièces, la pièce de rang supérieur prévaut. Toute clause du mémoire technique de l'attributaire contraire au CCTP est réputée non écrite, sauf lorsqu'elle est plus favorable à l'autorité contractante."
-    ]),
-    A('3.2',"Prix, révision et régime fiscal",'admin',[
-      "Les prix sont fermes et non révisables pendant les douze (12) premiers mois d'exécution. Au-delà, ils peuvent être actualisés selon la formule d'actualisation annexée à l'acte d'engagement, dans la limite d'une variation annuelle plafonnée.",
-      "La taxe sur la valeur ajoutée est applicable au taux de "+c.tva+" %. Les prestations réalisées par un prestataire non résident sont soumises à une retenue à la source de "+c.retenueNonResident+" % sur la part de rémunération de source locale, opérée par l'autorité contractante et reversée à l'administration fiscale.",
-      "Les droits et taxes à l'importation des matériels sont à la charge de : "+c.douaneACharge+". Le soumissionnaire intègre dans son prix l'ensemble des frais d'acheminement, d'assurance, de manutention, de dédouanement et de transport intérieur jusqu'aux sites d'installation, sauf stipulation contraire de l'acte d'engagement."
-    ]),
-    A('3.3',"Avance de démarrage et modalités de paiement",'admin',[
-      "Une avance de démarrage de "+c.avance+" % du montant du marché est versée à l'attributaire sur présentation d'une garantie de restitution d'avance de même montant, émise par un établissement agréé dans l'espace UEMOA. L'avance est remboursée par retenues proportionnelles sur les acomptes.",
-      "Les paiements sont effectués par virement dans un délai de trente (30) jours à compter de la réception de la facture accompagnée des pièces justificatives et du procès-verbal de service fait.",
-      "Les acomptes sont versés selon l'avancement constaté : trente pour cent (30 %) à la livraison des matériels sur site, quarante pour cent (40 %) après installation et essais partiels concluants, vingt pour cent (20 %) à la réception provisoire, dix pour cent (10 %) à la réception définitive."
-    ]),
-    A('3.4',"Garanties, pénalités et résiliation",'admin',[
-      "Une garantie de bonne exécution égale à cinq pour cent (5 %) du montant du marché est constituée dans les vingt (20) jours suivant la notification. Elle est libérée après la réception définitive, déduction faite des sommes éventuellement dues par le titulaire.",
-      "Le délai d'exécution ne peut excéder "+c.delaiMax+" jours calendaires à compter de l'ordre de service de démarrage. Tout retard imputable au titulaire donne lieu à une pénalité de "+c.penalite+" ‰ du montant du marché par jour calendaire de retard, plafonnée à dix pour cent (10 %) du montant du marché.",
-      "Le marché peut être résilié aux torts du titulaire en cas de manquement grave persistant après mise en demeure restée sans effet pendant quinze (15) jours, d'atteinte du plafond des pénalités, ou de fausse déclaration ayant déterminé l'attribution. La résiliation entraîne la saisie de la garantie de bonne exécution, sans préjudice des dommages et intérêts.",
-      "Les différends sont réglés prioritairement à l'amiable. À défaut d'accord dans un délai de soixante (60) jours, ils relèvent des juridictions compétentes du lieu d'exécution du marché, le droit applicable étant celui de l'État de l'autorité contractante."
-    ]),
-    A('3.5',"Assurances, sous-traitance et confidentialité",'admin',[
-      "Le titulaire justifie, avant tout démarrage, d'une assurance responsabilité civile professionnelle et d'une assurance couvrant les matériels jusqu'à leur réception, pour des montants adaptés à l'importance du marché.",
-      "La sous-traitance est admise dans la limite de quarante pour cent (40 %) du montant du marché, sous réserve de l'agrément préalable et écrit de l'autorité contractante sur l'identité et les capacités du sous-traitant. Le titulaire demeure seul responsable de l'exécution vis-à-vis de l'autorité contractante.",
-      "Le titulaire et ses intervenants sont tenus à une obligation de confidentialité absolue sur toute information relative aux systèmes, aux données et à l'organisation de l'autorité contractante, dont ils auraient connaissance à l'occasion du marché. Cette obligation survit cinq (5) ans à l'expiration du marché. Le personnel intervenant sur site fait l'objet d'une enquête de moralité préalable."
-    ])
-  ]});
-
-  /* ---------- PIÈCE 4 : CCTP ---------- */
+  /* ---------- PIÈCE 3 : BESOIN ET EXIGENCES TECHNIQUES (CCTP) ---------- */
   // clauses propres à l'achat (rédigées par l'IA ou saisies : cdc.cctp) ; à défaut, un CCTP générique tiré du cahier
   // des charges. L'article des spécifications minimales est toujours construit depuis la liste du cahier des charges.
   var propres = (c.cctp && (c.cctp.articles||[]).length) ? c.cctp.articles : cctpGenerique(c);
-  var artSpecs = { titre:"Spécifications minimales et fonctionnalités exigées", paragraphes:
-    [ "Les spécifications ci-après constituent des exigences minimales au sens de l'article 2.5 du règlement de la consultation. Une offre qui n'en satisfait pas une seule est écartée sans être notée. Le soumissionnaire renseigne, pour chacune, la référence précise de la page de son offre où la conformité est démontrée." ]
-    .concat(specs.map(function(s,i){ return "Exigence "+(i+1)+" — "+s+"."; }))
-    .concat([ "Toute proposition de variante par rapport à ces exigences est présentée séparément, chiffrée distinctement, et ne dispense pas le soumissionnaire de présenter une offre de base strictement conforme." ]) };
+  var artSpecs = { titre:"Spécifications minimales exigées", paragraphes:
+    [ "Les exigences ci-après sont minimales (article 2.3) : une offre qui n'en satisfait pas une seule est écartée sans être notée. Le soumissionnaire indique, pour chacune, la page de son offre qui démontre la conformité." ]
+    .concat(specs.map(function(x,k){ return "Exigence "+(k+1)+" — "+x+"."; }))
+    .concat([ "Une variante est présentée séparément et chiffrée à part ; elle ne dispense pas d'une offre de base strictement conforme." ]) };
   // placé après les exigences par lot (ou après le premier article)
   var apres = 1; propres.forEach(function(a,k){ if(/^Exigences techniques/.test(a.titre)) apres=k+1; });
-  var cctp = propres.slice(0,apres).concat([artSpecs], propres.slice(apres)).map(function(a,k){ return A('4.'+(k+1), a.titre, 'tech', a.paragraphes); });
-  P.push({ id:'p4', titre:"Pièce 4 — Cahier des clauses techniques particulières", cat:'tech', arts:cctp });
+  var cctp = propres.slice(0,apres).concat([artSpecs], propres.slice(apres)).map(function(a,k){ return A('3.'+(k+1), a.titre, 'tech', a.paragraphes); });
+  P.push({ id:'p3', titre:"Pièce 3 — Besoin et exigences techniques", cat:'tech', arts:cctp });
 
-  /* ---------- PIÈCE 5 : BORDEREAU ---------- */
-  P.push({ id:'p5', titre:"Pièce 5 — Bordereau des prix et détail quantitatif estimatif", cat:'admin', arts:[
-    A('5.1',"Structure des prix",'admin',[
-      "Le bordereau est renseigné ligne à ligne, sans ajout ni suppression de poste. Les prix unitaires sont exprimés hors taxes, dans la devise de soumission retenue, et s'entendent toutes sujétions comprises : fourniture, transport, assurance, dédouanement, installation, essais, documentation et formation afférents au poste.",
-      "Un poste laissé vide est réputé inclus dans les autres prix du bordereau et ne pourra donner lieu à rémunération complémentaire. Un prix manifestement anormal au regard de la prestation attendue peut donner lieu à demande de justification écrite avant toute décision d'écartement.",
-      "Le détail quantitatif estimatif est établi sur la base des quantités prévisionnelles indiquées. La rémunération du titulaire s'effectue sur la base des quantités réellement exécutées, constatées contradictoirement."
-    ]),
-    A('5.2',"Décomposition par lot et sous-détail",'admin',
-      [ "Le bordereau comporte une section par lot, dont la structure est la suivante :" ]
-      .concat(lots.map(function(l,i){ return "Section "+(i+1)+" — "+l.nom+" : postes de fourniture, postes de main-d'œuvre d'installation, postes d'essais et de recette, poste de documentation et de formation. Montant estimatif : "+l.montant+"."; }))
-      .concat([ "Pour les postes dont le montant unitaire dépasse cinq millions (5 000 000) de francs CFA, un sous-détail de prix est joint, faisant apparaître la part de fourniture, la part de main-d'œuvre, les frais généraux et la marge." ]))
+  /* ---------- PIÈCE 4 : CONDITIONS CONTRACTUELLES ESSENTIELLES ---------- */
+  var cond=[
+    "Les prix sont hors taxes, fermes pendant les douze premiers mois, toutes sujétions comprises (fourniture, transport, assurance, installation, essais, documentation)."
+      +(c.tva!==''&&c.tva!=null ? " La TVA applicable est de "+c.tva+" %." : "")
+      +(c.retenueNonResident ? " Une retenue à la source de "+c.retenueNonResident+" % s'applique à la rémunération d'un prestataire non résident." : "")
+      +(c.douaneACharge ? " Droits et taxes à l'importation à la charge de : "+txt(c.douaneACharge).toLowerCase()+"." : ""),
+    (c.avance ? "Une avance de démarrage de "+c.avance+" % est versée contre garantie de restitution. " : "")+"Les paiements se font par virement sous 30 jours après réception de la facture et du procès-verbal de service fait."
+  ];
+  var delais=[];
+  if(c.delaiMax) delais.push("Le délai d'exécution ne dépasse pas "+jours(c.delaiMax)+" calendaires à compter de l'ordre de service.");
+  if(c.penalite!==''&&c.penalite!=null&&Number(c.penalite)>0) delais.push("Tout retard imputable au titulaire donne lieu à une pénalité de "+c.penalite+" ‰ du montant du marché par jour, plafonnée à 10 % du montant.");
+  if(c.garantieMin) delais.push("Les fournitures sont garanties au moins "+c.garantieMin+" mois à compter de la réception, pièces et main-d'œuvre comprises.");
+  P.push({ id:'p4', titre:"Pièce 4 — Conditions contractuelles essentielles", cat:'admin', arts:[
+    A('4.1',"Prix, taxes et paiement",'admin',cond),
+    A('4.2',"Délais, pénalités et garantie",'admin',delais.concat(["Le marché est constitué, par ordre de priorité, de l'acte d'engagement, du présent dossier, du bordereau des prix, du mémoire technique de l'attributaire et des additifs publiés."]))
   ]});
 
-  /* ---------- PIÈCE 6 : CADRE DU MÉMOIRE TECHNIQUE ---------- */
-  P.push({ id:'p6', titre:"Pièce 6 — Cadre du mémoire technique", cat:'tech', arts:[
-    A('6.1',"Structure imposée du mémoire technique",'tech',[
-      "Le mémoire technique est présenté selon la structure imposée ci-après, sans inversion ni fusion de chapitres. Un mémoire ne respectant pas cette structure est plus difficilement comparable et s'expose à une notation défavorable sur le critère de méthodologie.",
-      "Chapitre 1 — Compréhension du besoin et analyse du contexte : reformulation des enjeux, identification des contraintes propres au site et à l'activité de l'autorité contractante, points de vigilance relevés.",
-      "Chapitre 2 — Solution technique proposée : description de la solution, schémas utiles, justification des choix au regard des exigences du CCTP.",
-      "Chapitre 3 — Fournitures et matériels proposés : fiches techniques, tableau de conformité exigence par exigence avec renvoi de page, attestations constructeur, engagements de support et de disponibilité des pièces.",
-      "Chapitre 4 — Méthodologie d'exécution : phasage, étapes de mise en œuvre, gestion des interruptions de service, plan de repli en cas de difficulté.",
-      "Chapitre 5 — Organisation et moyens : organigramme nominatif, curriculums des intervenants clés, moyens matériels affectés, localisation des équipes, part de sous-traitance envisagée.",
-      "Chapitre 6 — Planning détaillé : planning par lot et par phase, chemin critique identifié, jalons de contrôle, marges prévues pour l'acheminement et le dédouanement.",
-      "Chapitre 7 — Plan de recette : scénarios de test par exigence, modes de preuve, critères d'acceptation, modèle de procès-verbal.",
-      "Chapitre 8 — Garantie, maintenance et niveaux de service : organisation du support, disponibilité des pièces, engagements de délais d'intervention.",
-      "Chapitre 9 — Analyse et maîtrise des risques : registre des risques identifiés, probabilité, impact, mesures de prévention et plans de contingence associés.",
-      "Chapitre 10 — Références : marchés similaires exécutés, périmètre, montant, année, attestations de bonne exécution, contacts joignables pour vérification."
+  /* ---------- PIÈCE 5 : CADRE DE RÉPONSE ---------- */
+  P.push({ id:'p5', titre:"Pièce 5 — Cadre de réponse", cat:'admin', arts:[
+    A('5.1',"Bordereau des prix",'admin',[
+      "Le bordereau est complété ligne à ligne, sans ajout ni suppression de poste, hors taxes, en "+txt(c.deviseSoumission||'devise de soumission')+". Un poste laissé vide est réputé inclus dans les autres prix.",
+      "Le cadre ci-dessous comporte une section par lot. Au-delà de 5 000 000 de francs CFA par poste, joindre un sous-détail (fourniture, main-d'œuvre, frais généraux, marge)."
     ]),
-    A('6.2',"Éléments attendus à l'appui de la notation qualitative",'tech',[
-      "La notation du critère de méthodologie s'appuie sur le caractère spécifique et vérifiable des éléments produits. Un mémoire reprenant les termes du CCTP sans les traduire en organisation concrète est considéré comme générique et noté en conséquence.",
-      "Sont particulièrement valorisés : un planning dont le chemin critique est identifié et argumenté, un plan de repli documenté, un registre des risques comportant des mesures opérationnelles et non des intentions, et des références vérifiables auprès de contacts joignables.",
-      "Sont considérés comme insuffisants : les plannings sans jalon de contrôle, les organigrammes sans nom ni curriculum, les engagements de délai non assortis de moyens correspondants, et les références dont le périmètre n'est pas comparable à celui du présent marché."
-    ])
-  ]});
-
-  /* ---------- PIÈCE 7 : MODÈLES ---------- */
-  P.push({ id:'p7', titre:"Pièce 7 — Modèles et formulaires", cat:'admin', arts:[
-    A('7.1',"Liste des modèles annexés",'admin',[
-      "Sont annexés au présent dossier, à utiliser sans modification : le modèle d'acte d'engagement ; le modèle de caution de soumission ; le modèle de garantie de bonne exécution ; le modèle de garantie de restitution d'avance ; la déclaration sur l'honneur de non-exclusion ; le formulaire de renseignements sur le candidat ; le tableau de conformité aux spécifications minimales ; le modèle d'attestation de visite de site.",
-      "Toute modification apportée par un soumissionnaire au texte d'un modèle de garantie bancaire est signalée à l'autorité contractante, qui apprécie si elle en altère la portée. Une garantie dont la rédaction prive l'autorité contractante de son caractère à première demande est réputée non conforme."
+    A('5.2',"Cadre du mémoire technique",'tech',[
+      "Le mémoire suit cet ordre : 1. compréhension du besoin et du contexte ; 2. solution et fournitures proposées, avec un tableau de conformité exigence par exigence (renvoi de page) ; 3. méthodologie et planning détaillé, jalons et chemin critique ; 4. organisation, équipe nominative et moyens affectés ; 5. garantie, maintenance et niveaux de service ; 6. références de marchés similaires (périmètre, montant, année, contact joignable).",
+      "La note de méthodologie récompense les éléments précis et vérifiables (planning à jalons, équipe nommée, plan de repli, références vérifiables) plutôt que la reprise des termes du CCTP."
     ])
   ]});
 

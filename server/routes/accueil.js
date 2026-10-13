@@ -20,7 +20,8 @@ const P = require('../../public/js/profils.js');
 const r = express.Router();
 
 const voitTout = (req) => req.can('offres.read') || req.can('cdc.edit');
-const visible = (req, p) => voitTout(req) || (p.publie && !p.archive) || (p.demandeur && p.demandeur === req.user.id);
+// mêmes règles que la liste des procédures : un prestataire ne voit que les dossiers qui lui sont ouverts (consulté, ou déjà déposant)
+const visible = (req, p) => require('./procedures').visible(req, p);
 
 /** Contexte complet d'une procédure : de quoi calculer sa phase, son classement et son titulaire. */
 function ctxDe(pid) {

@@ -1,5 +1,5 @@
-/* Marché+ — Le dossier d'appel d'offres en document PDF paginé : page de garde illustrée selon le thème de l'achat,
-   sommaire avec numéros de page, page des informations clés, une pièce par chapitre (nouvelle page), en-tête et pied
+/* Marché+ — Le dossier d'appel d'offres en document PDF paginé : page de garde illustrée selon l'achat, page des
+   informations clés, cinq pièces à la suite (le nécessaire pour comprendre le besoin et soumissionner), en-tête et pied
    de page avec pagination. Généré dans le navigateur par pdfmake (servi par l'application : /vendor/pdfmake), à partir
    du contenu de buildDAO() ; le même document sert à l'acheteur (aperçu avant publication) et aux soumissionnaires.
    Script classique partagé (voir js/app/LISEZMOI.md) : chargé par index.html dans l'ordre, sans build. */
@@ -24,7 +24,7 @@ var PORTEE_PIECE = { tous:'Tous les soumissionnaires', local:'Établis en Côte 
 
 /* Définition pdfmake du dossier. */
 function definitionDossier(){
-  var c=state.cdc, org=state.org||{}, P=buildDAO(), th=themeDossier(c), illu=ILLUSTRATIONS[th]||ILLUSTRATIONS.generique;
+  var c=state.cdc, org=state.org||{}, P=buildDAO(), illu=illustrationDossier(c);
   var lieu=[org.ville,org.pays].filter(Boolean).join(' · '), auj=new Date().toLocaleDateString('fr-FR',{ day:'numeric', month:'long', year:'numeric' });
   var contenu=[];
 
@@ -49,20 +49,13 @@ function definitionDossier(){
     { text:'Document établi le '+auj+' — Marché+', style:'garPetit', alignment:'center', margin:[0,30,0,0], pageBreak:'after' }
   );
 
-  /* Sommaire */
-  contenu.push({ toc:{ title:{ text:'Sommaire', style:'h1' }, numberStyle:{ bold:true }, textMargin:[0,4,0,0] }, pageBreak:'after' });
-
   /* Informations clés */
-  contenu.push({ text:'Informations clés', style:'h1', tocItem:true, tocStyle:{ bold:true }, tocMargin:[0,8,0,0] });
+  contenu.push({ text:'Informations clés', style:'h1' });
   contenu.push({ text:'Allotissement et estimations', style:'h3' });
   contenu.push(tableauPdf(['Lot','Intitulé','Montant estimatif'],[80,'*',110],(c.lots||[]).map(function(l,i){ return [String(i+1),l.nom||'',{ text:l.montant||'—', alignment:'right' }]; })));
-  contenu.push({ text:'Calendrier', style:'h3' });
-  contenu.push(tableauPdf(['Étape','Date'],['*',170],[['Date limite de dépôt et ouverture des plis',dateLongue(c.ouverture)+' à 10 h 00']]));
   contenu.push({ text:'Critères d’évaluation', style:'h3' });
   contenu.push(tableauPdf(['Critère','Mode de notation','Pondération'],['*',180,80],(state.criteria||[]).map(function(x){
     return [x.label, x.kind==='auto'?'Calculé selon la formule du règlement':'Noté par la commission', { text:x.weight+' %', alignment:'right' }]; })));
-  var pieces=(DOCS()||[]).map(function(d){ return [d.label, PORTEE_PIECE[d.scope]||d.scope||'—']; });
-  if(pieces.length){ contenu.push({ text:'Pièces exigées du dossier de candidature', style:'h3' }); contenu.push(tableauPdf(['Pièce','Soumissionnaires concernés'],['*',190],pieces)); }
   contenu.push({ text:'Conditions principales', style:'h3' });
   contenu.push(tableauPdf(['Condition','Valeur'],['*',170],[
     ['Caution de soumission', c.caution!==''&&c.caution!=null ? c.caution+' % du montant de l’offre' : '—'],
@@ -75,10 +68,10 @@ function definitionDossier(){
 
   /* Les pièces du dossier : une par chapitre */
   P.forEach(function(pi,i){
-    contenu.push({ text:'Pièce '+(i+1), style:'surtitre', pageBreak:'before' });
-    contenu.push({ text:pi.titre.replace(/^Pièce \d+ — /,''), style:'h1', tocItem:true, tocStyle:{ bold:true }, tocMargin:[0,8,0,0] });
+    contenu.push({ text:'Pièce '+(i+1), style:'surtitre', margin:[0,i?18:0,0,2], pageBreak:i===0?'before':undefined });
+    contenu.push({ text:pi.titre.replace(/^Pièce \d+ — /,''), style:'h1' });
     pi.arts.forEach(function(a){
-      contenu.push({ text:'Article '+a.n+' — '+a.t, style:'h2', tocItem:true, tocStyle:{ fontSize:9.5, color:COUL_PDF.gris }, tocMargin:[14,2,0,0] });
+      contenu.push({ text:'Article '+a.n+' — '+a.t, style:'h2' });
       a.p.forEach(function(x){
         if(x.indexOf('SPÉCIFICATION MINIMALE')===0) contenu.push({ table:{ widths:['*'], body:[[{ text:x, fontSize:9.5 }]] },
           layout:{ fillColor:function(){ return COUL_PDF.doux; }, hLineWidth:function(){ return 0; }, vLineWidth:function(i){ return i===0?3:0; }, vLineColor:function(){ return COUL_PDF.accent; },
@@ -96,10 +89,10 @@ function definitionDossier(){
   /* Additifs publiés : ils font partie du dossier et priment sur les pièces qu'ils modifient */
   var adds=state.additifs||[];
   if(adds.length){
-    contenu.push({ text:'Additifs', style:'h1', tocItem:true, tocStyle:{ bold:true }, tocMargin:[0,8,0,0], pageBreak:'before' });
+    contenu.push({ text:'Additifs', style:'h1', pageBreak:'before' });
     contenu.push({ text:'Les additifs ci-dessous modifient ou précisent le dossier. En cas de contradiction, l’additif le plus récent prévaut.', style:'corps' });
     adds.forEach(function(a,i){
-      contenu.push({ text:'Additif n° '+(a.n||i+1)+' — '+a.objet, style:'h2', tocItem:true, tocStyle:{ fontSize:9.5, color:COUL_PDF.gris }, tocMargin:[14,2,0,0] });
+      contenu.push({ text:'Additif n° '+(a.n||i+1)+' — '+a.objet, style:'h2' });
       contenu.push({ text:'Publié le '+a.t+(a.report ? ' — date limite de dépôt reportée au '+dateLongue(a.report)+' à 10 h 00' : ''), fontSize:9, color:COUL_PDF.gris, margin:[0,0,0,6] });
       String(a.texte||'').split(/\n\s*\n/).forEach(function(x){ if(x.trim()) contenu.push({ text:x.trim(), style:'corps' }); });
     });
@@ -164,7 +157,7 @@ function telechargerDossierPdf(){
 
 /* Écran du dossier publié : la page de garde en vignette, le document entier à la demande. */
 function vDossierPublie(m){
-  var c=state.cdc, org=state.org||{}, th=themeDossier(c), illu=ILLUSTRATIONS[th]||ILLUSTRATIONS.generique;
+  var c=state.cdc, org=state.org||{}, illu=illustrationDossier(c);
   if(fournisseurSeul() && viewAllowed('portail')) retourListe(m,'Retour à l’appel d’offres',function(){ go('portail'); },'retour-portail');
   var carte=add(m,'section','card doc-carte'); carte.setAttribute('aria-label','Dossier d’appel d’offres');
   var barre=add(carte,'div','doc-barre');
@@ -186,7 +179,7 @@ function vDossierPublie(m){
   [['Procédure',c.procedure],['Date limite de dépôt',dateLongue(c.ouverture)],['Lots',(c.lots||[]).length+' lot(s)']].forEach(function(x){
     var d=add(info,'div'); add(d,'span',null,x[0]); add(d,'strong',null,x[1]||'—'); });
   var cote=add(scene,'div','dossier-cote');
-  add(cote,'p',null,'Le dossier complet : page de garde, sommaire, informations clés, puis les sept pièces (avis, règlement de la consultation, clauses administratives et techniques, bordereau des prix, cadre du mémoire technique, modèles).');
+  add(cote,'p',null,'Le dossier tient en quelques pages : informations clés, modalités de la consultation, contenu de l’offre et évaluation, besoin et exigences techniques, conditions contractuelles essentielles, cadre de réponse.');
   var b1=add(cote,'button','btn btn-primary','Ouvrir le document'); fk(b1,'dossier-ouvrir'); b1.setAttribute('data-consult',''); b1.addEventListener('click',ouvrirDossierPdf);
   var b2=add(cote,'button','btn btn-ghost','Télécharger le PDF'); fk(b2,'dossier-pdf'); b2.setAttribute('data-consult',''); b2.addEventListener('click',telechargerDossierPdf);
 }

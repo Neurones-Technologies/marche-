@@ -87,7 +87,9 @@ r.post('/messagerie/smtp/test', needPerm('params.edit'), async (req, res) => {
   const s = (kvGet('smtp') || {}).value || {};
   if (!s.hote || !s.expediteur) return res.status(422).json({ error: 'Enregistrez d’abord le serveur et l’adresse d’expédition.', code: 'SMTP_INCOMPLETE' });
   const moi = db.prepare('SELECT email FROM users WHERE id=?').get(req.user.id);
-  const r2 = await mail.envoyerSmtp(s, [moi.email], 'Marché+ — courriel de test', 'Ce message confirme que la messagerie de votre organisation fonctionne.\n\nServeur : ' + s.hote + ':' + s.port);
+  const corps = 'Ce message confirme que la messagerie de votre organisation fonctionne.\n\nServeur : ' + s.hote + ':' + s.port;
+  const m = require('../mail-modele').habiller({ objet: 'Courriel de test', corps, org: (kvGet('org') || { value: {} }).value });
+  const r2 = await mail.envoyerSmtp(s, [moi.email], 'Marché+ — courriel de test', m.texte, m.html);
   auditAppend(req.user.id, whoLabel(req.user), `Messagerie : courriel de test à ${moi.email} — ${r2.statut}${r2.erreur ? ' (' + r2.erreur + ')' : ''}`);
   res.status(r2.statut === 'envoyé' ? 200 : 502).json({ statut: r2.statut, erreur: r2.erreur || null, a: moi.email });
 });

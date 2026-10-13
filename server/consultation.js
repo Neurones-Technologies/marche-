@@ -41,6 +41,11 @@ function verifier(value, avant, get, aDeposeOffre) {
     if (!p) return 'Partenaire inconnu : ' + id + '.';
     if (p.statut !== 'reference') return `${p.raisonSociale} n’est pas référencé : seuls les partenaires référencés peuvent être consultés.`;
   }
+  // dossier publié : les partenaires consultés ont été prévenus, on peut en ajouter ou élargir la consultation, mais plus en retirer ni la restreindre
+  if ((get('cdc') || {}).cdcPublie) {
+    if (anciens.some((x) => !ids.includes(x))) return 'Le dossier est publié : un partenaire consulté ne peut plus être retiré.';
+    if (avant && avant.mode === 'ouvert' && value.mode === 'restreint') return 'Le dossier est publié : un appel d’offres ouvert à toute entreprise ne peut plus être restreint.';
+  }
   const retire = anciens.filter((x) => !ids.includes(x)).find((x) => aDeposeOffre(x));
   if (retire) return `${(partenaireGet(retire) || { raisonSociale: retire }).raisonSociale} a déjà déposé une offre : il reste consulté.`;
   return null;

@@ -623,6 +623,9 @@ db.transaction(function migrate() {
   // 08/10/2026 : date du dernier changement de mot de passe ; pour les comptes existants, celle de la mise à jour (le
   // délai d'expiration, s'il est réglé, court à partir d'elle).
   db.prepare("UPDATE users SET mdp_change_le=datetime('now') WHERE mdp_change_le IS NULL").run();
+  // 13/10/2026 : règles de notification ajoutées depuis la création de l'espace (ex. demande de référencement) : valeur par défaut.
+  { const r = kvGet('notifRules'), manquantes = r && Object.keys(seed.NOTIF_RULES).filter((k) => !r.value[k]);
+    if (manquantes && manquantes.length) kvSet('notifRules', { ...r.value, ...Object.fromEntries(manquantes.map((k) => [k, clone(seed.NOTIF_RULES[k])])) }, 'migration'); }
   // 07/10/2026 : budget et engagement. Sans ligne budgétaire, le contrôle des crédits reste inactif.
   if (kvGet('org') && !kvGet('budget')) kvSet('budget', { lignes: [] }, 'migration');
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.
@@ -846,7 +849,15 @@ function ajouterFictives(uid, who, zones) {
       for (const f of PARTENAIRES_FICTIFS) {
         if (noms.has(f.raisonSociale.toLowerCase())) continue;
         const { statut, compte, ...champs } = f;
-        const u = compte ? db.prepare('SELECT id FROM users WHERE lower(email)=? AND partenaire_id IS NULL').get(compte) : null;
+        let u = compte ? db.prepare('SELECT id FROM users WHERE lower(email)=? AND partenaire_id IS NULL').get(compte) : null;
+        // chaque fiche fictive a son compte fournisseur (courriel du contact, mot de passe de démonstration), sauf si l'adresse est déjà prise
+        const email = String((champs.contact || {}).email || '').trim().toLowerCase();
+        if (!u && email && !db.prepare('SELECT 1 FROM users WHERE lower(email)=?').get(email)) {
+          const uid = 'u' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex');
+          db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)').run(uid, champs.contact.nom || champs.raisonSociale, email, 'soum', bcrypt.hashSync(cfg.seedPassword, 10));
+          u = { id: uid };
+          ajout.comptes = (ajout.comptes || 0) + 1; ajout.motDePasse = cfg.seedPassword;
+        }
         const p = partenaireCreer(clone(champs), u ? u.id : null, statut);
         if (statut === 'reference') p.referenceLe = frDate();
         p.historique.push({ t: frDate(), who, action: 'fiche fictive ajoutée' + (statut === 'reference' ? ' (référencée)' : '') });

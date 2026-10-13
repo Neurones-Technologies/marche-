@@ -13,7 +13,11 @@ const PROPOSITION = {
   lots: [{ nom: 'Lot 1 — Postes de travail', montant: '40 000 000 XOF' }, { nom: 'Lot 2 — Imprimantes', montant: null }],
   specs: ['Processeur 64 bits, 6 cœurs au moins', 'Mémoire vive de 16 Go au moins'],
   caution: 2, garantieMin: 12, delaiMax: 90, penalite: 1, avance: null, tva: 18, retenueNonResident: null, douaneACharge: null,
-  prefActive: true, prefTaux: 15, resume: 'Proposition rédigée à partir de l’idée.',
+  prefActive: true, prefTaux: 15,
+  pieces: [{ label: 'Attestation de visite du site', scope: 'local' }, { label: ' ', scope: 'tous' }],
+  criteres: [{ label: 'Prix', poids: 50, nature: 'prix' }, { label: 'Méthodologie', poids: 150, nature: 'qualite' }],
+  cctp: [{ titre: 'Postes de travail', paragraphes: ['SPÉCIFICATION MINIMALE. Processeur 64 bits.'] }, { titre: 'Vide', paragraphes: [] }],
+  resume: 'Proposition rédigée à partir de l’idée.',
   aVerifier: [{ champ: 'caution', raison: 'Taux usuel supposé.' }], manquants: ['Date limite de dépôt'],
 };
 let appels = [], reponse = null;
@@ -47,6 +51,10 @@ test('idée : tâche de fond, proposition nettoyée, journal d’audit', async (
   assert.equal(fin.json.etat, 'prete');
   assert.deepEqual(fin.json.proposition.lots, PROPOSITION.lots);
   assert.equal(fin.json.proposition.ouverture, null);
+  // pièces à joindre, grille de critères et clauses techniques repris du document : bornés et nettoyés
+  assert.deepEqual(fin.json.proposition.pieces, [{ label: 'Attestation de visite du site', scope: 'local' }]);
+  assert.deepEqual(fin.json.proposition.criteres, [{ label: 'Prix', poids: 50, nature: 'prix' }, { label: 'Méthodologie', poids: 100, nature: 'qualite' }]);
+  assert.deepEqual(fin.json.proposition.cctp.map((a) => a.titre), ['Postes de travail']);
   // contrat de l'appel : schéma JSON, idée encadrée comme une donnée, contexte du profil
   const p = appels.at(-1);
   assert.equal(p.output_config.format.type, 'json_schema');

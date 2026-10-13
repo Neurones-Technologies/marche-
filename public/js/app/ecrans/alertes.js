@@ -8,7 +8,8 @@ var ALERTES_GROUPES = [
   { lab:'Publication', ic:'upload', ev:['cdc.publie','question.recue','additif.publie'] },
   { lab:'Offres et dépouillement', ic:'inbox', ev:['depot.recu','verif.requise','anomalie','offre.ecartee','clarif.envoyee','dep.cloture'] },
   { lab:'Évaluation et décision', ic:'scale', ev:['coi.declare','ecart.ia','eval.validee','appro.attendue','attribution','infructueux'] },
-  { lab:'Recours', ic:'gavel', ev:['standstill','recours.depose'] }
+  { lab:'Recours', ic:'gavel', ev:['standstill','recours.depose'] },
+  { lab:'Partenaires', ic:'users', ev:['partenaire.demande'] }
 ];
 
 /* ============ Règles de notification ============ */

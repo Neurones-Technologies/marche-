@@ -73,3 +73,4 @@ r.use('/:pid/ia', require('./ia')); // proposition de cahier des charges par l'I
 r.use('/:pid', require('./state'));
 
 module.exports = r;
+module.exports.visible = visible;

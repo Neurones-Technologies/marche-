@@ -457,6 +457,44 @@ function fermerFenetre(){
   if(f.prev && f.prev.focus && document.body.contains(f.prev)) try{ f.prev.focus(); }catch(e){}
   if(f.fermer) f.fermer();
 }
+/* Aperçu d'une pièce déposée, sans la télécharger : PDF et images tels quels, document Word converti en texte mis en page ;
+   les autres formats (tableur) se téléchargent. Se superpose à la fenêtre ouverte. */
+function apercuPiece(nom, idFichier){
+  var prev=document.activeElement;
+  var ov=el('div','modal-ov'), bx=add(ov,'div','modal apercu');
+  bx.setAttribute('role','dialog'); bx.setAttribute('aria-modal','true'); bx.setAttribute('aria-label','Aperçu — '+nom);
+  var tete=add(bx,'div','apercu-tete'); add(tete,'strong',null,nom);
+  var dl=add(tete,'a','btn btn-ghost btn-sm','Télécharger'); dl.href='/api/files/'+encodeURIComponent(idFichier); dl.setAttribute('download',nom);
+  var x=add(tete,'button','icon-btn'); x.type='button'; icon(x,'x'); x.setAttribute('aria-label','Fermer l’aperçu'); x.title='Fermer';
+  var zone=add(bx,'div','apercu-zone'); add(zone,'p','muted','Chargement…');
+  var url=null;
+  function fermer(){
+    document.removeEventListener('keydown',touche,true);
+    if(url) URL.revokeObjectURL(url);
+    if(ov.parentNode) ov.parentNode.removeChild(ov);
+    if(prev && prev.focus) try{ prev.focus(); }catch(e){}
+  }
+  function touche(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermer(); } }
+  x.addEventListener('click',fermer);
+  ov.addEventListener('mousedown',function(e){ if(e.target===ov) fermer(); });
+  document.addEventListener('keydown',touche,true);
+  document.body.appendChild(ov); x.focus();
+  function indisponible(msg){ zone.textContent=''; add(zone,'p','muted',msg||'Aperçu indisponible pour ce format : téléchargez le document.'); }
+  var ext=(nom.split('.').pop()||'').toLowerCase();
+  if(ext==='pdf' || ext==='png' || ext==='jpg' || ext==='jpeg'){
+    MP.blob('/api/files/'+encodeURIComponent(idFichier)).then(function(b){
+      url=URL.createObjectURL(b); zone.textContent='';
+      if(ext==='pdf'){ var f=add(zone,'iframe'); f.src=url; f.title='Aperçu — '+nom; }
+      else { var im=add(zone,'img'); im.src=url; im.alt=nom; }
+    }).catch(function(e){ indisponible(e.message); });
+  } else if(ext==='docx'){
+    MP.api('GET','/api/files/'+encodeURIComponent(idFichier)+'/apercu').then(function(r){
+      zone.textContent='';
+      var f=add(zone,'iframe'); f.setAttribute('sandbox',''); f.title='Aperçu — '+nom;
+      f.srcdoc='<!doctype html><meta charset="utf-8"><style>body{font:15px/1.5 system-ui,sans-serif;margin:24px;color:#222}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:4px 8px}img{max-width:100%}</style>'+r.html;
+    }).catch(function(e){ indisponible(e.message); });
+  } else indisponible();
+}
 /* Champ en lecture dans une fenêtre : libellé, puis valeur (texte ou nœud). */
 function champLecture(parent, lab, val){
   var d=add(parent,'div','fen-champ'); add(d,'div','fen-lab',lab);
@@ -486,6 +524,10 @@ function figer(zone){
     e.disabled=true;
     if(e.tagName==='BUTTON' && !e.title) e.title='Étape terminée : consultation seule.';
   });
+}
+/* Compte qui suit une procédure sans la conduire (le demandeur de l'achat) : tout s'y consulte, rien ne s'y modifie. */
+function suiviSeul(){
+  return ['offres.read','cdc.edit','cdc.publish','criteres.edit','partenaires.manage','portail.use','params.edit','roles.edit'].every(function(p){ return !can(p); });
 }
 /* Lien « ← Liste » en tête d'un détail, pour revenir au registre. */
 function retourListe(parent, lab, action, fkey){

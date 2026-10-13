@@ -190,7 +190,7 @@ function ecrire(req, changes) {
 
 /** Expédie un courriel de la boîte d'envoi et y consigne le résultat (envoyé, ou échec avec sa cause). */
 function expedier(e) {
-  mail.envoyer({ a: e.a, objet: e.objet, corps: e.corps }).then((r) => {
+  mail.envoyer({ a: e.a, objet: e.objet, corps: e.corps, action: { libelle: 'Ouvrir dans Marché+', url: require('../espaces').adresseCourante() } }).then((r) => {
     const cur = (kvGet('emails') || { value: [] }).value, x = cur.find((m) => m.id === e.id);
     if (!x) return;
     x.statut = r.statut; if (r.erreur) x.erreur = r.erreur; x.expedie = frDate();
@@ -217,7 +217,8 @@ function comptesConcernes(req, ev) {
     rôles visés. Pour les actions d'un prestataire, qui n'émet lui-même ni notification ni courriel. Avec req, une règle
     qui vise les fournisseurs ne vise que ceux de la procédure (jamais tous les comptes fournisseurs de l'espace). */
 function annoncer(ev, lab, titre, corps, ref, req) {
-  const r = ((kvGet('notifRules') || { value: {} }).value || {})[ev];
+  // une règle absente (espace créé avant l'événement) prend sa valeur par défaut
+  const r = ((kvGet('notifRules') || { value: {} }).value || {})[ev] || require('../db').seed.NOTIF_RULES[ev];
   if (!r) return;
   const cibles = req && r.roles.includes('soum') ? comptesConcernes(req, ev) : null;
   const roles = cibles ? r.roles.filter((x) => x !== 'soum') : r.roles.slice();
@@ -658,3 +659,4 @@ r.delete('/offers/mienne', (req, res) => {
 r.comptesConcernes = comptesConcernes;
 r.expedier = expedier;
 module.exports = r;
+module.exports.annoncer = annoncer;

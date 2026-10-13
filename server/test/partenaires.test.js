@@ -99,6 +99,8 @@ test('vérification du courriel : compte activé, dossier transmis au référenc
   assert.deepEqual(moi.reponses, { activite: 'Mobilier de bureau', effectif: 42 });
   assert.deepEqual(moi.exigees.map((e) => [e.id, e.etat]), [['registre', 'a_verifier'], ['fiscal', 'a_verifier'], ['cnps', 'a_verifier']]);
   assert.equal(moi.pieces.cnps.expire, '2099-06-30');
+  // les achats sont prévenus de la nouvelle demande (notification dans l'application)
+  assert.ok((await getState(achats)).notifs.some((n) => n.ev === 'partenaire.demande' && /Mobilia SARL/.test(n.titre)), 'demande de référencement annoncée aux achats');
   // le dossier attend les achats : il apparaît dans leur liste, et il est figé pour le prestataire
   assert.ok((await call('GET', '/api/partenaires', null, achats)).json.partenaires.some((p) => p.id === moi.id && p.statut === 'verification'));
   refusé(await call('GET', '/api/partenaires', null, mobilia), 403);
@@ -107,14 +109,23 @@ test('vérification du courriel : compte activé, dossier transmis au référenc
   refusé(await piece(mobilia, moi.id, 'registre'), 409, 'PARTNER_LOCKED');
 });
 
-test('instruction : rejet motivé, nouvelle soumission, référencement et validation des pièces', async () => {
+test('instruction : pièces validées une à une avant le parcours, rejet motivé, nouvelle soumission, référencement', async () => {
   const moi = (await call('GET', '/api/partenaires/moi', null, mobilia)).json.partenaire;
+  const decider = (doc, corps) => call('PUT', `/api/partenaires/${moi.id}/pieces/${doc}`, corps, achats);
+  const toutValider = async () => { for (const doc of ['registre', 'fiscal', 'cnps']) ok(await decider(doc, { statut: 'valide' })); };
   refusé(await call('POST', `/api/partenaires/${moi.id}/approbations/0`, {}, mobilia), 403);
-  ok(await call('POST', `/api/partenaires/${moi.id}/approbations/0`, {}, achats));
+  // le parcours reste fermé tant que les pièces obligatoires ne sont pas toutes validées
+  refusé(await call('POST', `/api/partenaires/${moi.id}/approbations/0`, {}, achats), 409, 'PIECES_NOT_VALIDATED');
+  refusé(await decider('registre', { statut: 'refuse' }), 422, 'REJECTION_REASON_REQUIRED');
+  ok(await decider('registre', { statut: 'refuse', motif: 'Registre du commerce illisible.' }));
+  refusé(await call('POST', `/api/partenaires/${moi.id}/approbations/0`, {}, achats), 409, 'PIECES_NOT_VALIDATED');
+  // à ce stade, tout instructeur renvoie le dossier (aucun niveau du parcours n'est encore concerné) ; le prestataire n'en a pas le droit
+  refusé(await call('POST', `/api/partenaires/${moi.id}/rejet`, { motif: 'x' }, mobilia), 403);
   refusé(await call('POST', `/api/partenaires/${moi.id}/rejet`, { motif: '' }, achats), 422, 'REJECTION_REASON_REQUIRED');
   const rj = await call('POST', `/api/partenaires/${moi.id}/rejet`, { motif: 'Registre du commerce illisible.' }, achats);
   ok(rj);
   assert.equal(rj.json.partenaire.statut, 'rejete');
+  assert.equal(rj.json.partenaire.rejet.role, 'Examen des pièces');
   // le prestataire corrige : contrôles du dépôt de pièces et des réponses depuis sa fiche
   refusé(await piece(mobilia, moi.id, 'caution'), 422, 'PIECE_NOT_REQUIRED');
   refusé(await piece(mobilia, moi.id, 'fiscal'), 422, 'PIECE_EXPIRY_REQUIRED');
@@ -122,6 +133,17 @@ test('instruction : rejet motivé, nouvelle soumission, référencement et valid
   ok(await call('PUT', `/api/partenaires/${moi.id}`, { adresse: 'Abidjan, Cocody', domaines: ['Mobilier'] }, mobilia));
   ok(await piece(mobilia, moi.id, 'registre'), 201);
   ok(await call('POST', `/api/partenaires/${moi.id}/soumettre`, {}, mobilia));
+  // la pièce déposée de nouveau est à examiner ; une fois les trois validées, le parcours s'ouvre
+  const instruction = (await call('GET', '/api/partenaires', null, achats)).json.partenaires.find((x) => x.id === moi.id);
+  assert.equal(instruction.piecesConformes, false);
+  await toutValider();
+  assert.equal((await call('GET', '/api/partenaires', null, achats)).json.partenaires.find((x) => x.id === moi.id).piecesConformes, true);
+  ok(await call('POST', `/api/partenaires/${moi.id}/approbations/0`, {}, achats));
+  // rejet par un niveau du parcours : motivé, et le niveau doit être celui attendu
+  const rj2 = await call('POST', `/api/partenaires/${moi.id}/rejet`, { motif: 'Dossier à compléter sur le niveau 2.' }, achats);
+  ok(rj2);
+  assert.notEqual(rj2.json.partenaire.rejet.role, 'Examen des pièces');
+  ok(await call('POST', `/api/partenaires/${moi.id}/soumettre`, {}, mobilia)); // pièces toujours validées
   ok(await call('POST', `/api/partenaires/${moi.id}/approbations/0`, {}, achats));
   const fin = await call('POST', `/api/partenaires/${moi.id}/approbations/1`, {}, achats);
   ok(fin);
@@ -168,7 +190,9 @@ test('consultation : seuls les partenaires référencés et sélectionnés voien
   refusé(await call('GET', '/api/partenaires/references', null, mobilia), 403);
   refusé(await patch(achats, { consultes: { mode: 'restreint', partenaires: [idAutre] } }, pid), 422, 'CONSULTATION_INVALID');
   refusé(await patch(achats, { consultes: { mode: 'ouvert', partenaires: [] } }, pid), 422, 'CONSULTATION_INVALID');
-  ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: [idMobilia] } }, pid));
+  // dossier publié : on peut ajouter un partenaire consulté, plus en retirer (SOTRAP reste consultée)
+  refusé(await patch(achats, { consultes: { mode: 'restreint', partenaires: [idMobilia] } }, pid), 422, 'CONSULTATION_INVALID');
+  ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001', idMobilia] } }, pid));
   assert.ok((await visibles(mobilia)).includes(pid));
   assert.ok((await getState(mobilia, pid)).notifs.some((n) => n.ev === 'consultation' && n.titre.includes('AO-2026-050')), 'prévenu dans son espace');
   assert.ok(!(await visibles(autre)).includes(pid));
@@ -252,4 +276,12 @@ test('formulaire de référencement : défini par l’organisation, contrôlé �
   assert.ok(moi.questions.some((q) => q.id === 'secteur'));
   const as = moi.exigees.find((e) => e.id === 'assurance');
   assert.equal(as.obligatoire, false); assert.equal(as.expiration, true);
+});
+
+test('aperçu des pièces : PDF et images tels quels, Word converti ; accès réservé à ceux qui voient la pièce', async () => {
+  const moi = (await call('GET', '/api/partenaires/moi', null, mobilia)).json.partenaire;
+  const f = moi.pieces.registre.fichier;
+  refusé(await call('GET', `/api/files/${f}/apercu`, null, achats), 422, 'PREVIEW_UNAVAILABLE'); // un PDF s'affiche directement, sans conversion
+  refusé(await call('GET', `/api/files/${f}/apercu`, null, await login('contact.sotrap@bal.ci')), 404); // la pièce d'un autre partenaire
+  refusé(await call('GET', '/api/files/inconnu/apercu', null, achats), 404);
 });

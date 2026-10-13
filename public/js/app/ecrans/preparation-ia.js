@@ -124,15 +124,18 @@ var SECTIONS_IA=[
   { id:'specs', lab:'3 · Spécifications techniques' },
   { id:'conditions', lab:'4 · Conditions administratives et financières', champs:[['caution','Caution de soumission (%)'],['garantieMin','Garantie minimale (mois)'],['delaiMax','Délai d’exécution maximal (jours)'],['penalite','Pénalité de retard (‰ par jour)'],['avance','Avance de démarrage (%)']] },
   { id:'fiscal', lab:'5 · Régime fiscal et douanier', champs:[['tva','TVA (%)'],['retenueNonResident','Retenue à la source — non-résidents (%)'],['douaneACharge','Droits et taxes à l’importation à la charge de']] },
-  { id:'pref', lab:'6 · Préférence communautaire', champs:[['prefActive','Marge de préférence'],['prefTaux','Taux (%)']] }
+  { id:'pref', lab:'6 · Préférence communautaire', champs:[['prefActive','Marge de préférence'],['prefTaux','Taux (%)']] },
+  { id:'pieces', lab:'7 · Pièces à joindre à l’offre', champs:[] },
+  { id:'criteres', lab:'8 · Grille de critères', champs:[] },
+  { id:'cctp', lab:'9 · Clauses techniques (CCTP)', champs:[] }
 ];
+var SECTIONS_LISTES_IA = ['lots','specs','pieces','criteres','cctp'];
 function sectionRemplie(p, s){
-  if(s.id==='lots') return p.lots.length>0;
-  if(s.id==='specs') return p.specs.length>0;
+  if(SECTIONS_LISTES_IA.indexOf(s.id)>=0) return (p[s.id]||[]).length>0;
   return s.champs.some(function(c){ return p[c[0]]!=null && p[c[0]]!==''; });
 }
 /* Sections proposées : sans la préférence quand les règles de la procédure ne la prévoient pas. */
-function sectionsIA(){ return SECTIONS_IA.filter(function(s){ return s.id!=='pref' || preferencePossible(); }); }
+function sectionsIA(){ return SECTIONS_IA.filter(function(s){ return (s.id!=='pref' || preferencePossible()) && (s.id!=='criteres' || can('criteres.edit')); }); }
 function choixParDefaut(p){ var o={}; sectionsIA().forEach(function(s){ o[s.id]=sectionRemplie(p,s); }); return o; }
 function valeurIA(k, v){
   if(v==null || v==='') return '—';
@@ -163,6 +166,13 @@ function ouvrirPropositionIA(){
       if(vide){ add(d,'span','muted','Rien de proposé.'); return; }
       if(s.id==='lots'){ var ul=add(d,'ul'); p.lots.forEach(function(x){ add(ul,'li',null,x.nom+(x.montant?' — '+x.montant:'')); }); return; }
       if(s.id==='specs'){ var us=add(d,'ul'); p.specs.forEach(function(x){ add(us,'li',null,x); }); return; }
+      if(s.id==='pieces'){ var up=add(d,'ul'); p.pieces.forEach(function(x){ add(up,'li',null,x.label+(x.scope==='local'?' (soumissionnaires locaux)':x.scope==='etranger'?' (soumissionnaires hors UEMOA)':'')); }); return; }
+      if(s.id==='criteres'){
+        var uc=add(d,'ul'), tot=0; p.criteres.forEach(function(x){ tot+=x.poids; add(uc,'li',null,x.label+' — '+x.poids+' %'); });
+        if(tot!==100) add(d,'span','muted','Total '+tot+' % : à ajuster à 100 % dans la grille de critères.');
+        return;
+      }
+      if(s.id==='cctp'){ var ua=add(d,'ul'); p.cctp.forEach(function(x){ add(ua,'li',null,x.titre); }); return; }
       s.champs.forEach(function(ch){ if(p[ch[0]]==null || p[ch[0]]==='') return; add(d,'span','muted',ch[1]+' : '+valeurIA(ch[0],p[ch[0]])); });
     });
     add(pied,'button','btn btn-ghost','Fermer').addEventListener('click',fermerFenetre);
@@ -179,6 +189,23 @@ function appliquerIA(p, choix){
     if(!choix[s.id] || !sectionRemplie(p,s)) return;
     if(s.id==='lots') c.lots=p.lots.map(function(x,i){ return { id:'l'+Date.now().toString(36)+i, nom:x.nom, montant:x.montant||'— XOF' }; });
     else if(s.id==='specs') c.specs=p.specs.slice();
+    else if(s.id==='pieces'){
+      state.docDefs=state.docDefs||[];
+      var connues=state.docDefs.map(function(d){ return String(d.label).trim().toLowerCase(); });
+      p.pieces.forEach(function(x,i){
+        if(connues.indexOf(x.label.toLowerCase())>=0) return;
+        state.docDefs.push({ id:'d'+Date.now().toString(36)+i, label:x.label, scope:x.scope||'tous' });
+      });
+    }
+    else if(s.id==='criteres'){
+      if(state.depClosed) return; // grille figée à la clôture du dépouillement
+      var avant=state.criteria||[], idx=function(id){ return avant.filter(function(x){ return x.id===id; })[0]; };
+      state.criteria=p.criteres.map(function(x,i){
+        if(x.nature==='prix' || x.nature==='delai'){ var ex=idx(x.nature); return { id:x.nature, label:x.label, weight:x.poids, kind:'auto', hint:ex?ex.hint:'' }; }
+        return { id:'c'+Date.now().toString(36)+i, label:x.label, weight:x.poids, kind:'qual', hint:'Notation proposée par IA, validée par un évaluateur' };
+      }).filter(function(x,i,t){ return x.kind==='qual' || t.findIndex(function(y){ return y.id===x.id; })===i; });
+    }
+    else if(s.id==='cctp') c.cctp={ source:'ia', le:new Date().toLocaleDateString('fr-FR'), articles:p.cctp.map(function(a){ return { titre:a.titre, paragraphes:a.paragraphes.slice() }; }), aVerifier:[] };
     else s.champs.forEach(function(ch){
       var k=ch[0], v=p[k]; if(v==null || v==='') return;
       if(k==='prefActive' && v && !CADRE().preferenceAutorisee) return; // le profil ne l'autorise pas
