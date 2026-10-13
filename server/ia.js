@@ -359,4 +359,14 @@ Devise de soumission prévue : ${cdc.deviseSoumission || '(non précisée)'}
   return { lecture: { champs, lots, remarques: (Array.isArray(donnees.remarques) ? donnees.remarques : []).slice(0, 15).map((x) => String(x).trim().slice(0, 400)).filter(Boolean) }, modele, jetons };
 }
 
-module.exports = { actif, proposerCdc, redigerCctp, noterMemoire, lireOffre, SCHEMA_OFFRE, SCHEMA_NOTATION, appeler: appelerClaude, ErreurIA, SCHEMA, SCHEMA_CCTP, MODELE };
+/* ---- Mots-clés de recherche d'une photo d'illustration, d'après l'objet de l'achat ---- */
+const SCHEMA_IMAGE = { type: 'object', additionalProperties: false, required: ['requetes'], properties: { requetes: { type: 'array', items: texte } } };
+const SYSTEME_IMAGE = `Tu aides à illustrer la page de garde d'un dossier d'appel d'offres. À partir de l'objet de l'achat, donne 3 requêtes de recherche de photographie en anglais (2 à 4 mots chacune), de la plus précise à la plus générale, qui décrivent ce qu'on VOIT sur une photo représentative de l'achat (l'objet acheté, pas l'organisation ni le lieu). Pas de marque, pas de nom de personne ni de pays.`;
+/** Requêtes en anglais pour trouver une photo de l'achat. Retourne { requetes: [3 chaînes au plus] }. */
+async function requetesImage(objet) {
+  const { donnees } = await appelJson({ system: SYSTEME_IMAGE, effort: 'low', schema: SCHEMA_IMAGE, tropLong: 'Réponse trop longue.',
+    contenu: [{ type: 'text', text: '<objet>\n' + String(objet || '').slice(0, 500) + '\n</objet>' }] });
+  return { requetes: (Array.isArray(donnees.requetes) ? donnees.requetes : []).map((x) => String(x).replace(/[^\p{L}\p{N} -]/gu, ' ').trim().slice(0, 60)).filter(Boolean).slice(0, 3) };
+}
+
+module.exports = { actif, requetesImage, proposerCdc, redigerCctp, noterMemoire, lireOffre, SCHEMA_OFFRE, SCHEMA_NOTATION, appeler: appelerClaude, ErreurIA, SCHEMA, SCHEMA_CCTP, MODELE };

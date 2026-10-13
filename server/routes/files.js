@@ -96,6 +96,11 @@ function accesFichier(req, res) {
   const f = db.prepare('SELECT * FROM files WHERE id=?').get(req.params.id);
   const eq = equipeDe(req.user.id), lui = f && eq.includes(f.owner); // un fichier de son entreprise
   const introuvable = () => { res.status(404).json({ error: 'Pièce introuvable.' }); return null; };
+  // image de la page de garde : lue par ceux qui voient le dossier (publié, ou rédacteur)
+  if (f && f.doc_id === 'illustration' && f.procedure_id) {
+    const p = require('../db').proceduresAll().find((x) => x.id === f.procedure_id);
+    return p && require('./procedures').visible(req, p) ? f : introuvable();
+  }
   // pièce d'exécution d'une commande : qui voit la commande (achats, valideurs, réceptionnaire, titulaire)
   if (f && f.commande_id) {
     if (!require('./commandes').voitCommande(req, f.commande_id)) return introuvable();

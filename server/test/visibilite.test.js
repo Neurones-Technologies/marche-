@@ -35,3 +35,37 @@ test('registre de l’accueil : un prestataire ne voit que les appels d’offres
   ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: [idDelta, 'PRT-0001'] } }, pid));
   assert.equal((await registre(sotrap)).includes('AO-2026-077'), true, 'ajouté ensuite, il le voit');
 });
+
+test('image de la page de garde : importée par le rédacteur, lue par ceux qui voient le dossier, figée à la publication', async () => {
+  const achats = await login('y.koffi@bal.ci'), sotrap = await login('contact.sotrap@bal.ci');
+  const c = await call('POST', '/api/procedures', { ref: 'AO-2026-088', objet: 'Acquisition de véhicules tout-terrain', profil: 'prive' }, achats);
+  ok(c, 201);
+  const pid = c.json.id, base = require('./_client').base();
+  await require('./_client').remplir(achats, pid);
+  const envoyer = (corps, nom, cookie) => fetch(base + `/api/procedures/${pid}/illustration/televerser`, { method: 'POST', body: corps,
+    headers: { 'content-type': 'application/octet-stream', 'x-filename': nom, cookie } }).then(async (x) => ({ status: x.status, json: await x.json() }));
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.from('image de test')]);
+  assert.equal((await envoyer(png, 'photo.png', sotrap)).status, 404); // dossier non publié : invisible d'un prestataire
+  assert.equal((await envoyer(Buffer.from('%PDF-1.4 x'), 'x.pdf', achats)).status, 415); // image JPEG ou PNG seulement
+  const r = await envoyer(png, 'photo.png', achats);
+  assert.equal(r.status, 201, JSON.stringify(r.json));
+  const s = await getState(achats, pid);
+  assert.equal(s.cdc.illustrationImage.fichier, r.json.illustrationImage.fichier);
+  assert.equal((await fetch(base + '/api/files/' + s.cdc.illustrationImage.fichier, { headers: { cookie: achats } })).status, 200);
+  assert.equal((await fetch(base + '/api/files/' + s.cdc.illustrationImage.fichier, { headers: { cookie: sotrap } })).status, 404); // dossier non publié : invisible
+  // une nouvelle image remplace la précédente
+  const r2 = await envoyer(Buffer.concat([png, Buffer.from(' 2')]), 'autre.png', achats);
+  assert.equal(r2.status, 201);
+  assert.equal((await fetch(base + '/api/files/' + r.json.illustrationImage.fichier, { headers: { cookie: achats } })).status, 404);
+  // un identifiant forgé est refusé
+  const forge = await patch(achats, { cdc: { ...s.cdc, illustrationImage: { fichier: '../x', credit: 'x' } } }, pid);
+  assert.equal(forge.json.code, 'ILLUSTRATION_INVALID');
+  // la recherche de photos exige l'objet et le droit de rédiger
+  assert.equal((await call('GET', `/api/procedures/${pid}/illustration/recherche?q=truck`, null, sotrap)).status, 404);
+  // publié, le dossier est figé ; un partenaire consulté lit l'image
+  const p = await getState(achats, pid);
+  ok(await patch(achats, { consultes: { mode: 'restreint', partenaires: ['PRT-0001'] } }, pid));
+  ok(await patch(achats, { cdc: { ...p.cdc, cdcPublie: true } }, pid));
+  assert.equal((await envoyer(png, 'trop-tard.png', achats)).json.code, 'CDC_PUBLISHED');
+  assert.equal((await fetch(base + '/api/files/' + p.cdc.illustrationImage.fichier, { headers: { cookie: sotrap } })).status, 200);
+});

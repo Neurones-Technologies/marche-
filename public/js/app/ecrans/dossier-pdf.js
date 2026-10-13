@@ -22,9 +22,9 @@ function dateLongue(iso){
 }
 var PORTEE_PIECE = { tous:'Tous les soumissionnaires', local:'Établis en Côte d’Ivoire', etranger:'Établis hors UEMOA' };
 
-/* Définition pdfmake du dossier. photo : { data (URL de données), credit } de la page de garde, ou null (dessin de repli). */
+/* Définition pdfmake du dossier. photo : { data (URL de données), credit } de la page de garde, ou null (page de garde sobre). */
 function definitionDossier(photo){
-  var c=state.cdc, org=state.org||{}, P=buildDAO(), illu=illustrationDossier(c);
+  var c=state.cdc, org=state.org||{}, P=buildDAO();
   var lieu=[org.ville,org.pays].filter(Boolean).join(' · '), auj=new Date().toLocaleDateString('fr-FR',{ day:'numeric', month:'long', year:'numeric' });
   var contenu=[];
 
@@ -37,9 +37,8 @@ function definitionDossier(photo){
     { canvas:[{ type:'line', x1:0, y1:8, x2:495, y2:8, lineWidth:2, lineColor:COUL_PDF.accent }], margin:[0,0,0,34] },
     { text:'DOSSIER D’APPEL D’OFFRES', style:'garTitre' },
     { text:c.objet||'', style:'garObjet' },
-    photo ? { image:photo.data, fit:[495,250], alignment:'center', margin:[0,22,0,3] } : { svg:illu.svg, width:400, alignment:'center', margin:[0,22,0,8] },
-    photo ? { text:'Photo : '+photo.credit, fontSize:6.5, color:COUL_PDF.gris, alignment:'center', margin:[0,0,0,5] } : { text:'', fontSize:1 },
-    { text:illu.lab, style:'garTheme' },
+    photo ? { image:photo.data, fit:[495,250], alignment:'center', margin:[0,24,0,3] } : { text:'', margin:[0,16,0,0] },
+    photo ? { text:photo.credit, fontSize:6.5, color:COUL_PDF.gris, alignment:'center', margin:[0,0,0,5] } : { text:'', fontSize:1 },
     { table:{ widths:['*','*'], body:[
       [cleValeur('Autorité contractante',c.autorite),cleValeur('Type de procédure',c.procedure)],
       [cleValeur('Date limite de dépôt des offres',dateLongue(c.ouverture)+' à 10 h 00'),cleValeur('Langue de soumission',c.langue)],
@@ -130,12 +129,12 @@ function tableauPdf(entetes, largeurs, lignes){
       paddingTop:function(){ return 5; }, paddingBottom:function(){ return 5; } }, fontSize:9.5, margin:[0,0,0,6] };
 }
 
-/* Photo de la page de garde en URL de données (pdfmake l'embarque) ; null si elle ne se charge pas : le dessin la remplace. */
+/* Image de la page de garde en URL de données (pdfmake l'embarque) ; null s'il n'y en a pas ou si elle ne se charge pas. */
 function chargerPhotoDossier(){
-  var ill=illustrationDossier(state.cdc);
-  if(!ill.photo) return Promise.resolve(null);
-  return fetch(ill.photo.src,{ credentials:'same-origin' }).then(function(r){ if(!r.ok) throw new Error('photo'); return r.blob(); })
-    .then(function(b){ return new Promise(function(ok,ko){ var fr=new FileReader(); fr.onload=function(){ ok({ data:fr.result, credit:ill.photo.credit }); }; fr.onerror=ko; fr.readAsDataURL(b); }); })
+  var ill=imageDossier(state.cdc);
+  if(!ill) return Promise.resolve(null);
+  return fetch(ill.src,{ credentials:'same-origin' }).then(function(r){ if(!r.ok) throw new Error('photo'); return r.blob(); })
+    .then(function(b){ return new Promise(function(ok,ko){ var fr=new FileReader(); fr.onload=function(){ ok({ data:fr.result, credit:ill.credit }); }; fr.onerror=ko; fr.readAsDataURL(b); }); })
     .catch(function(){ return null; });
 }
 /* Génère le PDF ; retourne une promesse de Blob. */
@@ -166,7 +165,7 @@ function telechargerDossierPdf(){
 
 /* Écran du dossier publié : la page de garde en vignette, le document entier à la demande. */
 function vDossierPublie(m){
-  var c=state.cdc, org=state.org||{}, illu=illustrationDossier(c);
+  var c=state.cdc, org=state.org||{}, illu=imageDossier(c);
   if(fournisseurSeul() && viewAllowed('portail')) retourListe(m,'Retour à l’appel d’offres',function(){ go('portail'); },'retour-portail');
   var carte=add(m,'section','card doc-carte'); carte.setAttribute('aria-label','Dossier d’appel d’offres');
   var barre=add(carte,'div','doc-barre');
@@ -182,10 +181,7 @@ function vDossierPublie(m){
   add(et,'span','dg-ref','Réf. '+REF());
   add(garde,'div','dg-titre','Dossier d’appel d’offres');
   add(garde,'div','dg-objet',c.objet||'');
-  var im=add(garde,'div','dg-illu');
-  if(illu.photo){ var ph=add(im,'img'); ph.src=illu.photo.src; ph.alt=illu.lab; ph.setAttribute('loading','lazy'); ph.onerror=function(){ im.textContent=''; im.innerHTML=illu.svg; }; }
-  else im.innerHTML=illu.svg; // à défaut de photo, le dessin du thème (fixe, de l'application)
-  add(garde,'div','dg-theme',illu.lab);
+  if(illu){ var im=add(garde,'div','dg-illu'); var ph=add(im,'img'); ph.src=illu.src; ph.alt='Illustration du dossier'; ph.setAttribute('loading','lazy'); }
   var info=add(garde,'div','dg-infos');
   [['Procédure',c.procedure],['Date limite de dépôt',dateLongue(c.ouverture)],['Lots',(c.lots||[]).length+' lot(s)']].forEach(function(x){
     var d=add(info,'div'); add(d,'span',null,x[0]); add(d,'strong',null,x[1]||'—'); });

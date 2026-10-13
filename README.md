@@ -119,9 +119,10 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
   technique, offre financière, pièces) se consultent dans l'outil à la réception, au dépouillement et à la conformité. La
   grille de critères est figée dès la publication du dossier.
 - **Dossier d'appel d'offres (PDF)** : cinq pièces (objet et modalités, contenu de l'offre et évaluation, besoin et exigences
-  techniques, conditions contractuelles essentielles, cadre de réponse). La page de garde porte une vraie photo libre de
-  droits du thème de l'achat (déduit de l'objet, ou choisi au cahier des charges), crédits dans `docs/CREDITS-IMAGES.md`
-  et sous la photo ; plusieurs photos par thème, l'achat en retient une d'après sa référence.
+  techniques, conditions contractuelles essentielles, cadre de réponse). La page de garde porte l'image propre à l'achat,
+  choisie au cahier des charges : une photo libre de droits trouvée d'après l'objet (recherche Wikimedia Commons ; l'IA
+  tire les mots-clés de l'objet quand elle est configurée), ou l'image de l'acheteur. Sans image, la page de garde reste
+  sobre. Crédit de l'auteur sous la photo.
 - **Besoins** : un service exprime un besoin, qui suit le circuit de validation de l'organisation (niveaux selon le
   budget, le demandeur ne valide jamais son propre besoin, rejet motivé) ; validé, il devient une procédure pré-remplie
   (objet, budget, type de procédure pressenti selon des seuils provisoires du profil), que le demandeur suit en lecture.

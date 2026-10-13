@@ -69,6 +69,7 @@ r.use('/:pid', (req, res, next) => {
   next();
 });
 r.use('/:pid/files', require('./files').proc);
+r.use('/:pid/illustration', require('./illustration')); // image de la page de garde du dossier
 r.use('/:pid/ia', require('./ia')); // proposition de cahier des charges par l'IA (document ou idée)
 r.use('/:pid', require('./state'));
 

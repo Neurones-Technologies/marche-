@@ -71,14 +71,7 @@ function vCDC(m){
   })();
   txt(f1,"Langue de soumission",c.langue,function(v){ c.langue=v; });
   txt(f1,"Devise de soumission",c.deviseSoumission,function(v){ c.deviseSoumission=v; });
-  (function(){
-    var w=add(f1,'div'); add(w,'label',null,'Illustration de la page de garde').setAttribute('for','cdc-illustration');
-    var sel=add(w,'select'); sel.id='cdc-illustration'; fk(sel,'cdc-illustration');
-    add(sel,'option',null,'Automatique — '+(ILLUSTRATIONS[themeDossier(c)]||ILLUSTRATIONS.generique).lab).value='';
-    Object.keys(ILLUSTRATIONS).forEach(function(k){ add(sel,'option',null,ILLUSTRATIONS[k].lab).value=k; });
-    sel.value=c.illustration||'';
-    sel.addEventListener('change',function(){ if(sel.value) c.illustration=sel.value; else delete c.illustration; logit('Illustration de la page de garde : '+(sel.value?ILLUSTRATIONS[sel.value].lab:'automatique')); save(); render(); });
-  })();
+  blocImageDossier(f1); // image de la page de garde, propre à l'achat
   txt(f1,"Date limite de dépôt et ouverture des plis",/^\d{4}-\d{2}-\d{2}$/.test(String(c.ouverture||''))?c.ouverture:'',function(v){ c.ouverture=v; logit('Date limite de dépôt : '+v); },'date');
 
   /* Allotissement */

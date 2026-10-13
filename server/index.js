@@ -18,7 +18,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'blob:'], // blob: aperçu des pièces déposées (images)
+      imgSrc: ["'self'", 'data:', 'blob:', 'https://upload.wikimedia.org'], // blob: aperçu des pièces déposées ; upload.wikimedia.org : vignettes de la recherche de photos d'illustration
       connectSrc: ["'self'"],
       frameSrc: ["'self'", 'blob:'], // dossier d'appel d'offres en PDF, généré dans le navigateur
       frameAncestors: ["'none'"],
@@ -26,7 +26,7 @@ app.use(helmet({
   },
 }));
 // Téléversement d'une pièce : corps binaire, ni analysé en JSON ni soumis à l'exigence JSON ci-dessous.
-const FILES = /^\/api\/((procedures\/[^/]+\/)?files|procedures\/[^/]+\/ia\/(document|offre-externe)|partenaires\/[^/]+\/fichiers|commandes\/[^/]+\/fichiers|inscription\/brouillon\/pieces)(\/|$)/;
+const FILES = /^\/api\/((procedures\/[^/]+\/)?files|procedures\/[^/]+\/ia\/(document|offre-externe)|procedures\/[^/]+\/illustration\/televerser|partenaires\/[^/]+\/fichiers|commandes\/[^/]+\/fichiers|inscription\/brouillon\/pieces)(\/|$)/;
 app.use((req, res, next) => (FILES.test(req.path) ? next() : express.json({ limit: '1mb' })(req, res, next)));
 
 // Les requêtes d'écriture doivent être du JSON (protection CSRF complémentaire au cookie SameSite=Strict)

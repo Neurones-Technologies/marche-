@@ -102,6 +102,9 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         return refus(409, 'REFERENCE_LOCKED', 'Le dossier est publié : sa référence ne peut plus être modifiée.');
       if (value.illustration != null && !(typeof value.illustration === 'string' && /^[a-z]{1,30}$/.test(value.illustration)))
         return refus(422, 'ILLUSTRATION_INVALID', 'Illustration de la page de garde invalide.');
+      if (value.illustrationImage != null && !(isObj(value.illustrationImage) && typeof value.illustrationImage.fichier === 'string' && /^[\w-]{1,60}$/.test(value.illustrationImage.fichier)
+        && typeof value.illustrationImage.credit === 'string' && value.illustrationImage.credit.length <= 200))
+        return refus(422, 'ILLUSTRATION_INVALID', 'Image de la page de garde invalide.');
       // clauses techniques propres à l'achat : articles titrés, paragraphes de texte, tailles bornées
       if (value.cctp != null && !(isObj(value.cctp) && Array.isArray(value.cctp.articles) && value.cctp.articles.length <= 40
         && value.cctp.articles.every((a) => isObj(a) && typeof a.titre === 'string' && a.titre.length <= 200 && Array.isArray(a.paragraphes)
