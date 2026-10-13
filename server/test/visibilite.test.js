@@ -57,6 +57,9 @@ test('image de la page de garde : importée par le rédacteur, lue par ceux qui 
   const r2 = await envoyer(Buffer.concat([png, Buffer.from(' 2')]), 'autre.png', achats);
   assert.equal(r2.status, 201);
   assert.equal((await fetch(base + '/api/files/' + r.json.illustrationImage.fichier, { headers: { cookie: achats } })).status, 404);
+  // choix automatique : sans effet quand le dossier a déjà une image
+  const auto = await call('POST', `/api/procedures/${pid}/illustration/auto`, {}, achats);
+  assert.equal(auto.status, 200); assert.equal(auto.json.deja, true);
   // un identifiant forgé est refusé
   const forge = await patch(achats, { cdc: { ...s.cdc, illustrationImage: { fichier: '../x', credit: 'x' } } }, pid);
   assert.equal(forge.json.code, 'ILLUSTRATION_INVALID');

@@ -10,19 +10,35 @@ function imageDossier(c){
   return i && i.fichier ? { src:'/api/files/'+encodeURIComponent(i.fichier), credit:i.credit||'' } : null;
 }
 
+/* Avant l'aperçu du dossier : si l'achat n'a pas d'image, une photo qui répond à l'objet est cherchée (sans bloquer si la banque ne répond pas). */
+function assurerImageDossier(){
+  if(imageDossier(state.cdc) || !can('cdc.edit') || String(state.cdc.objet||'').trim().length<8) return Promise.resolve();
+  return Promise.resolve(typeof flush==='function' ? flush() : null).then(function(){ return MP.api('POST',MP.url('/illustration/auto'),{}); })
+    .then(function(){ return relireEtat(); }).catch(function(){});
+}
+
 /* Bloc du formulaire (cahier des charges) : aperçu, choisir une photo, importer, retirer. */
 function blocImageDossier(parent){
   var c=state.cdc, img=imageDossier(c);
   var w=add(parent,'div','img-dossier'); w.style.gridColumn='1/-1';
   add(w,'label',null,'Image de la page de garde');
+  // pas d'image : une photo qui répond à l'objet est cherchée toute seule, une fois par objet ; le rédacteur la change ensuite
+  UI.imgAuto=UI.imgAuto||{};
+  var cle=state.procedure+'|'+String(c.objet||'').trim();
+  if(!img && String(c.objet||'').trim().length>=8 && can('cdc.edit') && !UI.imgAuto[cle]){
+    UI.imgAuto[cle]='en cours';
+    Promise.resolve(typeof flush==='function' ? flush() : null).then(function(){ return MP.api('POST',MP.url('/illustration/auto'),{}); })
+      .then(function(){ UI.imgAuto[cle]='fait'; return relireEtat(); })
+      .catch(function(){ UI.imgAuto[cle]='fait'; render(); });
+  }
   var ligne=add(w,'div','img-dossier-ligne');
   if(img){
     var im=add(ligne,'img','img-dossier-apercu'); im.src=img.src; im.alt='Image de la page de garde';
   } else {
-    var vide=add(ligne,'div','img-dossier-vide'); vide.textContent='Aucune image';
+    var vide=add(ligne,'div','img-dossier-vide'); vide.textContent=UI.imgAuto && UI.imgAuto[cle]==='en cours' ? 'Recherche d’une photo…' : 'Aucune image';
   }
   var d=add(ligne,'div','img-dossier-texte');
-  add(d,'div','muted', img ? img.credit : 'Sans image, la page de garde du dossier reste sobre. Choisissez une photo qui illustre l’achat, ou importez la vôtre.');
+  add(d,'div','muted', img ? img.credit : (UI.imgAuto && UI.imgAuto[cle]==='en cours' ? 'Une photo qui répond à l’objet est en cours de recherche…' : 'Aucune photo libre trouvée automatiquement : choisissez-en une, ou importez la vôtre. Sans image, la page de garde reste sobre.'));
   var act=add(d,'div'); act.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:8px';
   var go=add(act,'button','btn btn-ghost btn-sm', img?'Changer de photo':'Choisir une photo'); go.type='button'; fk(go,'img-choisir');
   go.addEventListener('click',function(){

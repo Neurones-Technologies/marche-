@@ -1,6 +1,7 @@
 /* Image de la page de garde du dossier, propre à chaque achat, montée sous /api/procedures/:pid/illustration :
    - GET  /recherche?q= : photos libres de droits (Wikimedia Commons : domaine public, CC0, CC BY) ; sans q, des mots-clés
                           en anglais sont tirés de l'objet par l'IA (à défaut, l'objet lui-même)
+   - POST /auto         : choisit la première photo libre qui répond à l'objet, si le dossier n'a pas d'image
    - POST /commons      : retient une de ces photos ({ titre }) : le serveur la télécharge lui-même, depuis Commons seulement
    - POST /televerser   : image de l'acheteur (JPEG ou PNG, corps brut)
    - DELETE /           : retire l'image (le dessin du thème reprend la place)
@@ -20,7 +21,7 @@ r.use(needPerm('cdc.edit'));
 const err = (res, status, code, error) => res.status(status).json({ error, code });
 const limite = rateLimit({ windowMs: 3600000, limit: 60, keyGenerator: (req) => 'u:' + req.user.id, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Trop de recherches d’images : réessayez dans une heure.', code: 'TOO_MANY' } });
-const UA = { 'User-Agent': 'MarchePlus/1.0 (illustrations de dossiers d’appel d’offres)' };
+const UA = { 'User-Agent': 'MarchePlus/1.0 (illustrations de dossiers)' }; // en-tete ASCII : un caractere typographique fait refuser la requete
 const API = 'https://commons.wikimedia.org/w/api.php';
 const MAX = 5 * 1024 * 1024;
 
@@ -39,6 +40,18 @@ async function chercher(q) {
   const j = await (await fetch(u, { headers: UA, signal: AbortSignal.timeout(15000) })).json();
   return Object.values((j.query || {}).pages || {}).map(fiche).filter(utilisable);
 }
+/* Sans IA : mots-clés anglais d'après quelques termes d'achat courants, puis les premiers mots de l'objet. */
+const LEXIQUE = [['véhicule', 'vehicle car'], ['voiture', 'car'], ['tout-terrain', '4x4 vehicle'], ['camion', 'truck'], ['moto', 'motorcycle'], ['climatis', 'air conditioner'], ['ordinateur', 'computer'],
+  ['informatique', 'computer equipment'], ['réseau', 'network cables'], ['serveur', 'server rack'], ['imprimant', 'printer'], ['mobilier', 'office furniture'], ['bureau', 'office desk'],
+  ['caméra', 'security camera'], ['surveillance', 'security camera'], ['nettoyage', 'cleaning'], ['entretien', 'maintenance'], ['groupe électrogène', 'generator'], ['solaire', 'solar panels'],
+  ['éclairage', 'led lighting'], ['travaux', 'construction site'], ['toiture', 'roof'], ['bâtiment', 'building'], ['peinture', 'painting wall'], ['formation', 'training room'],
+  ['restauration', 'catering buffet'], ['médical', 'medical equipment'], ['fourniture', 'office supplies'], ['papier', 'paper'], ['téléphon', 'telephone'], ['ascenseur', 'elevator'],
+  ['sécurité', 'security'], ['incendie', 'fire extinguisher'], ['uniforme', 'uniform'], ['vêtement', 'clothing'], ['impression', 'printing'], ['signalétique', 'signage']];
+function requetesLocales(objet) {
+  const o = String(objet).toLowerCase(), trouves = [...new Set(LEXIQUE.filter(([k]) => o.includes(k)).map(([, v]) => v))].slice(0, 3);
+  const mots = o.replace(/[^\p{L}\p{N} -]/gu, ' ').split(/\s+/).filter((m) => m.length > 4).slice(0, 3).join(' ');
+  return trouves.concat(mots ? [mots] : []).slice(0, 3);
+}
 const credit = (c) => `${c.auteur || 'auteur inconnu'} — ${c.licence} — Wikimedia Commons`.slice(0, 200);
 
 r.get('/recherche', limite, async (req, res) => {
@@ -47,7 +60,7 @@ r.get('/recherche', limite, async (req, res) => {
     const objet = String((req.store.get('cdc') || {}).objet || '').trim();
     if (!objet) return err(res, 422, 'CDC_EMPTY', 'Renseignez d’abord l’objet du marché.');
     try { if (IA.actif()) { requetes = (await IA.requetesImage(objet)).requetes; traduit = requetes.length > 0; } } catch (e) { /* sans IA : l'objet lui-même */ }
-    if (!requetes.length) requetes = [objet.slice(0, 100)];
+    if (!requetes.length) requetes = requetesLocales(objet);
   }
   try {
     const vus = new Set(), liste = [];
@@ -78,6 +91,16 @@ function poser(req, octets, mime, nom, creditTexte) {
 }
 const avantPublication = (req, res, next) => ((req.store.get('cdc') || {}).cdcPublie ? err(res, 409, 'CDC_PUBLISHED', 'Le dossier est publié : son illustration ne change plus.') : next());
 
+/** Télécharge la photo c (fiche Commons déjà contrôlée) depuis les serveurs de Wikimedia et la retient pour la procédure. */
+async function retenir(req, c) {
+  const url = new URL(c.vignette); // téléchargement limité aux serveurs de fichiers de Wikimedia
+  if (url.protocol !== 'https:' || !/^(upload|thumb)\.wikimedia\.org$/.test(url.hostname)) return null;
+  const rep = await fetch(url, { headers: UA, signal: AbortSignal.timeout(30000) });
+  const octets = Buffer.from(await rep.arrayBuffer());
+  if (!rep.ok || octets.length > MAX || octets[0] !== 0xff || octets[1] !== 0xd8) return null;
+  return { fichier: poser(req, octets, 'image/jpeg', c.titre.replace(/^File:/, '').slice(0, 120), credit(c)), credit: credit(c) };
+}
+
 r.post('/commons', limite, avantPublication, async (req, res) => {
   const titre = String((req.body || {}).titre || '');
   if (!/^File:[^|<>]{3,200}$/.test(titre)) return err(res, 422, 'TITLE_INVALID', 'Photo invalide.');
@@ -86,13 +109,27 @@ r.post('/commons', limite, avantPublication, async (req, res) => {
     const j = await (await fetch(u, { headers: UA, signal: AbortSignal.timeout(15000) })).json();
     const c = fiche(Object.values((j.query || {}).pages || {})[0] || {});
     if (!utilisable(c)) return err(res, 422, 'IMAGE_REFUSED', 'Cette photo n’est pas utilisable (licence ou format).');
-    const url = new URL(c.vignette); // téléchargement limité aux serveurs de fichiers de Wikimedia
-    if (url.protocol !== 'https:' || !/^(upload|thumb)\.wikimedia\.org$/.test(url.hostname)) return err(res, 422, 'IMAGE_REFUSED', 'Source de photo non admise.');
-    const rep = await fetch(url, { headers: UA, signal: AbortSignal.timeout(30000) });
-    const octets = Buffer.from(await rep.arrayBuffer());
-    if (!rep.ok || octets.length > MAX || octets[0] !== 0xff || octets[1] !== 0xd8) return err(res, 422, 'IMAGE_REFUSED', 'Photo illisible ou trop lourde.');
-    const id = poser(req, octets, 'image/jpeg', titre.replace(/^File:/, '').slice(0, 120), credit(c));
-    res.status(201).json({ illustrationImage: { fichier: id, credit: credit(c) } });
+    const x = await retenir(req, c);
+    if (!x) return err(res, 422, 'IMAGE_REFUSED', 'Photo illisible, trop lourde ou source non admise.');
+    res.status(201).json({ illustrationImage: x });
+  } catch (e) { err(res, 502, 'IMAGES_UNAVAILABLE', 'La banque de photos ne répond pas : réessayez.'); }
+});
+
+/** Choix automatique : la première photo libre qui répond à l'objet (ou aux mots-clés tirés de l'objet par l'IA), sauf si le
+    dossier a déjà une image. Le rédacteur la change ensuite à sa guise. */
+r.post('/auto', limite, avantPublication, async (req, res) => {
+  const cdc = req.store.get('cdc') || {}, objet = String(cdc.objet || '').trim();
+  if (cdc.illustrationImage) return res.json({ illustrationImage: cdc.illustrationImage, deja: true });
+  if (!objet) return err(res, 422, 'CDC_EMPTY', 'Renseignez d’abord l’objet du marché.');
+  try {
+    let requetes = [];
+    try { if (IA.actif()) requetes = (await IA.requetesImage(objet)).requetes; } catch (e) { /* sans IA : l'objet lui-même */ }
+    if (!requetes.length) requetes = requetesLocales(objet);
+    for (const q of requetes) for (const c of await chercher(q)) {
+      const x = await retenir(req, c);
+      if (x) return res.status(201).json({ illustrationImage: x });
+    }
+    err(res, 404, 'NO_IMAGE', 'Aucune photo libre ne correspond à cet objet : choisissez-en une ou importez la vôtre.');
   } catch (e) { err(res, 502, 'IMAGES_UNAVAILABLE', 'La banque de photos ne répond pas : réessayez.'); }
 });
 
