@@ -18,6 +18,9 @@ module.exports = {
   maxFileMb: Number(process.env.MAX_FILE_MB) || 10,
   seedPassword: process.env.SEED_PASSWORD || 'Marche+2026!',
   seedDemo: process.env.SEED_DEMO !== '0',
+  // Comptes de la démonstration : par défaut le seul administrateur (ADMIN_EMAIL, ADMIN_NOM), les autres se créent à la main ;
+  // SEED_COMPTES=tous crée un compte par rôle (jeu des tests).
+  seedComptesTous: process.env.SEED_COMPTES === 'tous',
   // Marchés publics (profil réglementaire « public ») : en attente, donc indisponibles sauf MARCHES_PUBLICS=1.
   // Indisponibles : ni choisis pour une organisation, un espace ou un appel d'offres, ni proposés à l'écran.
   marchesPublics: process.env.MARCHES_PUBLICS === '1',

@@ -172,18 +172,11 @@ npm start            # http://localhost:3000
 npm test             # 90 tests (Node 22 requis pour better-sqlite3)
 ```
 
-Comptes de démonstration (mot de passe `Marche+2026!`, modifiable via `SEED_PASSWORD`) :
-
-| Courriel | Rôle |
-|---|---|
-| y.koffi@bal.ci | Responsable des achats |
-| f.assamoi@bal.ci | Évaluateur technique |
-| m.traore@bal.ci | Évaluateur financier |
-| a.diomande@bal.ci | Membre du comité d'engagement |
-| s.bamba@bal.ci | Auditeur interne |
-| contact.sotrap@bal.ci | Soumissionnaire |
-| administrateur@bal.ci | Administrateur fonctionnel |
-| k.yao@bal.ci | Demandeur (service interne) |
+Compte de démonstration : **oboyer@neuronestech.com** (administrateur), mot de passe `Marche+2026!` (modifiable via
+`SEED_PASSWORD` ; courriel et nom via `ADMIN_EMAIL` et `ADMIN_NOM`). Les autres comptes (acheteur, évaluateurs, comité,
+audit, demandeur, soumissionnaire) se créent depuis l'écran Comptes. `SEED_COMPTES=tous` crée un compte par rôle
+(`y.koffi@bal.ci`, `f.assamoi@bal.ci`, `m.traore@bal.ci`, `a.diomande@bal.ci`, `s.bamba@bal.ci`, `contact.sotrap@bal.ci`,
+`administrateur@bal.ci`, `k.yao@bal.ci`) et assigne les offres de la démonstration : c'est le jeu des tests.
 
 ## Déploiement (Docker)
 

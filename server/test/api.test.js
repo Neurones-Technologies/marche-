@@ -1,5 +1,6 @@
 process.env.DB_FILE = ':memory:';
 process.env.NODE_ENV = 'test';
+process.env.SEED_COMPTES = 'tous';
 process.env.LOGIN_RATE_LIMIT = '1000';
 const test = require('node:test');
 const assert = require('node:assert/strict');

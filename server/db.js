@@ -507,7 +507,7 @@ function seedAll(withUsers = true, options = null) {
       const demo = procDefaults({ ...clone(seed.CDC), ...(cfg.marchesPublics ? {} : { prefActive: false, prefTaux: 0 }), cctp: clone(CCTP_EXEMPLE), ligneBudget: 'b-dsi-inv', ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
       seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
       // démonstration : chaque offre est déjà assignée à l'évaluateur technique (u2) et à l'évaluateur financier (u3)
-      seed.OFFERS.forEach((o) => { demo.assignations[o.id] = { tech: ['u2'], fin: ['u3'] }; });
+      if (cfg.seedComptesTous) seed.OFFERS.forEach((o) => { demo.assignations[o.id] = { tech: ['u2'], fin: ['u3'] }; });
       procedureInsert('p1', demo, 'seed');
       seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));
     }
@@ -516,7 +516,8 @@ function seedAll(withUsers = true, options = null) {
       if (demo) {
         const h = bcrypt.hashSync(cfg.seedPassword, 10);
         const ins = db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)');
-        for (const u of seed.USERS) ins.run(u.id, u.nom, slug(u.nom) + '@bal.ci', u.role, h);
+        if (cfg.seedComptesTous) for (const u of seed.USERS) ins.run(u.id, u.nom, slug(u.nom) + '@bal.ci', u.role, h);
+        else ins.run('u0', process.env.ADMIN_NOM || 'O. Boyer', String(process.env.ADMIN_EMAIL || 'oboyer@neuronestech.com').trim().toLowerCase(), 'admin', h);
       } else if (options && options.admin) {
         const a = options.admin;
         db.prepare('INSERT INTO users(id,nom,email,role,pass_hash) VALUES(?,?,?,?,?)').run('u0', a.nom, a.email, 'admin', a.hash);
