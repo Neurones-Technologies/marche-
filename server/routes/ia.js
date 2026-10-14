@@ -117,6 +117,9 @@ r.post('/notation/:offre', needPerm('eval.score'), limite, (req, res) => {
   if (!coi || !coi.declare || coi.conflit) return err(res, 403, 'COI_REQUIRED', 'Déclaration d’absence de conflit d’intérêts requise avant de noter.');
   if (!req.store.get('depClosed')) return err(res, 409, 'GATE_DEPOUILLEMENT_NOT_CLOSED', 'L’évaluation est fermée tant que le dépouillement n’est pas clôturé.');
   if (req.store.get('evalDone')) return err(res, 409, 'EVALUATION_VALIDATED', 'L’évaluation est validée : les notes ne peuvent plus être modifiées.');
+  // l'analyse du mémoire technique sert les évaluateurs techniques assignés à cette offre
+  if (!R.assignes({ assignations: req.store.get('assignations') }, o, 'technique').includes(req.user.id))
+    return err(res, 403, 'NOT_ASSIGNED', 'Cette offre ne vous est pas assignée pour les critères techniques.');
   // le mémoire technique joint en ligne ; pour une offre reçue hors plateforme, le document reçu qui le contient
   const p = (o.pieces || []).find((x) => x.doc === 'memoire') || (o.pieces || []).find((x) => x.doc === 'offre-recue');
   const f = p && db.prepare('SELECT id, mime FROM files WHERE id=? AND offer_id=?').get(p.id, o.id);
@@ -126,7 +129,7 @@ r.post('/notation/:offre', needPerm('eval.score'), limite, (req, res) => {
   const memoire = f.mime === 'application/pdf' ? { pdf: corps } : /wordprocessingml/.test(f.mime) ? { word: corps }
     : /^image\/(png|jpeg)$/.test(f.mime) ? { image: corps, mime: f.mime } : null;
   if (!memoire) return err(res, 415, 'FILE_TYPE', 'Le mémoire technique doit être un PDF, un document Word ou une image pour être analysé.');
-  const criteres = (req.store.get('criteria') || []).filter((c) => c.kind === 'qual').map((c) => ({ id: c.id, label: c.label, weight: c.weight, hint: c.hint }));
+  const criteres = (req.store.get('criteria') || []).filter((c) => c.kind === 'qual' && R.domaineDe(c) === 'technique').map((c) => ({ id: c.id, label: c.label, weight: c.weight, hint: c.hint }));
   const cdc = req.store.get('cdc') || {};
   return lancerTravail(req, res, () => IA.noterMemoire(memoire, cdc, criteres, ctx(req)).then((out) => {
     // enregistrée sur l'offre telle qu'elle est à la fin de l'analyse

@@ -125,7 +125,7 @@ const frDate = () => new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Abid
 
 /* Clés propres à une procédure ; toutes les autres appartiennent à l'organisation (une par instance). */
 const PROC_KEYS = ['rappels', 'jalons', 'reclamations', 'docDefs', 'cdc', 'criteria', 'quality', 'justif', 'confirmed', 'excluded', 'depClosed', 'evalDone', 'approvals',
-  'qa', 'additifs', 'clarifs', 'coi', 'recours', 'standstill', 'contractSigned', 'infructueux', 'fxFrozen', 'cadre', '_sod', 'rejets', 'consultes'];
+  'qa', 'additifs', 'clarifs', 'coi', 'recours', 'standstill', 'contractSigned', 'infructueux', 'fxFrozen', 'cadre', '_sod', 'rejets', 'consultes', 'assignations', 'notesEval'];
 const isProcKey = (k) => PROC_KEYS.includes(k);
 
 /* ---- révision globale (détection de changements côté client) ---- */
@@ -279,6 +279,22 @@ const CDC_VIDE = { procedure: '', langue: '', deviseSoumission: '', ouverture: '
   delaiMax: '', penalite: '', avance: '', tva: '', retenueNonResident: '', douaneACharge: '', prefActive: false, prefTaux: 0, partTechnique: 75 };
 /* Grille d'un appel d'offres neuf : les deux critères calculés (qu'on ne peut pas ajouter à la main), sans pondération. */
 const criteresVides = () => seed.CRITERIA.filter((c) => c.kind === 'auto').map((c) => ({ ...clone(c), weight: 0 }));
+const HINT_NOTE = 'Notation proposée par IA, validée par un évaluateur';
+/* Modèles de critères de l'organisation (paramétrage) : techniques (avec le nombre minimal d'évaluateurs techniques par
+   offre) et financiers (les critères calculés prix et délai, plus ceux qu'un évaluateur financier note). Par défaut :
+   aucun critère technique, et les deux critères calculés sans pondération, comme une grille vierge. */
+const criteresTechniquesDefaut = () => ({ minEvaluateurs: 1, criteres: [] });
+const criteresFinanciersDefaut = () => ({ criteres: criteresVides().map((c) => ({ ...c, domaine: 'financier' })) });
+const criteresTechniquesDemo = () => ({ minEvaluateurs: 1, criteres: seed.CRITERIA.filter((c) => c.kind === 'qual').map((c) => ({ ...clone(c), domaine: 'technique' })) });
+const criteresFinanciersDemo = () => ({ criteres: seed.CRITERIA.filter((c) => c.kind === 'auto').map((c) => ({ ...clone(c), domaine: 'financier' })) });
+/** Grille d'une procédure neuve : copie des modèles de l'organisation (critères financiers puis techniques), que
+    l'acheteur ajuste avant la publication. Sans modèle (instance ancienne), la grille vierge. */
+function criteresModele() {
+  const t = (kvGet('criteresTechniques') || {}).value, f = (kvGet('criteresFinanciers') || {}).value;
+  if (!t && !f) return criteresVides();
+  const copie = (c, domaine) => ({ ...clone(c), domaine, kind: c.kind === 'auto' ? 'auto' : 'qual', hint: c.hint || (c.kind === 'auto' ? '' : HINT_NOTE) });
+  return ((f && f.criteres) || []).map((c) => copie(c, 'financier')).concat(((t && t.criteres) || []).map((c) => copie(c, 'technique')));
+}
 /** Pièces de l'appel d'offres de démonstration : celles par défaut, plus la caution de soumission (propre à l'offre). */
 function piecesOffreDemo(cdc) {
   const d = piecesOffreDefaut(cdc);
@@ -289,7 +305,7 @@ function procDefaults(cdc, { demo = false } = {}) {
   const circuit = (kvGet('circuitModele') || { value: seed.APPROVALS }).value;
   return {
     docDefs: demo ? piecesOffreDemo(cdc) : piecesOffreDefaut(cdc),
-    cdc, criteria: demo ? clone(seed.CRITERIA) : criteresVides(), quality: {}, justif: {}, confirmed: {}, excluded: {},
+    cdc, criteria: demo ? clone(seed.CRITERIA) : criteresModele(), quality: {}, justif: {}, confirmed: {}, excluded: {}, assignations: {}, notesEval: {},
     depClosed: false, evalDone: false, approvals: C.reinitialiser(circuit),
     qa: [], additifs: [], clarifs: [], coi: {}, recours: [], rejets: [], reclamations: [], standstill: { days: 15, startedAt: null },
     contractSigned: false, infructueux: null, cadre: null,
@@ -443,6 +459,7 @@ function defaultOrgKv() {
     notifs: [], emails: [], delegations: [], circuitModele: clone(seed.APPROVALS), circuitBesoin: clone(CIRCUIT_BESOIN), circuitReferencement: clone(CIRCUIT_REFERENCEMENT), formulaireReferencement: formulaireDefaut(seed.DOC_DEFS), circuitCommande: clone(CIRCUIT_COMMANDE), evaluationPartenaires: clone(EVALUATION_PARTENAIRES),
     mailFrom: 'marches@bal.ci', mailSuffix: '@bal.ci',
     budget: { lignes: [] },
+    criteresTechniques: criteresTechniquesDefaut(), criteresFinanciers: criteresFinanciersDefaut(),
   };
 }
 /* Lignes budgétaires de la démonstration (exercice en cours). */
@@ -483,12 +500,14 @@ function seedAll(withUsers = true, options = null) {
       if (org.roles && org.roles.admin) org.roles.admin.perms['portail.use'] = false;
       org.mailFrom = ''; org.mailSuffix = '';
     }
-    if (demo) org.budget = { lignes: budgetDemo() };
+    if (demo) { org.budget = { lignes: budgetDemo() }; org.criteresTechniques = criteresTechniquesDemo(); org.criteresFinanciers = criteresFinanciersDemo(); }
     for (const [k, v] of Object.entries(org)) kvSet(k, v, 'seed');
     if (demo) {
       // procédure de démonstration : AO-2026-014, telle que dans le prototype, avec ses offres
       const demo = procDefaults({ ...clone(seed.CDC), ...(cfg.marchesPublics ? {} : { prefActive: false, prefTaux: 0 }), cctp: clone(CCTP_EXEMPLE), ligneBudget: 'b-dsi-inv', ouverture: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) }, { demo: true });
       seed.OFFERS.forEach((o) => { demo.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
+      // démonstration : chaque offre est déjà assignée à l'évaluateur technique (u2) et à l'évaluateur financier (u3)
+      seed.OFFERS.forEach((o) => { demo.assignations[o.id] = { tech: ['u2'], fin: ['u3'] }; });
       procedureInsert('p1', demo, 'seed');
       seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));
     }
@@ -635,6 +654,12 @@ db.transaction(function migrate() {
       if (t) { o.depot = String(t).replace(/:\d{2}$/, ''); offersReplace([o]); }
     }
   }
+  // 14/10/2026 : évaluateurs. Modèles de critères techniques et financiers de l'organisation (par défaut : grille vierge) ;
+  // chaque procédure reçoit ses assignations d'évaluateurs et les notes par évaluateur (vides : à assigner).
+  if (kvGet('org') && !kvGet('criteresTechniques')) kvSet('criteresTechniques', criteresTechniquesDefaut(), 'migration');
+  if (kvGet('org') && !kvGet('criteresFinanciers')) kvSet('criteresFinanciers', criteresFinanciersDefaut(), 'migration');
+  for (const p of db.prepare('SELECT id FROM procedures').all())
+    for (const k of ['assignations', 'notesEval']) if (!pkvGet(p.id, k)) pkvSet(p.id, k, {}, 'migration');
   // 07/10/2026 : budget et engagement. Sans ligne budgétaire, le contrôle des crédits reste inactif.
   if (kvGet('org') && !kvGet('budget')) kvSet('budget', { lignes: [] }, 'migration');
   // 02/10/2026 : module 4 (commandes). Circuit de validation par défaut.

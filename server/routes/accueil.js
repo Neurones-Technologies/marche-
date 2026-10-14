@@ -27,9 +27,10 @@ const visible = (req, p) => require('./procedures').visible(req, p);
 function ctxDe(pid) {
   const s = store(pid);
   const k = ['org', 'fxFrozen', 'cadre', 'cdc', 'criteria', 'quality', 'justif', 'excluded', 'confirmed', 'docDefs', 'approvals',
-    'depClosed', 'evalDone', 'standstill', 'contractSigned', 'infructueux', 'recours'];
+    'depClosed', 'evalDone', 'standstill', 'contractSigned', 'infructueux', 'recours', 'assignations', 'notesEval'];
   const ctx = { offers: s.offers() };
   k.forEach((x) => { ctx[x] = s.get(x); });
+  ctx.minEvaluateurs = (s.get('criteresTechniques') || {}).minEvaluateurs;
   return ctx;
 }
 /** Phase d'une procédure, de la préparation à la signature (ordre du cycle de vie). */
@@ -102,7 +103,13 @@ r.get('/accueil', requireAuth, (req, res) => {
       const L = (vue) => ({ vue, procedure: p.id });
       if (!cdc.cdcPublie && can('cdc.publish')) tache('Appels d’offres', `Publier le dossier ${ref}`, cdc.objet, L('cdc'));
       if (cdc.cdcPublie && !ctx.depClosed && can('depouille.close')) tache('Appels d’offres', `Dépouiller les offres de ${ref}`, `${ctx.offers.length} offre(s) reçue(s)`, L('depouille'));
-      if (ctx.depClosed && !ctx.evalDone && (can('eval.score') || can('eval.validate'))) tache('Appels d’offres', `Évaluer les offres de ${ref}`, can('eval.validate') ? 'Noter puis valider l’évaluation' : 'Noter les critères qualitatifs', L('evaluation'));
+      if (ctx.depClosed && !ctx.evalDone) {
+        // l'évaluation s'ouvre une fois les évaluateurs assignés ; chacun note ensuite ce qui lui est assigné
+        const manque = R.assignationManquante(ctx), mes = R.notationManquante(ctx).filter((x) => x.uid === moi);
+        if (manque.length) { if (can('eval.assign')) tache('Appels d’offres', `Assigner les évaluateurs de ${ref}`, `${manque.length} offre(s) sans évaluateurs complets`, L('evaluation')); }
+        else if (mes.length) tache('Appels d’offres', `Noter les offres de ${ref}`, `${mes.length} note(s) à saisir`, L('evaluation'));
+        else if (can('eval.validate')) tache('Appels d’offres', `Valider l’évaluation de ${ref}`, R.notationManquante(ctx).length ? 'En attente des notes des évaluateurs' : 'Toutes les notes sont saisies', L('evaluation'));
+      }
       if (ctx.evalDone && !R.allApproved(ctx.approvals) && can('decision.approve')) {
         const i = C.prochaine(ctx.approvals);
         if (i >= 0 && !C.controle(ctx.approvals, i, req.user, [], SU.sup(req.user, 'attribution', p.id))) tache('Appels d’offres', `Approuver l’attribution de ${ref}`, ctx.approvals[i].role, L('decision'));

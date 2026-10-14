@@ -118,7 +118,11 @@ test('notation proposée par l’IA d’après le mémoire technique joint ; les
   s = await getState(achats);
   const o = s.offers.find((x) => x.depotPar && x.name === 'SOTRAP SARL');
   const ev = await login('f.assamoi@bal.ci'), uid = (await getState(ev)).me;
+  // une offre déposée en ligne n'a pas encore d'évaluateurs : l'analyse sert les évaluateurs techniques assignés
   assert.equal((await call('POST', `/api/procedures/p1/ia/notation/${o.id}`, {}, ev)).json.code, 'COI_REQUIRED');
+  ok(await patch(ev, { coi: { ...s.coi, [uid]: { declare: true, conflit: false, t: 'test' } } }));
+  assert.equal((await call('POST', `/api/procedures/p1/ia/notation/${o.id}`, {}, ev)).json.code, 'NOT_ASSIGNED');
+  ok(await call('PUT', `/api/procedures/p1/assignations/${o.id}`, { tech: ['u2'], fin: ['u3'] }, achats));
   ok(await patch(ev, { coi: { ...s.coi, [uid]: { declare: true, conflit: false, t: 'test' } } }));
   assert.equal((await call('POST', '/api/procedures/p1/ia/notation/kora', {}, ev)).json.code, 'NO_MEMOIRE'); // offre de démonstration
   assert.equal((await call('POST', `/api/procedures/p1/ia/notation/${o.id}`, {}, sotrap)).status, 403);

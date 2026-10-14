@@ -1,6 +1,6 @@
 /* Parcours complet d'une procédure, en essayant à chaque étape de contourner l'ordre ou les rôles.
    Les tests s'enchaînent : chacun part de l'état laissé par le précédent. */
-const { call, login, getState, patch, clone } = require('./_client');
+const { call, login, getState, patch, clone, assignerEvaluateurs, evaluerOffres } = require('./_client');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const R = require('../../public/js/regles.js');
@@ -14,11 +14,8 @@ async function declarerCoi(cookie, uid) {
   coi[uid] = { declare: true, conflit: false, t: 'test' };
   ok(await patch(cookie, { coi }));
 }
-async function noter(cookie, offerId, critId, valeur) {
-  const q = clone((await getState(cookie)).quality);
-  q[offerId][critId] = valeur;
-  return patch(cookie, { quality: q });
-}
+/** Note d'un évaluateur assigné : la note retenue du critère est la moyenne des notes des évaluateurs. */
+const noter = (cookie, offerId, critId, valeur) => call('PUT', `/api/procedures/p1/scores/${offerId}/${critId}`, { note: valeur }, cookie);
 async function approuver(cookie, niveau) {
   const ap = clone((await getState(cookie)).approvals);
   ap[niveau].done = true;
@@ -88,11 +85,25 @@ test('changer les taux dans les paramètres ne fait plus bouger le classement', 
   assert.deepEqual(R.ranking(ctx(apres)).map((r) => [r.o.id, r.total]), avant);
 });
 
+test('évaluation : fermée tant que les évaluateurs ne sont pas assignés à chaque offre conforme', async () => {
+  // la démonstration assigne déjà chaque offre ; on retire ceux de SOTRAP, et seul l'acheteur ou l'administrateur peut assigner
+  refusé(await call('PUT', '/api/procedures/p1/assignations/sotrap', { tech: [], fin: [] }, evaltech), 403);
+  ok(await call('PUT', '/api/procedures/p1/assignations/sotrap', { tech: [], fin: [] }, achats));
+  refusé(await noter(evaltech, 'sotrap', 'metho', 60), 409, 'GATE_EVALUATORS_NOT_ASSIGNED');
+  refusé(await patch(evalfin, { evalDone: true }), 409, 'GATE_EVALUATORS_NOT_ASSIGNED');
+  await assignerEvaluateurs();
+  // un second évaluateur technique, l'administrateur, sur une seule offre : il ne pourra plus approuver
+  ok(await call('PUT', '/api/procedures/p1/assignations/delta', { tech: ['u2', 'u0'], fin: ['u3'] }, admin));
+});
+
 test('notation : tout écart avec le score IA exige une justification écrite', async () => {
   ok(await noter(evaltech, 'sotrap', 'metho', 60));
   // l'administrateur note aussi : il ne pourra plus approuver (séparation des fonctions)
   await declarerCoi(admin, 'u0');
   ok(await noter(admin, 'delta', 'refs', 95));
+  // l'évaluation ne se valide pas tant qu'un évaluateur assigné n'a pas noté
+  refusé(await patch(evalfin, { evalDone: true }), 409, 'EVALUATION_INCOMPLETE');
+  await evaluerOffres();
 
   let r = await patch(evalfin, { evalDone: true });
   refusé(r, 422, 'JUSTIFICATION_REQUIRED');
@@ -110,6 +121,7 @@ test('notation : tout écart avec le score IA exige une justification écrite', 
 
 test('après validation : notes, justifications et conformité sont figées', async () => {
   refusé(await noter(evaltech, 'sotrap', 'metho', 65), 409, 'EVALUATION_VALIDATED');
+  refusé(await call('PUT', '/api/procedures/p1/assignations/sotrap', { tech: [], fin: ['u3'] }, admin), 409, 'EVALUATION_VALIDATED');
   refusé(await patch(evaltech, { justif: {} }), 409, 'EVALUATION_VALIDATED');
   refusé(await patch(achats, { excluded: { kora: false } }), 409, 'EVALUATION_VALIDATED');
   const ap = clone((await getState(admin)).approvals);

@@ -137,6 +137,15 @@ Ce que le serveur garantit (et que l'interface seule ne garantissait pas) :
   confiance n'est pas confirmé, pas d'approbation avant la validation de l'évaluation, niveaux franchis dans l'ordre.
   Un retour en arrière n'est possible que par un recours déclaré fondé.
 - **Justification obligatoire** de tout écart avec le score proposé par l'IA, vérifiée à la validation de l'évaluation.
+- **Évaluateurs technique et financier** : les critères d'évaluation sont définis dans le paramétrage de l'organisation
+  (écran « Critères d'évaluation » : critères techniques et nombre minimal d'évaluateurs techniques par offre, par
+  l'administration ; critères financiers, aussi par l'acheteur) et copiés comme grille de chaque nouvel appel d'offres.
+  Le responsable des achats assigne à chaque offre conforme ses évaluateurs techniques et son évaluateur financier :
+  **l'évaluation reste fermée tant que ce n'est pas fait**. Chaque évaluateur note, pour les offres qui lui sont
+  assignées, les critères de son domaine (habilitations « Noter les critères techniques / financiers ») ; la note
+  retenue d'un critère est la **moyenne** des notes des évaluateurs assignés (une décimale), jamais écrite à la main.
+  L'évaluation ne se valide qu'une fois toutes les notes saisies. Un évaluateur technique « seul » ne reçoit que ses
+  offres (sans les montants) et ses propres notes ; l'acheteur, l'évaluateur financier et le comité voient tout.
 - **Circuit d'approbation paramétrable** : chaque niveau peut ne s'appliquer qu'à partir d'un montant (fixé par le
   serveur à la validation de l'évaluation, d'après l'offre classée première) et être réservé à un rôle ; les niveaux se
   franchissent un par un, dans l'ordre ; le niveau attendu peut rejeter l'attribution, avec un motif obligatoire, ce

@@ -11,6 +11,20 @@ const C = require('../../public/js/circuits.js');
 
 const r = express.Router({ mergeParams: true });
 
+/** Ce que reçoit un évaluateur technique « seul » (voir R.evaluateurRestreint) parmi des valeurs de la procédure :
+    ses assignations et ses propres notes, sans la moyenne retenue ni les notes de ses collègues. */
+function restreindre(req, vals) {
+  if (!req.pid || !R.evaluateurRestreint(req.can)) return vals;
+  const moi = req.user.id, out = { ...vals }, ass = req.store.get('assignations') || {};
+  const mes = Object.keys(ass).filter((id) => ((ass[id] || {}).tech || []).includes(moi));
+  if ('assignations' in out) out.assignations = Object.fromEntries(mes.map((id) => [id, { tech: [moi], fin: [] }]));
+  if ('quality' in out) out.quality = {};
+  if ('notesEval' in out) out.notesEval = Object.fromEntries(Object.entries(out.notesEval || {}).map(([o, cs]) => [o,
+    Object.fromEntries(Object.entries(cs || {}).filter(([, n]) => n && n[moi] != null).map(([c, n]) => [c, { [moi]: n[moi] }]))]).filter(([, cs]) => Object.keys(cs).length));
+  if ('justif' in out) out.justif = Object.fromEntries(Object.entries(out.justif || {}).filter(([k]) => mes.some((id) => k.startsWith(id + '_'))));
+  return out;
+}
+
 /** État complet visible par l'utilisateur courant, pour la procédure req.pid. */
 function buildState(req) {
   const org = kvAll(), proc = pkvAll(req.pid);
@@ -58,8 +72,25 @@ function buildState(req) {
     st.monPartenaire = p ? { id: p.id, raisonSociale: p.raisonSociale, pays: p.pays, statut: p.statut,
       piecesValables: Object.keys(p.pieces).filter((k) => pieceValable(p.pieces[k])).reduce((o, k) => { o[k] = { nom: p.pieces[k].nom, expire: p.pieces[k].expire }; return o; }, {}) } : null;
   }
+  // L'évaluation est-elle ouverte (chaque offre conforme a ses évaluateurs) ? Calculé sur toutes les offres : un évaluateur
+  // technique, qui n'en voit que quelques-unes, ne peut pas le déduire ; la liste de ce qui manque n'est donnée qu'à ceux qui assignent.
+  if (canSeeOffers && req.pid) {
+    const manque = R.assignationManquante({ offers: st.offers, org: values.org, fxFrozen: values.fxFrozen, cadre: values.cadre, cdc: values.cdc, criteria: values.criteria,
+      excluded: values.excluded, confirmed: values.confirmed, docDefs: values.docDefs, assignations: values.assignations, minEvaluateurs: (values.criteresTechniques || {}).minEvaluateurs });
+    st.evalGate = { prete: !manque.length, manque: req.can('eval.assign') ? manque : [] };
+  }
   // Un soumissionnaire ne doit voir ni les notes, ni les décisions internes.
-  if (!canSeeOffers) { st.quality = {}; st.justif = {}; st.confirmed = {}; st.excluded = {}; }
+  if (!canSeeOffers) { st.quality = {}; st.justif = {}; st.confirmed = {}; st.excluded = {}; st.assignations = {}; st.notesEval = {}; }
+  // Un évaluateur technique (sans assignation, validation ni notation financière) ne voit que les offres qui lui sont
+  // assignées, et que ses propres notes : ni les autres offres, ni les notes de ses collègues, ni la moyenne retenue.
+  if (canSeeOffers && req.pid && R.evaluateurRestreint(req.can)) {
+    Object.assign(st, restreindre(req, { assignations: st.assignations, notesEval: st.notesEval, quality: st.quality, justif: st.justif }));
+    const mes = new Set(Object.keys(st.assignations));
+    // sans les montants : l'évaluation technique se fait à l'aveugle du prix
+    st.offers = st.offers.filter((o) => mes.has(o.id)).map(({ montant, prixLots, ...o }) => o);
+    st.receipts = [];
+    st.confirmed = {}; st.excluded = {};
+  }
   // … ni le personnel (qui évalue, qui approuve), ni les délibérations, ni ce qui concerne ses concurrents (qui est
   // consulté, leurs clarifications et leurs recours) : son portail n'en a pas besoin
   if (!canSeeOffers && req.can('portail.use')) {
@@ -376,7 +407,7 @@ function cible(req, res, changes) {
   if (out.status !== 200) return res.status(out.status).json(out.body);
   const values = {};
   for (const k of Object.keys(changes)) values[k] = req.store.get(k);
-  res.json({ ...out.body, values });
+  res.json({ ...out.body, values: restreindre(req, values) });
 }
 const offreDe = (req) => req.store.offers().find((o) => o.id === req.params.offre);
 const introuvable = (quoi) => ({ status: 404, error: quoi + ' introuvable dans cette procédure.' });
@@ -391,10 +422,45 @@ r.put('/scores/:offre/:critere', (req, res) => {
   else if (note == null && justification == null) changes = { error: 'Note ou justification attendue.' };
   else if (justification != null && (typeof justification !== 'string' || justification.length > 2000)) changes = { error: 'Justification invalide (2 000 caractères au plus).' };
   else {
-    if (note != null) { const q = copie(req.store.get('quality')); q[o.id] = { ...(q[o.id] || {}), [c.id]: Number(note) }; changes.quality = q; }
+    if (note != null) {
+      // la note est celle de l'évaluateur connecté ; la note retenue du critère est la moyenne des évaluateurs assignés
+      const ne = copie(req.store.get('notesEval')); ne[o.id] = ne[o.id] || {};
+      ne[o.id][c.id] = { ...(ne[o.id][c.id] || {}), [req.user.id]: Number(note) };
+      changes.notesEval = ne;
+      const m = R.moyenneNotes({ assignations: req.store.get('assignations'), notesEval: ne }, o, c);
+      if (m != null) { const q = copie(req.store.get('quality')); q[o.id] = { ...(q[o.id] || {}), [c.id]: m }; changes.quality = q; }
+    }
     if (justification != null) { const j = copie(req.store.get('justif')); j[o.id + '_' + c.id] = justification.trim(); changes.justif = j; }
   }
   cible(req, res, changes);
+});
+
+/** Assignation des évaluateurs d'une offre : techniques (tech) et/ou financiers (fin), par identifiants de comptes.
+    Chaque évaluateur est prévenu ; l'assignation est journalisée. */
+r.put('/assignations/:offre', (req, res) => {
+  const o = offreDe(req), { tech, fin } = req.body || {};
+  const liste = (v) => v == null || (Array.isArray(v) && v.every((x) => typeof x === 'string'));
+  let changes;
+  if (!o) changes = introuvable('Offre');
+  else if (tech == null && fin == null) changes = { error: 'Évaluateurs techniques et/ou financiers attendus.' };
+  else if (!liste(tech) || !liste(fin)) changes = { error: 'Listes d’identifiants de comptes attendues.' };
+  else {
+    const a = copie(req.store.get('assignations')), cur = a[o.id] || { tech: [], fin: [] };
+    a[o.id] = { tech: tech == null ? cur.tech : tech, fin: fin == null ? cur.fin : fin };
+    changes = { assignations: a };
+  }
+  if (changes.error) return res.status(changes.status || 422).json({ error: changes.error, code: changes.code });
+  const avant = (req.store.get('assignations') || {})[o.id] || { tech: [], fin: [] };
+  const out = ecrire(req, changes);
+  if (out.status !== 200) return res.status(out.status).json(out.body);
+  const apres = req.store.get('assignations')[o.id], nom = (id) => (db.prepare('SELECT nom FROM users WHERE id=?').get(id) || { nom: id }).nom;
+  for (const [champ, lab] of [['tech', 'technique'], ['fin', 'financier']]) {
+    const nouveaux = apres[champ].filter((u) => !avant[champ].includes(u)), retires = avant[champ].filter((u) => !apres[champ].includes(u));
+    if (nouveaux.length || retires.length) auditAppend(req.user.id, whoLabel(req.user), 'Évaluation ' + lab + ' de « ' + o.name + ' »' + (nouveaux.length ? ' — assignée à ' + nouveaux.map(nom).join(', ') : '') + (retires.length ? ' — retirée à ' + retires.map(nom).join(', ') : ''), req.pid);
+    if (nouveaux.length) notifierServeur({ ev: 'eval.assignee', lab: 'Évaluation', titre: 'Offre assignée à votre évaluation ' + lab,
+      corps: 'L’offre de ' + o.name + ' vous est assignée (procédure ' + ((req.store.get('cdc') || {}).ref || req.pid) + '). Notez-la depuis l’écran Évaluation.', ids: nouveaux });
+  }
+  res.json({ ...out.body, values: restreindre(req, { assignations: req.store.get('assignations') }) });
 });
 
 /** Confirmation (ou retrait de la confirmation) d'un champ extrait d'une offre. */

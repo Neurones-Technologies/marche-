@@ -1,6 +1,6 @@
 /* Moteur de circuits : étapes requises selon le montant, rôle réservé, rejet motivé, minimum du profil.
    Les tests d'API s'enchaînent : chacun part de l'état laissé par le précédent. */
-const { call, login, getState, patch, clone } = require('./_client');
+const { call, login, getState, patch, clone, evaluerOffres } = require('./_client');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../../public/js/circuits.js');
@@ -51,6 +51,7 @@ test('validation de l’évaluation : refusée si le montant laisse moins de niv
   const confirmed = {};
   s.offers.forEach((o) => o.fields.forEach((f, i) => { if (f.flag) confirmed[o.id + '_' + i] = true; }));
   ok(await patch(achats, { confirmed, depClosed: true }));
+  await evaluerOffres();
   refusé(await patch(evalfin, { evalDone: true }), 422, 'APPROVAL_CIRCUIT_TOO_SHORT');
   const ap = clone((await getState(admin)).approvals); ap[1].seuil = 50000000;
   ok(await patch(admin, { approvals: ap }));

@@ -32,9 +32,9 @@ test('création : réservée au cahier des charges, référence unique', async (
   assert.equal(s.cdc.ref, 'AO-2026-020');
   assert.equal(s.cdc.profil, 'prive');
   assert.equal(s.cdc.cdcPublie, false);
-  // formulaires vides : aucune donnée d'exemple, grille réduite aux deux critères calculés sans pondération
+  // formulaires vides : aucune donnée d'exemple ; la grille est la copie des modèles de critères de l'organisation (ici ceux de la démonstration)
   assert.deepEqual([s.cdc.lots, s.cdc.specs, s.cdc.procedure], [[], [], '']);
-  assert.deepEqual(s.criteria.map((x) => [x.id, x.weight]), [['prix', 0], ['delai', 0]]);
+  assert.deepEqual(s.criteria.map((x) => [x.id, x.weight, x.domaine]), [['prix', 40, 'financier'], ['delai', 15, 'financier'], ['metho', 30, 'technique'], ['refs', 15, 'technique']]);
   assert.equal(s.offers.length, 0);
   assert.ok(s.approvals.length && s.approvals.every((a) => !a.done));
   assert.ok(s.audit.some((e) => e.a.startsWith('Procédure créée — AO-2026-020')));
@@ -114,7 +114,7 @@ test('publication : refusée tant que le dossier n’est pas prêt, avec ce qui 
   // un appel d'offres neuf naît vide : publication refusée tant que rien n'est saisi
   const vide = await patch(achats, { cdc: { ...(await getState(achats, c.json.id)).cdc, cdcPublie: true } }, c.json.id);
   refusé(vide, 409, 'CDC_INCOMPLETE');
-  assert.match(vide.json.error, /type de procédure.*date limite.*au moins un lot.*grille de critères/);
+  assert.match(vide.json.error, /type de procédure.*date limite.*au moins un lot/);
   const s = await require('./_client').remplir(achats, c.json.id);
   ok(await patch(achats, { cdc: { ...s.cdc, specs: [] } }, c.json.id));
   const r = await patch(achats, { cdc: { ...s.cdc, specs: [], cdcPublie: true } }, c.json.id);

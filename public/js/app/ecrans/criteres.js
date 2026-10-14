@@ -18,17 +18,24 @@ function vCriteres(m){
   var ph2=add(k2,'div','panel-head'); add(ph2,'span',null,'Critères');
   add(ph2,'span','chip '+(wt===100?'c-green':'c-red'), wt===100 ? 'Total : 100 % ✓' : (wt<100 ? 'Total : '+wt+' % · reste '+(100-wt)+' %' : 'Total : '+wt+' % · dépassement de '+(wt-100)+' %'));
   var b2=add(k2,'div','pad');
-  [['auto','Calculés automatiquement'],['qual','Notés par l’évaluateur · note proposée par l’IA']].forEach(function(g){
-    var lignes=crit.map(function(c,i){ return {c:c,i:i}; }).filter(function(x){ return (x.c.kind==='auto')===(g[0]==='auto'); });
+  /* Trois groupes : critères calculés (financiers), critères financiers notés par l'évaluateur financier, critères
+     techniques notés par les évaluateurs techniques assignés (leur moyenne fait la note). */
+  [['auto','Calculés automatiquement · financiers'],['qualfin','Notés par l’évaluateur financier'],['qual','Notés par les évaluateurs techniques · moyenne de leurs notes, note proposée par l’IA']].forEach(function(g){
+    var lignes=crit.map(function(c,i){ return {c:c,i:i}; }).filter(function(x){
+      var fin=R.domaineDe(x.c)==='financier';
+      return g[0]==='auto' ? x.c.kind==='auto' : g[0]==='qualfin' ? (x.c.kind!=='auto' && fin) : (x.c.kind!=='auto' && !fin);
+    });
+    if(g[0]==='qualfin' && !lignes.length && fige) return;
     var part=lignes.reduce(function(t,x){ return t+(Number(x.c.weight)||0); },0);
     var grp=add(b2,'div','crit-groupe');
     var gt=add(grp,'div','crit-groupe-titre'); add(gt,'span','crit-groupe-pct',part+' %'); gt.appendChild(document.createTextNode(g[1]));
     lignes.forEach(function(x){ ligneCritere(grp, x.c, x.i, fige); });
-    if(g[0]==='qual' && !fige){
-      var aj=add(grp,'button','btn btn-ghost btn-sm crit-ajout','+ Ajouter un critère'); fk(aj,'crit-ajouter');
+    if(g[0]!=='auto' && !fige){
+      var fin=g[0]==='qualfin';
+      var aj=add(grp,'button','btn btn-ghost btn-sm crit-ajout','+ Ajouter un critère'+(fin?' financier':' technique')); fk(aj,fin?'crit-ajouter-fin':'crit-ajouter');
       aj.addEventListener('click',function(){
-        // Pas d'écriture dans les notes : un critère sans note vaut 70 (curScore), et noter relève de l'évaluateur.
-        state.criteria.push({id:'c'+Date.now(),label:'Nouveau critère',weight:0,kind:'qual',hint:'Notation proposée par IA, validée par un évaluateur'});
+        // Pas d'écriture dans les notes : un critère sans note vaut 70 (curScore), et noter relève des évaluateurs assignés.
+        state.criteria.push({id:'c'+Date.now(),label:'Nouveau critère',weight:0,kind:'qual',domaine:fin?'financier':'technique',hint:'Notation proposée par IA, validée par un évaluateur'});
         logit('Critère ajouté à la grille'); save(); render();
       });
     }

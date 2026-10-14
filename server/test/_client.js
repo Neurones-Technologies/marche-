@@ -59,3 +59,47 @@ async function remplir(cookie, pid) {
   return (await call('GET', `/api/procedures/${pid}/state`, null, cookie)).json.state;
 }
 module.exports.remplir = remplir;
+
+/** Assigne l'évaluateur technique (u2) et l'évaluateur financier (u3) aux offres qui n'ont encore aucune assignation
+    (l'administrateur, qui assigne). Les assignations déjà posées sont gardées. */
+async function assignerEvaluateurs(pid = 'p1') {
+  const admin = await login('administrateur@bal.ci');
+  const s = await getState(admin, pid);
+  for (const o of s.offers) {
+    const a = (s.assignations || {})[o.id];
+    if (a && a.tech.length && a.fin.length) continue;
+    const r = await call('PUT', `/api/procedures/${pid}/assignations/${o.id}`, { tech: ['u2'], fin: ['u3'] }, admin);
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+  }
+}
+module.exports.assignerEvaluateurs = assignerEvaluateurs;
+
+/** Complète l'évaluation d'une procédure comme le font les évaluateurs : assignations manquantes posées, puis chaque
+    évaluateur assigné (u0, u2, u3) déclare l'absence de conflit d'intérêts et saisit les notes qui lui manquent, à la note
+    retenue jusque-là (70 par défaut) : la moyenne retenue ne change donc pas. */
+async function evaluerOffres(pid = 'p1') {
+  await assignerEvaluateurs(pid);
+  const cookies = { u0: await login('administrateur@bal.ci'), u2: await login('f.assamoi@bal.ci'), u3: await login('m.traore@bal.ci') };
+  const s = await getState(cookies.u0, pid);
+  const utiles = new Set();
+  for (const a of Object.values(s.assignations)) for (const u of [...a.tech, ...a.fin]) utiles.add(u);
+  for (const uid of utiles) {
+    const coi = clone((await getState(cookies[uid], pid)).coi);
+    if (coi[uid] && coi[uid].declare) continue;
+    coi[uid] = { declare: true, conflit: false, t: 'test' };
+    assert.equal((await call('PATCH', `/api/procedures/${pid}/state`, { changes: { coi } }, cookies[uid])).status, 200);
+  }
+  for (const c of s.criteria.filter((x) => x.kind === 'qual')) {
+    const dom = c.domaine || 'technique';
+    for (const o of s.offers) {
+      const a = s.assignations[o.id] || { tech: [], fin: [] };
+      for (const uid of (dom === 'financier' ? a.fin : a.tech)) {
+        if (((((s.notesEval[o.id] || {})[c.id]) || {})[uid]) != null) continue;
+        const note = ((s.quality[o.id] || {})[c.id]) ?? 70;
+        const r = await call('PUT', `/api/procedures/${pid}/scores/${o.id}/${c.id}`, { note }, cookies[uid]);
+        assert.equal(r.status, 200, JSON.stringify(r.json));
+      }
+    }
+  }
+}
+module.exports.evaluerOffres = evaluerOffres;

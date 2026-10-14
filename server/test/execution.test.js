@@ -25,6 +25,7 @@ test('préparation : commande émise au titulaire SOTRAP', async () => {
   for (const doc of ['registre', 'fiscal', 'cnps', 'caution']) ok(await upload(doc, doc + '.pdf', PDF, sotrap, pid), 201);
   ok(await call('POST', `/api/procedures/${pid}/offers`, { name: 'SOTRAP Ingénierie SA', iso: 'CI', devise: 'XOF', montant: 10000000, delai: 45, lots: [s0.cdc.lots[0].id] }, sotrap), 201);
   ok(await patch(achats, { depClosed: true }, pid));
+  await require('./_client').evaluerOffres(pid);
   ok(await patch(await login('m.traore@bal.ci'), { evalDone: true }, pid));
   ok(await call('POST', `/api/procedures/${pid}/approbations/0`, {}, approb));
   cmd = (await call('POST', '/api/commandes', { procedure: pid }, achats)).json.commande;

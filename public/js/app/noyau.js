@@ -19,7 +19,10 @@ var PERMS = [
   {id:'depouille.close', lab:"Clôturer le dépouillement",           grp:'Traitement'},
   {id:'conformite.decide',lab:"Écarter ou réintégrer une offre",    grp:'Traitement'},
   {id:'eval.score',      lab:"Noter les offres",                    grp:'Décision'},
+  {id:'eval.technique',  lab:"Noter les critères techniques des offres assignées", grp:'Décision'},
+  {id:'eval.financier',  lab:"Noter les critères financiers des offres assignées", grp:'Décision'},
   {id:'eval.validate',   lab:"Valider l'évaluation",                grp:'Décision'},
+  {id:'eval.assign',     lab:"Assigner les évaluateurs aux offres",  grp:'Décision'},
   {id:'decision.approve',lab:"Approuver l'attribution",             grp:'Décision'},
   {id:'pv.read',         lab:"Consulter le procès-verbal",          grp:'Décision'},
   {id:'audit.read',      lab:"Consulter la piste d'audit",          grp:'Contrôle'},
@@ -53,9 +56,9 @@ function permsDef(list){ var o={}; PERMS.forEach(function(p){ o[p.id]= list.inde
 function ROLES_DEF(){
   return {
     admin:    { lab:'Administrateur fonctionnel', perms:permsDef(PERMS.map(function(p){return p.id;})) },
-    achats:   { lab:'Responsable des achats',     perms:permsDef(['cdc.edit','cdc.publish','criteres.edit','offres.read','depouille.confirm','depouille.open','depouille.close','conformite.decide','pv.read','audit.read','qa.answer','clarif.send','recours.handle']) },
-    evaltech: { lab:'Évaluateur technique',       perms:permsDef(['offres.read','eval.score','pv.read']) },
-    evalfin:  { lab:'Évaluateur financier',       perms:permsDef(['offres.read','depouille.confirm','eval.score','eval.validate','pv.read']) },
+    achats:   { lab:'Responsable des achats',     perms:permsDef(['cdc.edit','cdc.publish','criteres.edit','offres.read','depouille.confirm','depouille.open','depouille.close','conformite.decide','eval.assign','pv.read','audit.read','qa.answer','clarif.send','recours.handle']) },
+    evaltech: { lab:'Évaluateur technique',       perms:permsDef(['offres.read','eval.score','eval.technique','pv.read']) },
+    evalfin:  { lab:'Évaluateur financier',       perms:permsDef(['offres.read','depouille.confirm','eval.score','eval.financier','eval.validate','pv.read']) },
     approb:   { lab:"Membre du comité d'engagement", perms:permsDef(['offres.read','decision.approve','pv.read','audit.read','recours.handle','contract.sign']) },
     audit:    { lab:'Auditeur interne (lecture)', perms:permsDef(['offres.read','pv.read','audit.read']) },
     soum:     { lab:'Soumissionnaire',            perms:permsDef(['portail.use']) },
@@ -105,8 +108,8 @@ var UI = { q:'', sort:'nom' };
 /* Clés partagées avec le serveur ; view / offerIndex / draft restent propres à chaque session. */
 var SYNC_KEYS = ['cdc','criteria','quality','justif','confirmed','excluded','depClosed','evalDone','org','seuils','docDefs','roles','users',
   'notifRules','notifs','emails','qa','additifs','clarifs','coi','recours','standstill','contractSigned','infructueux',
-  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','formulaireReferencement','circuitCommande','evaluationPartenaires','consultes','budget'];
-var SERVER_ONLY = ['delegations','affectations','audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres','courriels','monResultat','reclamations','monOffre','jalons','rappels','marchesPublics'];
+  'mailFrom','mailSuffix','approvals','offers','circuitModele','circuitBesoin','circuitReferencement','formulaireReferencement','circuitCommande','evaluationPartenaires','consultes','budget','criteresTechniques','criteresFinanciers'];
+var SERVER_ONLY = ['delegations','affectations','audit','receipts','fxFrozen','cadre','rejets','monPartenaire','evaluationsOffres','courriels','monResultat','reclamations','monOffre','jalons','rappels','marchesPublics','assignations','notesEval','evalGate'];
 /* Notes, justifications, confirmations et décisions de conformité s'écrivent une par une par les routes ciblées
    (cibler ci-dessous) : elles ne partent jamais dans l'envoi en bloc, et la valeur du serveur fait toujours foi. */
 var TARGETED = ['quality','justif','confirmed','excluded'];
@@ -305,7 +308,8 @@ function xof(n){ return sep(n)+' XOF'; }
 var R = window.MPRegles;
 function RCTX(){
   return { offers:SEED_OFFERS, org:state.org, fxFrozen:state.fxFrozen, cadre:state.cadre, cdc:state.cdc, criteria:state.criteria,
-    quality:state.quality, justif:state.justif, excluded:state.excluded, confirmed:state.confirmed, docDefs:DOCS(), depClosed:state.depClosed, jalons:state.jalons };
+    quality:state.quality, justif:state.justif, excluded:state.excluded, confirmed:state.confirmed, docDefs:DOCS(), depClosed:state.depClosed, jalons:state.jalons,
+    assignations:state.assignations, notesEval:state.notesEval, minEvaluateurs:(state.criteresTechniques||{}).minEvaluateurs };
 }
 /* Référence de la procédure : une donnée du cahier des charges, jamais une valeur écrite dans le code. */
 function REF(){ return (state && state.cdc && state.cdc.ref) || '—'; }
@@ -538,6 +542,7 @@ var VIEWS=[
   {id:'roles',      label:'Rôles', grp:'Administration', perm:'roles.edit', famille:'acces'},
   {id:'suppleances', label:'Suppléances', grp:'Administration', perm:'roles.edit', famille:'acces'},
   {id:'journal',    label:'Audit', grp:'Administration', perm:'audit.read'},
+  {id:'modeles-criteres', label:'Critères d’évaluation', grp:'Administration', perms:['params.edit','criteres.edit']},
   {id:'params',     label:'Paramètres', grp:'Administration', perm:'params.edit'},
   {id:'regles',     label:'Règles', grp:'Administration', perm:'notif.manage', famille:'alertes'},
   {id:'envois',     label:'Journal des envois', grp:'Administration', perm:'notif.manage', famille:'alertes'}
@@ -557,15 +562,21 @@ function lockReason(id){
   return null;
 }
 /* Écrans utilisables sans procédure ouverte : ils ne concernent que l'organisation. */
-var SANS_PROCEDURE = ['accueil','indicateurs','envois','suppleances','params','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
+var SANS_PROCEDURE = ['accueil','indicateurs','envois','suppleances','params','modeles-criteres','procedures','besoins','referencement','partenaires','commandes','comptes','roles','journal','regles'];
 /* Familles d'écrans : une seule entrée de menu, et des onglets en tête de page pour passer de l'un à l'autre. */
 var FAMILLES = { acces:{ lab:'Utilisateurs et accès', icone:'users' }, alertes:{ lab:'Alertes', icone:'ring' } };
 function familleDe(id){ var v=VIEWS.filter(function(x){ return x.id===id; })[0]; return v && v.famille || null; }
 function avecProcedure(){ return !!(state && state.procedure); }
 /* Un écran est visible si l'une de ses habilitations est accordée (perm, ou perms pour plusieurs), et, sans
    procédure ouverte, s'il ne dépend pas d'une procédure. */
+/* Un évaluateur technique « seul » (voir MPRegles.evaluateurRestreint) ne voit que l'évaluation des offres qui lui sont
+   assignées : pas la vue d'ensemble, la réception, le dépouillement, la conformité, les clarifications, la décision, le procès-verbal ni les indicateurs
+   (les montants des offres ne lui sont d'ailleurs pas transmis). */
+var MASQUE_EVALUATEUR = ['indicateurs','dashboard','qa','reception','depouille','conformite','clarifs','decision','recours','pv','audit','journal'];
+function evaluateurRestreint(){ return !!state && R.evaluateurRestreint(can); }
 function vueVisible(v){
   if(!avecProcedure() && SANS_PROCEDURE.indexOf(v.id)<0) return false;
+  if(evaluateurRestreint() && MASQUE_EVALUATEUR.indexOf(v.id)>=0) return false;
   if(v.perms) return v.perms.some(can);
   return !v.perm || can(v.perm);
 }

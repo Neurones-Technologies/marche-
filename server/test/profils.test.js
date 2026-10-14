@@ -1,6 +1,6 @@
 /* Profils réglementaires : règles imposées en marché public, paramétrables en achats privés, cadre figé à la
    publication. Les tests s'enchaînent : chacun part de l'état laissé par le précédent. */
-const { login, getState, patch, clone } = require('./_client');
+const { call, login, getState, patch, clone } = require('./_client');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const P = require('../../public/js/profils.js');
@@ -83,8 +83,10 @@ test('achats privés, sans séparation des fonctions ni délai : une même perso
   ok(await patch(admin, { confirmed, depClosed: true }));
   ok(await patch(admin, { coi: { ...s.coi, u0: { declare: true, conflit: false, t: 'test' } } }));
   s = await getState(admin);
-  const q = clone(s.quality); q.sotrap.metho = 60;
-  ok(await patch(admin, { quality: q, justif: { sotrap_metho: 'Planning de bascule absent.' } }));
+  // il est aussi l'évaluateur technique et financier de chaque offre : sans séparation des fonctions, rien ne l'en empêche
+  for (const o of s.offers) ok(await call('PUT', `/api/procedures/p1/assignations/${o.id}`, { tech: ['u0'], fin: ['u0'] }, admin));
+  ok(await call('PUT', '/api/procedures/p1/scores/sotrap/metho', { note: 60, justification: 'Planning de bascule absent.' }, admin));
+  await require('./_client').evaluerOffres();
   ok(await patch(admin, { evalDone: true }));
   s = await getState(admin);
   const ap = clone(s.approvals); ap[0].done = true;

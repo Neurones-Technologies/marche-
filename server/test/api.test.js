@@ -77,7 +77,9 @@ test('publication du CDC puis dépôt d’offre avec accusé et audit', async ()
 test('notation : déclaration de conflit d’intérêts obligatoire, une seule fois par personne', async () => {
   const ev = await login('f.assamoi@bal.ci');
   const st = (await call('GET', '/api/procedures/p1/state', null, ev)).json;
-  const q = JSON.parse(JSON.stringify(st.state.quality)); const id = Object.keys(q)[0]; q[id].metho = 55;
+  // l'évaluateur technique ne voit pas la note retenue : on part de celle qu'affiche l'administrateur
+  const adm = await login('administrateur@bal.ci');
+  const q = JSON.parse(JSON.stringify((await call('GET', '/api/procedures/p1/state', null, adm)).json.state.quality)); const id = Object.keys(q)[0]; q[id].metho = 55;
   let r = await call('PATCH', '/api/procedures/p1/state', { changes: { quality: q } }, ev);
   assert.equal(r.status, 403);
   // impossible de déclarer pour autrui

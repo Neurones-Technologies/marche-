@@ -16,7 +16,10 @@ const WRITE_PERMS = {
   criteria: ['criteres.edit'],
   confirmed: ['depouille.confirm'],
   excluded: ['conformite.decide'],
-  quality: ['eval.score'],
+  quality: ['eval.score'], // moyenne des notes des évaluateurs : jamais écrite seule (voir notesEval)
+  notesEval: ['eval.score'],
+  assignations: ['eval.assign'],
+  criteresTechniques: ['params.edit'], criteresFinanciers: ['params.edit', 'criteres.edit'],
   justif: ['eval.score', 'eval.validate', 'decision.approve', 'conformite.decide'],
   depClosed: ['depouille.close'],
   evalDone: ['eval.validate', 'recours.handle'],
@@ -60,6 +63,7 @@ function ctxOf(get) {
   return {
     offers: ST.offers(), org: get('org'), fxFrozen: stored('fxFrozen'), cadre: stored('cadre'), cdc: get('cdc'), criteria: get('criteria'),
     quality: get('quality'), justif: get('justif'), excluded: get('excluded'), confirmed: get('confirmed'), docDefs: get('docDefs'),
+    assignations: get('assignations'), notesEval: get('notesEval'), minEvaluateurs: (get('criteresTechniques') || {}).minEvaluateurs,
   };
 }
 
@@ -82,6 +86,16 @@ function hasNewRejection(changes) {
 }
 /** Retour en arrière autorisé : recours déclaré fondé, ou rejet de l'attribution par un niveau du circuit. */
 const retourAutorise = (changes) => hasFoundedAppeal(changes) || hasNewRejection(changes);
+
+/** Nom d'un compte, pour les messages. */
+const nomCompte = (id) => ((db.prepare('SELECT nom FROM users WHERE id=?').get(id)) || { nom: id }).nom;
+/** Un compte actif détient-il l'habilitation (d'après son rôle) ? */
+function comptePeut(id, perm) {
+  const u = db.prepare('SELECT role FROM users WHERE id=? AND active=1').get(id);
+  return !!(u && ((stored('roles') || {})[u.role] || { perms: {} }).perms[perm]);
+}
+const PERM_DOMAINE = { technique: 'eval.technique', financier: 'eval.financier' };
+const sansDoublon = (l) => new Set(l).size === l.length;
 
 /** Valide un changement de clé de la procédure req.store. Retourne null si OK ; sinon un message (403) ou { status, code, error }. */
 function validateChange(key, value, req, changes = { [key]: value }) {
@@ -137,6 +151,8 @@ function validateChange(key, value, req, changes = { [key]: value }) {
     case 'criteria': {
       if (!Array.isArray(value)) return 'Grille invalide.';
       if (value.some((c) => !c || !c.id || !(Number(c.weight) >= 0))) return 'Critère invalide.';
+      if (value.some((c) => c.domaine != null && !['technique', 'financier'].includes(c.domaine))) return refus(422, 'CRITERIA_INVALID', 'Domaine de critère inconnu (technique ou financier).');
+      if (value.some((c) => c.kind === 'auto' && c.domaine != null && c.domaine !== 'financier')) return refus(422, 'CRITERIA_INVALID', 'Un critère calculé est un critère financier.');
       // la grille fait partie du dossier publié : opposable aux candidats, elle ne change plus (ni critère retiré, ni poids modifié)
       if ((stored('cdc') || {}).cdcPublie && !same(value, cur))
         return refus(409, 'CRITERIA_LOCKED', 'Le dossier est publié : la grille de critères est opposable aux candidats et ne peut plus être modifiée.');
@@ -168,6 +184,96 @@ function validateChange(key, value, req, changes = { [key]: value }) {
         return refus(409, 'EVALUATION_VALIDATED', 'L’évaluation est validée : les notes ne peuvent plus être modifiées.');
       if (cadreOf(next).separationFonctions && sod().approvers.includes(uid))
         return refus(403, 'SEPARATION_OF_DUTIES', 'Vous avez approuvé l’attribution de cette procédure : vous ne pouvez pas en noter les offres.');
+      // la note retenue d'un critère est la moyenne des notes des évaluateurs assignés : elle ne s'écrit qu'avec elles
+      {
+        const ctx = ctxOf(next), crits = next('criteria') || [];
+        for (const [offre, notes] of Object.entries(value)) for (const [crit, v] of Object.entries(notes || {})) {
+          const c = crits.find((x) => x.id === crit), m = c ? R.moyenneNotes(ctx, { id: offre }, c) : null;
+          const attendu = m != null ? m : ((cur || {})[offre] || {})[crit];
+          if (Number(v) !== Number(attendu))
+            return refus(409, 'NOTES_PER_EVALUATOR', 'La note retenue d’un critère est la moyenne des notes des évaluateurs assignés : chacun saisit la sienne.');
+        }
+      }
+      break;
+    }
+    case 'notesEval': {
+      if (!isObj(value)) return 'Notes invalides.';
+      const coi = (stored('coi') || {})[uid];
+      if (!coi || !coi.declare || coi.conflit) return 'Déclaration d’absence de conflit d’intérêts requise avant de noter.';
+      const avant = cur || {}, diffs = [];
+      for (const offre of new Set([...Object.keys(avant), ...Object.keys(value)])) {
+        const a = avant[offre] || {}, b = value[offre] || {};
+        if (!isObj(a) || !isObj(b)) return 'Notes invalides.';
+        for (const crit of new Set([...Object.keys(a), ...Object.keys(b)])) {
+          const x = a[crit] || {}, y = b[crit] || {};
+          if (!isObj(x) || !isObj(y)) return 'Notes invalides.';
+          for (const u of new Set([...Object.keys(x), ...Object.keys(y)])) if (x[u] !== y[u]) diffs.push({ offre, crit, u, v: y[u] });
+        }
+      }
+      if (!diffs.length) break;
+      if (!stored('depClosed'))
+        return refus(409, 'GATE_DEPOUILLEMENT_NOT_CLOSED', 'L’évaluation est fermée tant que le dépouillement n’est pas clôturé.');
+      if (stored('evalDone'))
+        return refus(409, 'EVALUATION_VALIDATED', 'L’évaluation est validée : les notes ne peuvent plus être modifiées.');
+      {
+        const manque = R.assignationManquante(ctxOf(next));
+        if (manque.length) return refus(409, 'GATE_EVALUATORS_NOT_ASSIGNED', 'L’évaluation est fermée tant que les évaluateurs ne sont pas assignés à chaque offre conforme : ' + manque.join(' ; ') + '.');
+      }
+      const offres = new Set(ST.offers().map((o) => o.id)), crits = next('criteria') || [], ctxA = { assignations: next('assignations') };
+      for (const d of diffs) {
+        if (d.u !== uid) return refus(403, 'NOTE_NOT_YOURS', 'Chacun ne saisit que ses propres notes.');
+        if (d.v === undefined) return refus(409, 'NOTE_LOCKED', 'Une note saisie ne se retire pas : corrigez-la.');
+        const c = crits.find((x) => x.id === d.crit);
+        if (!offres.has(d.offre) || !c || c.kind !== 'qual') return refus(422, 'NOTE_TARGET_UNKNOWN', 'Offre ou critère noté inconnu.');
+        const dom = R.domaineDe(c);
+        if (!req.can(PERM_DOMAINE[dom])) return refus(403, 'DOMAIN_FORBIDDEN', 'Vous n’êtes pas habilité à noter les critères ' + (dom === 'financier' ? 'financiers' : 'techniques') + '.');
+        if (!R.assignes(ctxA, { id: d.offre }, dom).includes(uid)) return refus(403, 'NOT_ASSIGNED', 'Cette offre ne vous est pas assignée pour les critères ' + (dom === 'financier' ? 'financiers' : 'techniques') + '.');
+        if (!(typeof d.v === 'number' && d.v >= 0 && d.v <= 100)) return 'Une note doit être comprise entre 0 et 100.';
+      }
+      if (cadreOf(next).separationFonctions && sod().approvers.includes(uid))
+        return refus(403, 'SEPARATION_OF_DUTIES', 'Vous avez approuvé l’attribution de cette procédure : vous ne pouvez pas en noter les offres.');
+      break;
+    }
+    case 'assignations': {
+      if (!isObj(value)) return 'Assignations invalides.';
+      const avant = cur || {}, offres = new Set(ST.offers().map((o) => o.id)), notes = stored('notesEval') || {};
+      if (stored('evalDone') && !same(value, avant)) return refus(409, 'EVALUATION_VALIDATED', 'L’évaluation est validée : les évaluateurs ne peuvent plus être changés.');
+      for (const id of new Set([...Object.keys(avant), ...Object.keys(value)])) {
+        const a = value[id] || { tech: [], fin: [] };
+        if (!offres.has(id) || !isObj(a)) return refus(422, 'ASSIGNMENT_INVALID', 'Offre inconnue ou assignation invalide.');
+        for (const [champ, dom] of [['tech', 'technique'], ['fin', 'financier']]) {
+          const l = a[champ] == null ? [] : a[champ];
+          if (!Array.isArray(l) || l.length > 10 || l.some((u) => typeof u !== 'string') || !sansDoublon(l))
+            return refus(422, 'ASSIGNMENT_INVALID', 'Au plus dix évaluateurs, sans doublon, par offre et par domaine.');
+          for (const u of l) if (!comptePeut(u, PERM_DOMAINE[dom]))
+            return refus(422, 'ASSIGNMENT_PERMISSION', nomCompte(u) + ' n’a pas l’habilitation de noter les critères ' + (dom === 'financier' ? 'financiers' : 'techniques') + '.');
+          // un évaluateur qui a déjà noté cette offre ne peut plus être retiré (sa note compte dans la moyenne)
+          for (const u of ((avant[id] || {})[champ] || [])) if (!l.includes(u) && Object.values(notes[id] || {}).some((n) => n && n[u] != null))
+            return refus(409, 'EVALUATOR_HAS_NOTES', nomCompte(u) + ' a déjà noté cette offre : il ne peut plus être retiré.');
+        }
+        if (value[id]) value[id] = { tech: a.tech || [], fin: a.fin || [] };
+      }
+      break;
+    }
+    case 'criteresTechniques':
+    case 'criteresFinanciers': {
+      const tech = key === 'criteresTechniques', autre = (stored(tech ? 'criteresFinanciers' : 'criteresTechniques') || {}).criteres || [];
+      if (!isObj(value) || !Array.isArray(value.criteres) || value.criteres.length > 20)
+        return refus(422, 'CRITERIA_TEMPLATE_INVALID', 'Modèle de critères invalide (20 critères au plus).');
+      if (tech && !(Number.isInteger(Number(value.minEvaluateurs)) && Number(value.minEvaluateurs) >= 1 && Number(value.minEvaluateurs) <= 10))
+        return refus(422, 'CRITERIA_TEMPLATE_INVALID', 'Le nombre minimal d’évaluateurs techniques par offre est compris entre 1 et 10.');
+      const vus = new Set(autre.map((c) => c.id));
+      value.criteres = value.criteres.map((c) => {
+        if (!isObj(c) || typeof c.id !== 'string' || !/^[a-z][\w-]{0,39}$/.test(c.id) || vus.has(c.id)) return null;
+        vus.add(c.id);
+        const calcule = !tech && (c.id === 'prix' || c.id === 'delai');
+        if (!calcule && (c.id === 'prix' || c.id === 'delai')) return null;
+        const label = typeof c.label === 'string' ? c.label.trim() : '', poids = Number(c.weight);
+        if (!label || label.length > 120 || !(poids >= 0 && poids <= 100)) return null;
+        return { id: c.id, label, weight: poids, kind: calcule ? 'auto' : 'qual', domaine: tech ? 'technique' : 'financier', hint: typeof c.hint === 'string' ? c.hint.slice(0, 300) : '' };
+      });
+      if (value.criteres.some((c) => !c)) return refus(422, 'CRITERIA_TEMPLATE_INVALID', 'Chaque critère a un identifiant unique, un libellé (120 caractères au plus) et un poids de 0 à 100 ; « prix » et « delai » sont réservés aux critères financiers calculés.');
+      if (tech) value.minEvaluateurs = Number(value.minEvaluateurs);
       break;
     }
     case 'justif':
@@ -201,6 +307,12 @@ function validateChange(key, value, req, changes = { [key]: value }) {
       const ctx = ctxOf(next);
       const wt = R.weightTotal(ctx);
       if (wt !== 100) return refus(422, 'GRID_INVALID', `Le total des pondérations est de ${wt} % : la grille doit totaliser 100 %.`);
+      {
+        const manque = R.assignationManquante(ctx);
+        if (manque.length) return refus(409, 'GATE_EVALUATORS_NOT_ASSIGNED', 'Des évaluateurs restent à assigner : ' + manque.join(' ; ') + '.');
+        const reste = R.notationManquante(ctx);
+        if (reste.length) return refus(409, 'EVALUATION_INCOMPLETE', `${reste.length} note(s) restent à saisir par les évaluateurs assignés, par exemple : ${reste.slice(0, 3).map((x) => `${nomCompte(x.uid)} — ${x.o.name} / ${x.c.label}`).join(' ; ')}.`);
+      }
       const miss = R.missingJustifs(ctx);
       if (miss.length) return refus(422, 'JUSTIFICATION_REQUIRED', `Justification écrite obligatoire pour tout écart avec le score proposé : ${miss.join(', ')}.`);
       if (cadreOf(next).separationFonctions && sod().approvers.includes(uid))
@@ -492,7 +604,7 @@ function effectsOf(changes, req) {
   const s = sod(), before = JSON.stringify(s), kv = {}, audit = [];
   const add = (list) => { if (!list.includes(uid)) list.push(uid); };
 
-  if ('quality' in changes && !same(changes.quality, stored('quality'))) add(s.scorers);
+  if (('quality' in changes && !same(changes.quality, stored('quality'))) || ('notesEval' in changes && !same(changes.notesEval, stored('notesEval')))) add(s.scorers);
   if (changes.evalDone === true && !stored('evalDone')) {
     add(s.validators);
     const rows = R.ranking({ ...ctxOf(next), fxFrozen: stored('fxFrozen') });

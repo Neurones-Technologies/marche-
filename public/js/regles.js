@@ -106,6 +106,56 @@
     return rows;
   }
 
+  /* ---- Évaluateurs : domaine des critères, assignation aux offres, moyenne des notes ----
+     Un critère relève du domaine « technique » ou « financier » (champ domaine ; à défaut, un critère calculé est
+     financier et un critère noté est technique). Chaque offre est assignée à un ou plusieurs évaluateurs techniques
+     et financiers (ctx.assignations : { offre: { tech: [compte], fin: [compte] } }) ; leurs notes (ctx.notesEval :
+     { offre: { critère: { compte: note } } }) sont moyennées, la moyenne étant la note retenue (ctx.quality). */
+  function domaineDe(c) { return (c && c.domaine) || (c && c.kind === 'auto' ? 'financier' : 'technique'); }
+  /* Évaluateur technique « seul » : ni assignation, ni validation, ni notation financière. Il ne voit que les offres
+     qui lui sont assignées, et leurs critères techniques. `can` : fonction d'habilitation. */
+  function evaluateurRestreint(can) { return !!can('eval.technique') && !can('eval.assign') && !can('eval.validate') && !can('eval.financier'); }
+  function assignes(ctx, o, domaine) {
+    var a = (ctx.assignations || {})[o.id] || {};
+    return (domaine === 'financier' ? a.fin : a.tech) || [];
+  }
+  function minEvaluateurs(ctx) { var n = Math.floor(Number(ctx.minEvaluateurs)); return n >= 1 ? n : 1; }
+  function critNotes(ctx, domaine) {
+    return (ctx.criteria || []).filter(function (c) { return c.kind === 'qual' && domaineDe(c) === domaine; });
+  }
+  /* Offres conformes dont les évaluateurs ne sont pas tous assignés : libellés, vide quand l'évaluation peut s'ouvrir.
+     Le nombre d'évaluateurs techniques exigé est un réglage de l'organisation (ctx.minEvaluateurs, 1 au moins) ; un
+     évaluateur financier est toujours exigé. Sans critère technique à noter, aucun évaluateur technique n'est exigé. */
+  function assignationManquante(ctx) {
+    var min = minEvaluateurs(ctx), tech = critNotes(ctx, 'technique').length > 0, out = [];
+    conformes(ctx).forEach(function (o) {
+      var m = [], nt = assignes(ctx, o, 'technique').length;
+      if (tech && nt < min) m.push(min === 1 ? 'évaluateur technique' : (min - nt) + ' évaluateur(s) technique(s) de plus (' + min + ' exigés)');
+      if (!assignes(ctx, o, 'financier').length) m.push('évaluateur financier');
+      if (m.length) out.push(o.name + ' : ' + m.join(', '));
+    });
+    return out;
+  }
+  /* Notes qui restent à saisir : un élément { o, c, uid } par offre conforme, critère noté et évaluateur assigné sans note. */
+  function notationManquante(ctx) {
+    var out = [], ne = ctx.notesEval || {};
+    conformes(ctx).forEach(function (o) {
+      (ctx.criteria || []).filter(function (c) { return c.kind === 'qual'; }).forEach(function (c) {
+        assignes(ctx, o, domaineDe(c)).forEach(function (uid) {
+          var v = ((ne[o.id] || {})[c.id] || {})[uid];
+          if (v == null) out.push({ o: o, c: c, uid: uid });
+        });
+      });
+    });
+    return out;
+  }
+  /* Moyenne des notes des évaluateurs assignés qui ont noté ce critère (une décimale) ; null si personne n'a noté. */
+  function moyenneNotes(ctx, o, c) {
+    var notes = ((ctx.notesEval || {})[o.id] || {})[c.id] || {}, v = [];
+    assignes(ctx, o, domaineDe(c)).forEach(function (uid) { if (notes[uid] != null) v.push(Number(notes[uid])); });
+    return v.length ? Math.round(v.reduce(function (s, x) { return s + x; }, 0) / v.length * 10) / 10 : null;
+  }
+
   /* Écarts entre score IA et score retenu qui n'ont pas de justification écrite. */
   function missingJustifs(ctx) {
     var out = [], j = ctx.justif || {};
@@ -215,6 +265,8 @@
     rates: rates, rate: rate, isUemoa: isUemoa, isLocal: isLocal, montantXOF: montantXOF, montantCorrige: montantCorrige,
     requiredDocs: requiredDocs, missingDocs: missingDocs, isExcluded: isExcluded, conformes: conformes,
     aiScore: aiScore, curScore: curScore, flagsRemaining: flagsRemaining, weightTotal: weightTotal,
+    domaineDe: domaineDe, evaluateurRestreint: evaluateurRestreint, assignes: assignes, minEvaluateurs: minEvaluateurs, critNotes: critNotes,
+    assignationManquante: assignationManquante, notationManquante: notationManquante, moyenneNotes: moyenneNotes,
     ranking: ranking, missingJustifs: missingJustifs, allApproved: allApproved, montantAttribution: montantAttribution, standstillRemaining: standstillRemaining,
   };
 });

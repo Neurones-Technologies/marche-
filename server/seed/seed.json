@@ -68,8 +68,23 @@
    "grp": "Décision"
   },
   {
+   "id": "eval.technique",
+   "lab": "Noter les critères techniques des offres assignées",
+   "grp": "Décision"
+  },
+  {
+   "id": "eval.financier",
+   "lab": "Noter les critères financiers des offres assignées",
+   "grp": "Décision"
+  },
+  {
    "id": "eval.validate",
    "lab": "Valider l'évaluation",
+   "grp": "Décision"
+  },
+  {
+   "id": "eval.assign",
+   "lab": "Assigner les évaluateurs aux offres",
    "grp": "Décision"
   },
   {
@@ -200,7 +215,10 @@
     "partenaires.manage": true,
     "commande.manage": true,
     "commande.approve": true,
-    "depouille.open": true
+    "depouille.open": true,
+    "eval.technique": true,
+    "eval.financier": true,
+    "eval.assign": true
    }
   },
   "achats": {
@@ -232,7 +250,10 @@
     "partenaires.manage": true,
     "commande.manage": true,
     "commande.approve": false,
-    "depouille.open": true
+    "depouille.open": true,
+    "eval.technique": false,
+    "eval.financier": false,
+    "eval.assign": true
    }
   },
   "evaltech": {
@@ -264,7 +285,10 @@
     "partenaires.manage": false,
     "commande.manage": false,
     "commande.approve": false,
-    "depouille.open": false
+    "depouille.open": false,
+    "eval.technique": true,
+    "eval.financier": false,
+    "eval.assign": false
    }
   },
   "evalfin": {
@@ -296,7 +320,10 @@
     "partenaires.manage": false,
     "commande.manage": false,
     "commande.approve": false,
-    "depouille.open": false
+    "depouille.open": false,
+    "eval.technique": false,
+    "eval.financier": true,
+    "eval.assign": false
    }
   },
   "approb": {
@@ -328,7 +355,10 @@
     "partenaires.manage": false,
     "commande.manage": false,
     "commande.approve": true,
-    "depouille.open": false
+    "depouille.open": false,
+    "eval.technique": false,
+    "eval.financier": false,
+    "eval.assign": false
    }
   },
   "audit": {
@@ -360,7 +390,10 @@
     "partenaires.manage": false,
     "commande.manage": false,
     "commande.approve": false,
-    "depouille.open": false
+    "depouille.open": false,
+    "eval.technique": false,
+    "eval.financier": false,
+    "eval.assign": false
    }
   },
   "soum": {
@@ -392,7 +425,10 @@
     "partenaires.manage": false,
     "commande.manage": false,
     "commande.approve": false,
-    "depouille.open": false
+    "depouille.open": false,
+    "eval.technique": false,
+    "eval.financier": false,
+    "eval.assign": false
    }
   },
   "demandeur": {
@@ -424,7 +460,10 @@
     "partenaires.manage": false,
     "commande.manage": false,
     "commande.approve": false,
-    "depouille.open": false
+    "depouille.open": false,
+    "eval.technique": false,
+    "eval.financier": false,
+    "eval.assign": false
    }
   }
  },
@@ -1532,28 +1571,32 @@
    "label": "Prix",
    "weight": 40,
    "kind": "auto",
-   "hint": "Note = (offre corrigée la moins-disante ÷ offre corrigée) × 100"
+   "hint": "Note = (offre corrigée la moins-disante ÷ offre corrigée) × 100",
+   "domaine": "financier"
   },
   {
    "id": "delai",
    "label": "Délai d'exécution",
    "weight": 15,
    "kind": "auto",
-   "hint": "Note = (délai le plus court ÷ délai) × 100"
+   "hint": "Note = (délai le plus court ÷ délai) × 100",
+   "domaine": "financier"
   },
   {
    "id": "metho",
    "label": "Méthodologie",
    "weight": 30,
    "kind": "qual",
-   "hint": "Notation proposée par IA, validée par un évaluateur"
+   "hint": "Notation proposée par IA, validée par un évaluateur",
+   "domaine": "technique"
   },
   {
    "id": "refs",
    "label": "Références",
    "weight": 15,
    "kind": "qual",
-   "hint": "Notation proposée par IA, validée par un évaluateur"
+   "hint": "Notation proposée par IA, validée par un évaluateur",
+   "domaine": "technique"
   }
  ],
  "APPROVALS": [

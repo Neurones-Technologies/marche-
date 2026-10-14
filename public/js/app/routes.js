@@ -8,7 +8,7 @@
 
 var ROUTES_VUES = { accueil:'tableau-de-bord', besoins:'demandes-achat', procedures:'appels-offres', commandes:'execution',
   partenaires:'partenaires', indicateurs:'indicateurs', referencement:'mon-referencement', comptes:'utilisateurs', roles:'utilisateurs/roles',
-  suppleances:'utilisateurs/suppleances', journal:'audit', params:'parametres', regles:'alertes', envois:'alertes/envois' };
+  suppleances:'utilisateurs/suppleances', journal:'audit', params:'parametres', 'modeles-criteres':'criteres-evaluation', regles:'alertes', envois:'alertes/envois' };
 var ROUTES_PROCEDURE = { dashboard:'vue-ensemble', cdc:'cahier-des-charges', prestataires:'prestataires', criteres:'criteres', qa:'questions',
   reception:'reception', depouille:'depouillement', conformite:'conformite', clarifs:'clarifications', evaluation:'evaluation',
   decision:'decision', recours:'cloture', pv:'proces-verbal', audit:'journal', portail:'preparation', echanges:'echanges', soumission:'soumission' };
