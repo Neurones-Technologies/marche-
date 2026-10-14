@@ -19,9 +19,6 @@ function vModelesCriteres(m){
   add(l,'h1',null,'Critères d’évaluation');
   var t=modeleCriteres('technique'), f=modeleCriteres('financier'), total=totalModele(t)+totalModele(f);
 
-  var intro=add(m,'div','note'); intro.style.marginTop='0'; intro.style.marginBottom='18px';
-  add(intro,'strong',null,'Modèles de l’organisation. ');
-  intro.appendChild(document.createTextNode('Chaque nouvel appel d’offres reçoit ces critères comme grille de départ ; l’acheteur peut l’ajuster avant la publication du dossier, puis elle est figée. Les critères techniques sont notés par les évaluateurs techniques assignés à l’offre (leur moyenne fait la note), les critères financiers calculés par la formule du règlement, les autres par l’évaluateur financier assigné.'));
   var tot=add(m,'div','chip '+(total===100?'c-green':'c-red'), total===100 ? 'Total des deux modèles : 100 % ✓' : 'Total des deux modèles : '+total+' % — il doit faire 100 % pour publier un dossier');
   tot.style.marginBottom='14px';
 

@@ -1,6 +1,6 @@
 # Marché+
 
-Plateforme de gestion des appels d'offres d'une organisation (démonstration : AO-2026-014, Banque Atlantique du Littoral) :
+Plateforme de gestion des appels d'offres d'une organisation (démonstration : AO-2026-014, Neurones Technologies) :
 cahier des charges, dossier d'appel d'offres, dépôt dématérialisé, dépouillement, conformité, évaluation,
 décision, procès-verbal, recours, rôles et piste d'audit.
 

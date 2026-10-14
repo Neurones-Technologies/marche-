@@ -452,7 +452,7 @@ function commandeNumero(prefixe) {
 /* ---- jeu de données initial ---- */
 function defaultOrgKv() {
   return {
-    org: { nom: 'Banque Atlantique du Littoral', pays: 'Côte d’Ivoire', ville: 'Abidjan', devisePivot: 'XOF', accent: '#1F6F6B', initiales: 'BAL',
+    org: { nom: 'Neurones Technologies', pays: 'Côte d’Ivoire', ville: 'Abidjan', devisePivot: 'XOF', accent: '#1F6F6B', initiales: 'NT',
       rates: clone(seed.RATES_DEF), profilDefaut: cfg.marchesPublics ? 'uemoa-ci' : 'prive', reglages: {}, inscriptionOuverte: true, prefixeCommande: 'BC' },
     seuils: { confianceMin: 75, prixBas: 25, structureEcart: 0.8, refsMin: 3, validiteMin: 90, ecartIaMax: 0 },
     docDefs: clone(seed.DOC_DEFS), roles: clone(seed.ROLES), notifRules: clone(seed.NOTIF_RULES),
