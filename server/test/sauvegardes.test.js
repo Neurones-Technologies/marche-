@@ -18,6 +18,7 @@ const S = require('../sauvegardes');
 
 test('sauvegarde vérifiée, pièces incrémentales, rotation', async () => {
   fs.mkdirSync(cfg.filesDir, { recursive: true });
+  const n0 = fs.readdirSync(cfg.filesDir).length; // les offres de démonstration ont déjà leurs pièces
   fs.writeFileSync(path.join(cfg.filesDir, 'piece-1'), 'pdf');
   const m1 = await S.sauvegarder('test');
   assert.equal(m1.statut, 'ok');
@@ -27,14 +28,14 @@ test('sauvegarde vérifiée, pièces incrémentales, rotation', async () => {
   assert.equal(crypto.createHash('sha256').update(fs.readFileSync(copie)).digest('hex'), base.sha256);
   assert.ok(m1.bases.some((b) => b.fichier === 'plateforme.db'));
   assert.deepEqual(fs.readdirSync(path.join(S.dossier(), m1.nom)).sort(), ['demo.db', 'manifeste.json', 'plateforme.db']); // fichiers autonomes, sans -wal ni -shm
-  assert.deepEqual(m1.fichiers.demo, { total: 1, copies: 1 });
+  assert.deepEqual(m1.fichiers.demo, { total: n0 + 1, copies: n0 + 1 });
   // la copie se relit : c'est une base complète
   const v = new Database(copie, { readonly: true });
   assert.ok(JSON.parse(v.prepare("SELECT value FROM kv WHERE key='org'").get().value).nom);
   v.close();
   fs.writeFileSync(path.join(cfg.filesDir, 'piece-2'), 'pdf');
   const m2 = await S.sauvegarder('test');
-  assert.deepEqual(m2.fichiers.demo, { total: 2, copies: 1 }); // la pièce déjà copiée ne l'est pas deux fois
+  assert.deepEqual(m2.fichiers.demo, { total: n0 + 2, copies: 1 }); // la pièce déjà copiée ne l'est pas deux fois
   await S.sauvegarder('test');
   const e = S.etat();
   assert.equal(e.sauvegardes.length, 2); // rotation : deux conservées
