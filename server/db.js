@@ -10,6 +10,7 @@ const seed = require('./seed/seed.json');
 const CCTP_EXEMPLE = require('./seed/cctp-exemple.json');
 const R = require('../public/js/regles.js');
 const P = require('../public/js/profils.js');
+const OF = require('./offres-fictives');
 const C = require('../public/js/circuits.js');
 
 /* ---- bases de données ----
@@ -509,7 +510,7 @@ function seedAll(withUsers = true, options = null) {
       // démonstration : chaque offre est déjà assignée à l'évaluateur technique (u2) et à l'évaluateur financier (u3)
       if (cfg.seedComptesTous) seed.OFFERS.forEach((o) => { demo.assignations[o.id] = { tech: ['u2'], fin: ['u3'] }; });
       procedureInsert('p1', demo, 'seed');
-      seed.OFFERS.forEach((o) => offerInsert(o, false, 'p1'));
+      seed.OFFERS.forEach((o) => offerInsert(OF.joindre(db, clone(o), demo.cdc, 'p1', org.org.nom), false, 'p1'));
     }
     if (withUsers) {
       db.exec('DELETE FROM users');
@@ -782,7 +783,7 @@ function executionFictive(uid, who) {
   });
   procedureInsert(pid, v, uid);
   db.prepare('UPDATE procedures SET created_at=? WHERE id=?').run(il(55).toISOString().replace('T', ' ').slice(0, 19), pid);
-  offres.forEach((o) => offerInsert(o, false, pid));
+  offres.forEach((o) => offerInsert(OF.joindre(db, o, cdc, pid, org.nom), false, pid));
   const ctx = { offers: offres, org, fxFrozen: v.fxFrozen, cadre: v.cadre, cdc, criteria: v.criteria, quality: v.quality, justif: {}, excluded: {}, confirmed: {}, docDefs: v.docDefs };
   const rang = R.ranking(ctx);
   if (!rang.length) throw new Error('Appel d’offres fictif : aucune offre classée.');
@@ -914,7 +915,7 @@ function ajouterFictives(uid, who, zones) {
       const offres = seed.OFFERS.map((o) => ({ ...clone(o), id: pris.has(o.id) ? o.id + '-' + pid : o.id }));
       offres.forEach((o) => { v.quality[o.id] = { metho: o.aiMetho, refs: o.aiRefs }; });
       procedureInsert(pid, v, uid);
-      offres.forEach((o) => offerInsert(o, false, pid));
+      offres.forEach((o) => offerInsert(OF.joindre(db, o, v.cdc, pid, ((kvGet('org') || { value: {} }).value || {}).nom), false, pid));
       // achats privés : les partenaires fictifs qui ont une offre sont consultés
       const noms = new Set(offres.map((o) => o.name.toLowerCase()));
       const consultes = partenairesAll().filter((p) => p.statut === 'reference' && noms.has(String(p.raisonSociale).toLowerCase())).map((p) => p.id);
